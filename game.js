@@ -171,7 +171,9 @@
       const s = localStorage.getItem(SAVE_KEY);
       if (!s) return null;
       const o = JSON.parse(s);
-      return o && o.v === 1 && Array.isArray(o.jinxes) ? o : null;
+      if (!(o && o.v === 1 && Array.isArray(o.jinxes))) return null;
+      for (const j of o.jinxes) if (j.stage !== "egg" && !JG.TRAITS[j.trait]) j.trait = pick(Object.keys(JG.TRAITS));
+      return o;
     } catch (e) { return null; }
   }
 
@@ -190,7 +192,8 @@
     return {
       id: uid++ + "-" + Date.now().toString(36), name: o.name || pick(JG.NAMES), stage: "child",
       hue: o.hue !== undefined ? o.hue : (rand() * 360) | 0, seed: rand() * 10, align: o.align || 0,
-      stats: o.stats || blankStats(1, 3), belly: 70, mood: 70, love: 10, age: 0, gen: o.gen || 1, u, v
+      stats: o.stats || blankStats(1, 3), belly: 70, mood: 70, love: 10, age: 0, gen: o.gen || 1, u, v,
+      trait: o.trait || pick(Object.keys(JG.TRAITS))
     };
   }
   function makeEgg(o) {
@@ -320,6 +323,7 @@
       : `<h2>${esc(j.name)}</h2>`;
     p.innerHTML = `<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">×</button></div>
       <p class="tag">${formName(j)} · show ${j.age} of 12${j.gen > 1 ? " · generation " + j.gen : ""}</p>
+      ${ringHtml(j)}
       <div class="needs">
         <div><span>Belly</span>${bar(j.belly, 100, "#ffb36b")}</div>
         <div><span>Mood</span>${bar(j.mood, 100, "#ff5fa8")}</div>
@@ -340,6 +344,14 @@
       box.select();
       box.addEventListener("keydown", (e) => { if (e.key === "Enter") finishRename(); });
     }
+  }
+  function ringHtml(j) {
+    const T = JG.TRAITS[j.trait], F = JG.FORMS[leanForm(j)];
+    const imp = j.love >= 70 ? "often" : j.love >= 35 ? "now and then" : "rarely";
+    const mood = j.mood < 35 ? " Mood is low, so they might phone it in." : "";
+    return `<div class="ring"><p><b>${T ? esc(T.name) : ""}.</b> ${T ? esc(T.desc) : ""}</p>
+      <p><b style="color:${F.color}">${F.name} in the ring.</b> ${esc(F.desc)} Showstopper: ${esc(F.show)}.</p>
+      <p class="note">With this much Love they improvise ${imp}.${mood}</p></div>`;
   }
   function finishRename() {
     const j = jinxById(G.selected), box = $("#renameBox");
@@ -454,7 +466,7 @@
 
   function hatchEgg(e) {
     const inh = e.inherit;
-    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, gen: inh ? inh.gen : 1 });
+    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined });
     if (inh) for (const s of JG.STATS) j.stats[s].lv = Math.max(j.stats[s].lv, inh.stats[s]);
     j.u = e.u; j.v = e.v; j.love = inh ? 30 : 10;
     const i = G.save.jinxes.indexOf(e);
@@ -542,6 +554,9 @@
         <li>Food raises stats. Cotton Comets and Angel Floss lean a Jinx toward Stardust; Sludge Pops and Black Hole Gum lean it toward Sludge.</li>
         <li>After 3 shows a child grows up. How it leans, and its best stat, decide what it becomes.</li>
         <li>On a run, the cards you play train the matching stat: attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.</li>
+        <li>In a fight, the crowd's Applause fills as you play a mix of cards and avoid hits. When it's full, use your Showstopper.</li>
+        <li>Each Jinx has a trait, and the more Love it has, the more often it improvises a free move. A sad Jinx sometimes phones it in.</li>
+        <li>How a Jinx leans changes how it fights: Sludge builds Corruption, Stardust builds Starlight, and Harlequins get a Wild card every turn.</li>
         <li>If your Jinx faints, it comes home sad with less of what it learned and only one thing from its bag.</li>
       </ul>
       <button class="btn" data-act="close">Back</button>`, { close: closeModal });
@@ -552,7 +567,8 @@
     const deck = starterDeck(j);
     modal(`<h2>Showtime for ${esc(j.name)}?</h2>
       <p>Three acts of the cosmic circus: <b>${JG.ACTS.map((a) => a.name).join("</b>, <b>")}</b>. Each act ends with a Ringmaster.</p>
-      <p class="note">Health ${maxHpFor(j, [])}. Starting deck of ${deck.length}: ${deckSummary(deck)}.</p>
+      ${ringHtml(j)}
+      <p class="note">Health ${maxHpFor(j, []) + (j.trait === "glutton" && j.belly >= 70 ? 6 : 0)}. Starting deck of ${deck.length}: ${deckSummary(deck)}.</p>
       <div class="row"><button class="btn big" data-act="go">Raise the curtain</button><button class="btn ghost" data-act="close">Not yet</button></div>`,
       { close: closeModal, go: () => { closeModal(); startRun(j); } });
   }
@@ -579,8 +595,10 @@
     A.init();
     G.selected = null;
     const run = { jid: j.id, act: 1, floor: -1, at: -1, map: genMap(1), deck: starterDeck(j), charms: [], tix: 0, loot: [], xp: { juggle: 0, tumble: 0, glow: 0, grit: 0 }, patchUsed: false, seen: [], foesSeen: [] };
-    run.maxHp = maxHpFor(j, run.charms);
+    run.maxHp = maxHpFor(j, run.charms) + (j.trait === "glutton" && j.belly >= 70 ? 6 : 0);
     run.hp = run.maxHp;
+    run.loveStart = j.love;
+    run.moodStart = j.mood;
     G.run = run;
     j.sleep = false;
     persist();
@@ -756,8 +774,8 @@
     o = o || {};
     const c = JG.CARDS[id], T = JG.TYPE_INFO[c.type];
     const rar = ["Starter", "Common", "Uncommon", "Rare"][c.rarity];
-    return `<button class="card t-${c.type}${o.dim ? " dim" : ""}" style="--tc:${T.color}" ${o.act ? `data-act="${o.act}"` : ""} ${o.i !== undefined ? `data-i="${o.i}"` : ""} ${o.disabled ? "disabled" : ""}>
-      <span class="cost">${c.cost}</span><span class="cname">${esc(c.name)}</span><span class="cart">${T.glyph}</span>
+    return `<button class="card t-${c.type}${o.dim ? " dim" : ""}${o.wild ? " wild" : ""}" style="--tc:${T.color}" ${o.act ? `data-act="${o.act}"` : ""} ${o.i !== undefined ? `data-i="${o.i}"` : ""} ${o.disabled ? "disabled" : ""}>
+      ${o.wild ? `<span class="wildtag">Wild \u00D72</span>` : ""}<span class="cost">${c.cost}</span><span class="cname">${esc(c.name)}</span><span class="cart">${T.glyph}</span>
       <span class="ctext">${cardText(id, o.B)}</span><span class="ctype">${T.label} · ${rar}${o.price ? ` · <b>${o.price} Tix</b>` : ""}</span></button>`;
   }
   function rewardCards(kind) {
@@ -782,15 +800,26 @@
   }
 
   // ---------- battle ----------
+  // Three layers sit on top of the card play:
+  // Applause (the crowd), the Jinx's own will (love, mood and trait), and a mechanic per lean (form).
+  function leanForm(j) { return j.align <= -0.33 ? "sludge" : j.align >= 0.33 ? "stardust" : "harlequin"; }
+  JG.leanForm = leanForm;
+  const scr = (k) => (G.B && G.B.screen && G.B.screen[k]) || { x: 0, y: 0 };
+  const runLove = () => (G.run.loveStart === undefined ? runJinx().love : G.run.loveStart);
+  const runMood = () => (G.run.moodStart === undefined ? runJinx().mood : G.run.moodStart);
+  function improviseChance(j) { return clamp(runLove() / 250, 0.04, 0.4) + (j.trait === "showoff" ? 0.1 : 0); }
+  function flubChance() { const m = runMood(); return m < 15 ? 0.25 : m < 35 ? 0.12 : 0; }
+
   function startBattle(foeId, kind) {
     const r = G.run, j = runJinx(), def = JG.FOES[foeId];
     const hp = def.hp[0] + ((rand() * (def.hp[1] - def.hp[0] + 1)) | 0);
     const B = (G.B = {
-      act: r.act, kind, jinx: j,
+      act: r.act, kind, jinx: j, form: leanForm(j),
       foe: { id: foeId, def, hp, maxHp: hp, block: 0, st: {}, mi: 0, charge: false },
       p: { block: 0, st: {}, energy: 3 },
       draw: shuffle(r.deck.map((id) => ({ id, u: uid++ }))), hand: [], disc: [], exh: [],
-      turn: 0, busy: false, over: null, anim: {}
+      turn: 0, busy: false, over: null, anim: {},
+      applause: r.charms.includes("rose") ? 25 : 0, res: 0, wild: null, lastType: null, lastCard: null, played: 0, tookDmg: 0
     });
     if (r.charms.includes("nose")) B.p.st.hype = 1;
     if (r.charms.includes("kazoo")) B.foe.st.dazed = 1;
@@ -813,9 +842,48 @@
       B.hand.push(B.draw.pop());
     }
   }
+
+  function addApplause(n, label) {
+    const B = G.B;
+    if (!B || B.over || !n) return;
+    const was = B.applause;
+    B.applause = clamp(B.applause + n, 0, 100);
+    const pp = scr("p");
+    if (label) D.float(pp.x, pp.y - 115, label, n > 0 ? "#ffd23f" : "#9a8fb0");
+    if (was < 100 && B.applause >= 100) {
+      const { W, H } = D.size();
+      D.float(W / 2, H * 0.32, "Showstopper ready!", "#ffd23f", true);
+      D.burst(W / 2, H * 0.3, "confetti", 36, "multi");
+      sfx("buff");
+    }
+  }
+  function gainRes(n) {
+    const B = G.B;
+    if (!n || B.form === "harlequin") return;
+    const cap = B.form === "stardust" ? 5 : 30;
+    const before = B.res;
+    B.res = Math.min(cap, B.res + n);
+    if (B.res > before) {
+      const pp = scr("p");
+      D.float(pp.x + 40, pp.y - 70, `+${B.res - before} ${JG.FORMS[B.form].res}`, JG.FORMS[B.form].color);
+    }
+  }
+  function scaleFx(fx, k) {
+    const o = {};
+    for (const key in fx) {
+      const v = fx[key];
+      o[key] = ["hits", "piedHit", "doubleGunk", "blockHit"].includes(key) || typeof v !== "number" ? v : Math.max(1, Math.floor(v * k));
+    }
+    if (fx.blockHit) o.blockScale = k;
+    return o;
+  }
+
   function startTurn(first) {
-    const B = G.B, r = G.run;
+    const B = G.B, r = G.run, j = B.jinx;
     B.turn++;
+    if (!first && B.tookDmg === 0) addApplause(10, "Flawless!");
+    B.tookDmg = 0;
+    B.played = 0;
     B.p.block = first && r.charms.includes("bell") ? 6 : 0;
     B.p.energy = 3 + (first && r.charms.includes("glowstick") ? 1 : 0);
     if (B.p.st.gunk) {
@@ -824,7 +892,19 @@
       B.p.st.gunk = g - 1;
       if (B.over) return;
     }
-    drawCards(5 + (r.charms.includes("shoes") ? 1 : 0));
+    if (B.form === "stardust" && B.res) {
+      B.p.block += B.res * 2;
+      const pp = scr("p");
+      D.float(pp.x, pp.y - 30, `◆ ${B.res * 2} Starlight`, "#8fe9ff");
+    }
+    let n = 5 + (r.charms.includes("shoes") ? 1 : 0);
+    if (j.trait === "daydream" && rand() < 0.2) { n++; D.float(scr("p").x, scr("p").y - 90, "Daydream: +1 card", "#c9b8ff"); }
+    drawCards(n);
+    if (j.trait === "daydream" && !first && B.hand.length > 2 && rand() < 0.1) {
+      B.disc.push(B.hand.splice((rand() * B.hand.length) | 0, 1)[0]);
+      D.float(scr("p").x, scr("p").y - 90, "Forgot a card…", "#9a8fb0");
+    }
+    B.wild = B.form === "harlequin" && B.hand.length ? pick(B.hand).u : null;
     B.busy = false;
     renderBattle();
   }
@@ -836,6 +916,11 @@
     if (st.pied) out.push(`<span class="st st-pied" title="Pied: takes 50% more damage. Lasts ${st.pied} more turn(s)">● Pied ${st.pied}</span>`);
     if (st.gunk) out.push(`<span class="st st-gunk" title="Gunk: loses ${st.gunk} health at the start of each turn, then it drops by 1">☣ Gunk ${st.gunk}</span>`);
     return out.join("");
+  }
+  function resHtml(B) {
+    if (B.form === "sludge") return `<span class="st st-res sludge" title="${esc(JG.FORMS.sludge.desc)}">☣ Corruption ${B.res}${B.res >= 10 ? " · hits add Gunk" : ""}</span>`;
+    if (B.form === "stardust") return `<span class="st st-res stardust" title="${esc(JG.FORMS.stardust.desc)}">☾ Starlight ${B.res}/5</span>`;
+    return `<span class="st st-res harlequin" title="${esc(JG.FORMS.harlequin.desc)}">♠ One Wild card each turn</span>`;
   }
   function foeHitValue(base) {
     const B = G.B;
@@ -854,22 +939,35 @@
     if (m.dazed) p.push(`<span class="in in-debuff">✵ Daze you</span>`);
     if (m.pied) p.push(`<span class="in in-debuff">● Pie you</span>`);
     if (m.gunk) p.push(`<span class="in in-gunk">☣ Gunk you</span>`);
+    if (m.heckle) p.push(`<span class="in in-heckle" title="Heckling drains your Applause">☹︎ Heckle</span>`);
     return p.join("");
   }
   function renderBattle() {
     const B = G.B, r = G.run;
     if (!B) return;
+    const j = B.jinx, F = JG.FORMS[B.form], T = JG.TRAITS[j.trait];
     $("#youHp").innerHTML = `${bar(r.hp, r.maxHp, "#ff5fa8")}<b>${r.hp}/${r.maxHp}</b>`;
-    $("#youSt").innerHTML = statusHtml(B.p.st, B.p.block);
-    $("#youName").textContent = B.jinx.name;
+    $("#youSt").innerHTML = resHtml(B) + statusHtml(B.p.st, B.p.block);
+    $("#youName").textContent = j.name;
+    $("#youTag").textContent = `${T ? T.name : "Performing"} · ${F.name}`;
+    $("#youTag").title = T ? T.desc : "";
     $("#foeHp").innerHTML = `${bar(B.foe.hp, B.foe.maxHp, "#a6d94a")}<b>${Math.max(0, B.foe.hp)}/${B.foe.maxHp}</b>`;
     $("#foeSt").innerHTML = statusHtml(B.foe.st, B.foe.block);
     $("#intent").innerHTML = B.over ? "" : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}`;
     $("#energy").innerHTML = `<b>${B.p.energy}</b><small>energy</small>`;
     $("#pileDraw").textContent = `Draw ${B.draw.length}`;
     $("#pileDisc").textContent = `Used ${B.disc.length}`;
-    $("#hand").innerHTML = B.hand.map((c, i) => cardHtml(c.id, { i, act: "play", B, dim: JG.CARDS[c.id].cost > B.p.energy, disabled: B.busy || !!B.over })).join("");
+    $("#hand").innerHTML = B.hand.map((c, i) => cardHtml(c.id, { i, act: "play", B, wild: c.u === B.wild, dim: JG.CARDS[c.id].cost > B.p.energy, disabled: B.busy || !!B.over })).join("");
     $("#hand").style.setProperty("--n", B.hand.length);
+    const full = B.applause >= 100;
+    $("#applause").classList.toggle("full", full);
+    $("#applause i").style.width = B.applause + "%";
+    $("#applauseNum").textContent = full ? "Ready!" : Math.round(B.applause);
+    const ss = $("#showstop");
+    ss.hidden = !full || !!B.over;
+    ss.disabled = B.busy;
+    ss.innerHTML = `Showstopper<small>${esc(F.show)}</small>`;
+    ss.title = F.showDesc;
     $("#endTurn").disabled = B.busy || !!B.over;
     renderRunbar();
   }
@@ -879,37 +977,65 @@
     playCard(+b.dataset.i);
   });
   $("#endTurn").addEventListener("click", () => endTurn());
+  $("#showstop").addEventListener("click", () => showstopper());
   addEventListener("keydown", (e) => {
     if (G.mode !== "battle" || !G.B || G.B.busy || G.B.over || !$("#modal").hidden) return;
     if (e.key === "e" || e.key === "E") endTurn();
+    if (e.key === "s" || e.key === "S") showstopper();
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= 9) playCard(n - 1);
   });
 
   function gainRunXp(stat, n) { if (stat) G.run.xp[stat] += n; }
   async function playCard(i) {
-    const B = G.B, r = G.run;
+    const B = G.B;
     if (!B || B.busy || B.over) return;
     const card = B.hand[i];
     if (!card) return;
-    const c = JG.CARDS[card.id], fx = c.fx, bo = bonuses(B.jinx);
+    const c = JG.CARDS[card.id];
     if (c.cost > B.p.energy) { toast("Not enough energy. End your turn to get more."); return; }
+    const j = B.jinx;
+    const half = rand() < flubChance();
+    const wild = card.u === B.wild;
     B.busy = true;
     B.p.energy -= c.cost;
     B.hand.splice(i, 1);
     (c.exhaust ? B.exh : B.disc).push(card);
+    if (wild) B.wild = null;
     sfx("card");
     const T = JG.TYPE_INFO[c.type];
     if (T.stat) gainRunXp(T.stat, 2);
     else {
       let low = "juggle";
-      for (const s of JG.STATS) if (B.jinx.stats[s].lv < B.jinx.stats[low].lv) low = s;
+      for (const s of JG.STATS) if (j.stats[s].lv < j.stats[low].lv) low = s;
       gainRunXp(low, 2);
     }
     if (c.type === "gunk") gainRunXp("glow", 1);
-    const P = B.screen || {};
-    const pp = P.p || { x: 0, y: 0 }, fp = P.f || { x: 0, y: 0 };
-    if (fx.selfdmg) { hurtPlayer(fx.selfdmg, true); if (B.over) return; }
+    B.played++;
+    const pp = scr("p");
+    if (half) {
+      addApplause(2);
+      D.float(pp.x, pp.y - 95, `${j.name} phones it in…`, "#9a8fb0");
+    } else {
+      const variety = B.lastType && B.lastType !== c.type;
+      addApplause(6 + (variety ? 6 : 0) + (j.trait === "showoff" ? 3 : 0));
+    }
+    if (wild) D.float(pp.x, pp.y - 95, "Wild! Twice!", "#ff5fa8", true);
+    B.lastType = c.type;
+    B.lastCard = card.id;
+    if (B.form === "stardust" && c.type === "eth") gainRes(1);
+    const fx = half ? scaleFx(c.fx, 0.5) : c.fx;
+    for (let rep = 0; rep < (wild ? 2 : 1); rep++) {
+      if (!(await applyFx(fx))) return;
+      if (rep === 0 && wild) await sleep(200);
+    }
+    B.busy = false;
+    renderBattle();
+  }
+  // Runs one card's effects. Returns false once the fight is over.
+  async function applyFx(fx) {
+    const B = G.B, r = G.run, bo = bonuses(B.jinx), pp = scr("p"), fp = scr("f");
+    if (fx.selfdmg) { hurtPlayer(fx.selfdmg, true); if (B.over) return false; }
     if (fx.hype) { B.p.st.hype = (B.p.st.hype || 0) + fx.hype; D.float(pp.x, pp.y - 50, `+${fx.hype} Hype`, "#ff8a3d"); sfx("buff"); }
     if (fx.block) { B.p.block += fx.block + bo.blk; D.float(pp.x, pp.y - 30, `◆ ${fx.block + bo.blk}`, "#ffd23f"); sfx("block"); }
     if (fx.heal) {
@@ -922,40 +1048,60 @@
     renderBattle();
     if (fx.dmg || fx.blockHit) {
       const hits = fx.hits || 1;
+      const hit = () => (fx.dmg ? dmgValue(fx.dmg, B) : Math.floor(B.p.block * (fx.blockScale || 1)));
       for (let h = 0; h < hits; h++) {
         B.anim.pLunge = G.t;
         await sleep(140);
-        hurtFoe(fx.dmg ? dmgValue(fx.dmg, B) : B.p.block);
-        if (B.over) return;
+        hurtFoe(hit());
+        if (B.over) return false;
+        sludgeTouch();
         await sleep(hits > 1 ? 160 : 120);
       }
       if (fx.piedHit && B.foe.st.pied) {
         B.anim.pLunge = G.t;
         await sleep(140);
-        hurtFoe(dmgValue(fx.dmg, B));
-        if (B.over) return;
+        hurtFoe(hit());
+        if (B.over) return false;
+        sludgeTouch();
       }
     }
-    if (fx.gunk) { addFoeSt("gunk", fx.gunk + bo.gunk); sfx("gunk"); D.burst(fp.x, fp.y, "drop", 10, "#a6d94a"); }
+    if (fx.gunk) applyGunk(fx.gunk + bo.gunk);
     if (fx.doubleGunk) {
-      if (B.foe.st.gunk) { B.foe.st.gunk *= 2; D.float(fp.x, fp.y - 40, `Gunk ×2`, "#a6d94a"); sfx("gunk"); }
-      else D.float(fp.x, fp.y - 40, "No Gunk to double", "#cfc6d8");
+      if (B.foe.st.gunk) {
+        const add = B.foe.st.gunk;
+        B.foe.st.gunk *= 2;
+        D.float(fp.x, fp.y - 40, `Gunk ×2`, "#a6d94a");
+        sfx("gunk");
+        if (B.form === "sludge") gainRes(Math.ceil(add / 2));
+      } else D.float(fp.x, fp.y - 40, "No Gunk to double", "#cfc6d8");
     }
     if (fx.dazed) { addFoeSt("dazed", fx.dazed); sfx("honk"); }
     if (fx.pied) { addFoeSt("pied", fx.pied); D.burst(fp.x, fp.y - 20, "drop", 12, "#efe6d2"); sfx("hit"); }
     if (fx.energy) B.p.energy += fx.energy;
     if (fx.draw) drawCards(fx.draw);
-    B.busy = false;
     renderBattle();
+    return true;
+  }
+  function applyGunk(n) {
+    const B = G.B, fp = scr("f");
+    addFoeSt("gunk", n);
+    sfx("gunk");
+    D.burst(fp.x, fp.y, "drop", 10, "#a6d94a");
+    if (B.form === "sludge") gainRes(Math.ceil(n / 2));
+  }
+  // Sludge Jinxes at 10+ Corruption smear a little Gunk with every hit.
+  function sludgeTouch() {
+    const B = G.B;
+    if (B.form === "sludge" && B.res >= 10 && !B.over) B.foe.st.gunk = (B.foe.st.gunk || 0) + 1;
   }
   function addFoeSt(k, n) {
-    const B = G.B, fp = (B.screen && B.screen.f) || { x: 0, y: 0 };
+    const B = G.B, fp = scr("f");
     B.foe.st[k] = (B.foe.st[k] || 0) + n;
     const label = { gunk: "Gunk", dazed: "Dazed", pied: "Pied" }[k];
     D.float(fp.x, fp.y - 60, `${label} +${n}`, { gunk: "#a6d94a", dazed: "#c9b8ff", pied: "#efe6d2" }[k]);
   }
   function hurtFoe(n, isGunk) {
-    const B = G.B, f = B.foe, fp = (B.screen && B.screen.f) || { x: 0, y: 0 };
+    const B = G.B, f = B.foe, fp = scr("f");
     let dmg = n;
     if (!isGunk && f.block) { const ab = Math.min(f.block, dmg); f.block -= ab; dmg -= ab; if (ab) D.float(fp.x + 30, fp.y - 20, `◆${ab}`, "#ffd23f"); }
     f.hp -= dmg;
@@ -963,21 +1109,31 @@
     D.float(fp.x, fp.y - 40, dmg ? `-${dmg}` : "Blocked", isGunk ? "#a6d94a" : "#ffffff", dmg >= 15);
     D.burst(fp.x, fp.y, isGunk ? "drop" : "star", dmg >= 15 ? 14 : 6, isGunk ? "#a6d94a" : "#ffd23f");
     sfx(dmg ? "hit" : "block");
+    if (!isGunk && dmg >= 15) addApplause(8, "Ooooh!");
     renderBattle();
     if (f.hp <= 0) winBattle();
   }
   function hurtPlayer(n, unblockable) {
-    const B = G.B, r = G.run, pp = (B.screen && B.screen.p) || { x: 0, y: 0 };
+    const B = G.B, r = G.run, pp = scr("p");
     let dmg = n;
     if (!unblockable) {
       const dodge = Math.min(0.15, B.jinx.stats.tumble.lv * 0.004);
-      if (rand() < dodge) { D.float(pp.x, pp.y - 40, "Dodged!", "#ffd23f"); sfx("dodge"); return; }
+      if (rand() < dodge) { D.float(pp.x, pp.y - 40, "Dodged!", "#ffd23f"); sfx("dodge"); addApplause(8); return; }
       if (B.p.block) { const ab = Math.min(B.p.block, dmg); B.p.block -= ab; dmg -= ab; if (ab) D.float(pp.x - 30, pp.y - 20, `◆${ab}`, "#ffd23f"); }
     }
     r.hp -= dmg;
     gainRunXp("grit", dmg / 3);
-    if (dmg) { B.anim.pHurt = G.t; D.float(pp.x, pp.y - 40, `-${dmg}`, "#ff5fa8", dmg >= 12); sfx("hit"); }
-    else sfx("block");
+    if (dmg) {
+      B.tookDmg += dmg;
+      B.anim.pHurt = G.t;
+      D.float(pp.x, pp.y - 40, `-${dmg}`, "#ff5fa8", dmg >= 12);
+      sfx("hit");
+      addApplause(-Math.floor(dmg / 2));
+      if (!unblockable && dmg >= 8 && B.jinx.trait === "hothead" && r.hp > 0) {
+        B.p.st.hype = (B.p.st.hype || 0) + 1;
+        D.float(pp.x, pp.y - 75, "Hothead! +1 Hype", "#ff8a3d");
+      }
+    } else sfx("block");
     if (r.hp <= 0) {
       if (r.charms.includes("patch") && !r.patchUsed) {
         r.patchUsed = true;
@@ -991,21 +1147,105 @@
     }
     renderBattle();
   }
+
+  // Between your turn and the foe's, the Jinx may act on its own.
+  async function jinxActsAlone() {
+    const B = G.B, r = G.run, j = B.jinx, bo = bonuses(j), pp = scr("p");
+    if (j.trait === "scaredy" && r.hp < r.maxHp / 2 && rand() < 0.45) {
+      B.p.block += 5 + bo.blk;
+      D.float(pp.x, pp.y - 60, `Ducks for cover! ◆${5 + bo.blk}`, "#ffd23f");
+      sfx("block");
+      renderBattle();
+      await sleep(400);
+    }
+    if (rand() < improviseChance(j)) {
+      D.float(pp.x, pp.y - 120, `${j.name} improvises!`, "#ff8a3d", true);
+      sfx("honk");
+      addApplause(8);
+      renderBattle();
+      await sleep(420);
+      let fx;
+      if (j.trait === "copycat" && B.lastCard) {
+        fx = scaleFx(JG.CARDS[B.lastCard].fx, 0.5);
+        delete fx.selfdmg; delete fx.energy; delete fx.draw;
+      } else {
+        const best = j.trait === "showoff" ? "juggle" : D.jinxLook(j).best;
+        fx = { juggle: { dmg: 4 }, tumble: { block: 5 }, glow: { heal: 3, block: 2 }, grit: { dmg: 3, hype: 1 } }[best];
+      }
+      await applyFx(fx);
+    }
+  }
+
+  async function showstopper() {
+    const B = G.B;
+    if (!B || B.busy || B.over || B.applause < 100) return;
+    B.busy = true;
+    B.applause = 0;
+    B.anim.show = G.t;
+    const j = B.jinx, bo = bonuses(j), r = G.run, F = JG.FORMS[B.form];
+    const { W, H } = D.size();
+    const pp = scr("p");
+    sfx("win");
+    D.float(W / 2, H * 0.3, `${F.show}!`, F.color, true);
+    D.burst(pp.x, pp.y - 30, "confetti", 50, "multi");
+    for (const s of JG.STATS) gainRunXp(s, 2);
+    renderBattle();
+    await sleep(650);
+    if (B.form === "sludge") {
+      const c = B.res;
+      B.anim.pLunge = G.t;
+      await sleep(140);
+      hurtFoe(8 + Math.floor(c * 1.5) + bo.atk * 2);
+      if (B.over) return;
+      applyGunk(6 + bo.gunk);
+      B.res = 0;
+    } else if (B.form === "stardust") {
+      const s = B.res;
+      B.anim.pLunge = G.t;
+      await sleep(140);
+      hurtFoe(6 + s * 4 + bo.atk * 2);
+      if (B.over) return;
+      const h = Math.min(r.maxHp - r.hp, 4 + s * 3 + bo.heal);
+      r.hp += h;
+      D.float(pp.x, pp.y - 70, `+${h}`, "#8fe9ff", true);
+      D.burst(pp.x, pp.y, "star", 20, "#8fe9ff");
+      delete B.p.st.dazed; delete B.p.st.pied; delete B.p.st.gunk;
+      sfx("heal");
+      B.res = 0;
+    } else {
+      B.disc.push(...B.hand);
+      B.hand = [];
+      drawCards(5);
+      B.p.energy += 2;
+      B.p.st.hype = (B.p.st.hype || 0) + 1;
+      B.wild = B.hand.length ? pick(B.hand).u : null;
+      D.float(pp.x, pp.y - 70, "New hand, +2 energy, +1 Hype", "#ff5fa8");
+      sfx("buff");
+    }
+    B.busy = false;
+    renderBattle();
+  }
+
   async function endTurn() {
     const B = G.B;
     if (!B || B.busy || B.over) return;
     B.busy = true;
+    if (!B.played) addApplause(-10, "The crowd yawns…");
     B.disc.push(...B.hand);
     B.hand = [];
+    B.wild = null;
     for (const k of ["dazed", "pied"]) if (B.p.st[k]) B.p.st[k]--;
     renderBattle();
-    await sleep(350);
-    const f = B.foe, fp = (B.screen && B.screen.f) || { x: 0, y: 0 };
+    await sleep(300);
+    await jinxActsAlone();
+    if (B.over) return;
+    const f = B.foe, fp = scr("f");
     f.block = 0;
     if (f.st.gunk) {
       const g = f.st.gunk;
       hurtFoe(g, true);
       f.st.gunk = g - 1;
+      if (B.form === "sludge") gainRes(g);
       if (B.over) return;
       await sleep(350);
     }
@@ -1014,6 +1254,7 @@
     if (m.blk) { f.block += m.blk; D.float(fp.x, fp.y - 30, `◆ ${m.blk}`, "#ffd23f"); sfx("block"); }
     if (m.heal) { const h = Math.min(f.maxHp - f.hp, m.heal); f.hp += h; D.float(fp.x, fp.y - 60, `+${h}`, "#8fe9ff"); sfx("heal"); }
     if (m.hype) { f.st.hype = (f.st.hype || 0) + m.hype; D.float(fp.x, fp.y - 80, `+${m.hype} Hype`, "#ff8a3d"); sfx("buff"); }
+    if (m.heckle) { B.anim.heckle = G.t; addApplause(-m.heckle, `Boo! -${m.heckle} Applause`); sfx("debuff"); }
     renderBattle();
     if (m.atk) {
       for (let h = 0; h < (m.n || 1); h++) {
@@ -1025,7 +1266,7 @@
       }
       f.charge = false;
     }
-    const pp = (B.screen && B.screen.p) || { x: 0, y: 0 };
+    const pp = scr("p");
     if (m.dazed) { B.p.st.dazed = (B.p.st.dazed || 0) + m.dazed; D.float(pp.x, pp.y - 60, `Dazed +${m.dazed}`, "#c9b8ff"); sfx("debuff"); }
     if (m.pied) { B.p.st.pied = (B.p.st.pied || 0) + m.pied; D.float(pp.x, pp.y - 75, `Pied +${m.pied}`, "#efe6d2"); sfx("debuff"); }
     if (m.gunk) { B.p.st.gunk = (B.p.st.gunk || 0) + m.gunk; D.float(pp.x, pp.y - 90, `Gunk +${m.gunk}`, "#a6d94a"); sfx("gunk"); }
@@ -1037,14 +1278,15 @@
   }
 
   function winBattle() {
-    const B = G.B, r = G.run;
+    const B = G.B;
     if (B.over) return;
     B.over = "win";
     B.busy = true;
     B.anim.fDie = G.t;
     sfx("win");
-    const fp = (B.screen && B.screen.f) || { x: 0, y: 0 };
+    const fp = scr("f");
     D.burst(fp.x, fp.y, "star", 30, "#ffd23f");
+    D.burst(fp.x, fp.y - 40, "confetti", 30, "multi");
     renderBattle();
     setTimeout(() => showRewards(B.kind), 1100);
   }
@@ -1299,7 +1541,7 @@
     s.sky.push({ name: j.name, pts, note: `${formName(j)}, 12 shows, generation ${j.gen}` });
     const i = s.jinxes.indexOf(j);
     if (loved) {
-      const inherit = { name: j.name, align: j.align * 0.5, gen: j.gen + 1, stats: {} };
+      const inherit = { name: j.name, align: j.align * 0.5, gen: j.gen + 1, stats: {}, trait: j.trait };
       for (const st of JG.STATS) inherit.stats[st] = Math.floor(j.stats[st].lv * 0.3);
       const e = makeEgg({ hue: j.hue, inherit, hatch: 30 });
       e.u = j.u; e.v = j.v;

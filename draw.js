@@ -1392,10 +1392,12 @@
   };
 
   // ---------- particles and floating numbers ----------
+  const CONFETTI = ["#ff4fa3", "#ffd23f", "#8fe9ff", "#a6d94a", "#c9b8ff", "#efe6d2"];
   D.burst = function (x, y, kind, n, color) {
     for (let i = 0; i < (n || 8); i++) {
-      const a = Math.random() * Math.PI * 2, sp = (40 + Math.random() * 120) * U;
-      D.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80 * U, life: 1, kind: kind || "star", color: color || "#ffd23f", s: (3 + Math.random() * 4) * U, rot: Math.random() * 6 });
+      const a = Math.random() * Math.PI * 2, sp = (40 + Math.random() * (kind === "confetti" ? 260 : 120)) * U;
+      const c = color === "multi" ? CONFETTI[(Math.random() * CONFETTI.length) | 0] : color || "#ffd23f";
+      D.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (kind === "confetti" ? 200 : 80) * U, life: 1, kind: kind || "star", color: c, s: (3 + Math.random() * 4) * U, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 12 });
     }
   };
   D.float = function (x, y, text, color, big) {
@@ -1404,14 +1406,24 @@
   function particlesStep(dt) {
     for (let i = D.particles.length - 1; i >= 0; i--) {
       const p = D.particles[i];
-      p.life -= dt * 0.9;
+      const conf = p.kind === "confetti";
+      p.life -= dt * (conf ? 0.38 : 0.9);
       if (p.life <= 0) { D.particles.splice(i, 1); continue; }
-      p.vy += 160 * U * dt * (p.kind === "note" || p.kind === "heart" ? -0.6 : 1);
+      p.vy += 160 * U * dt * (p.kind === "note" || p.kind === "heart" ? -0.6 : conf ? 0.9 : 1);
+      if (conf) { p.vy = Math.min(p.vy, 70 * U); p.vx += Math.sin(p.rot * 2) * 30 * U * dt; p.rot += p.spin * dt; }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vx *= 0.97;
+      p.vx *= conf ? 0.985 : 0.97;
       const a = Math.min(1, p.life * 1.5);
-      if (p.kind === "heart") heart(p.x, p.y, p.s, rgb(p.color, a));
+      if (conf) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.scale(1, Math.cos(p.rot * 1.7));
+        ctx.fillStyle = rgb(p.color, a);
+        ctx.fillRect(-p.s * 0.8, -p.s * 0.4, p.s * 1.6, p.s * 0.8);
+        ctx.restore();
+      } else if (p.kind === "heart") heart(p.x, p.y, p.s, rgb(p.color, a));
       else if (p.kind === "drop") {
         ctx.fillStyle = rgb(p.color, a);
         ctx.beginPath();
@@ -1522,7 +1534,9 @@
     // spotlights
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    for (const [sx, c] of [[P.px, "#ffe9b0"], [P.fx, tint]]) {
+    const ap = (B.applause || 0) / 100;
+    const pCol = rgb(mix("#ffe9b0", "#ffd23f", ap));
+    for (const [sx, c] of [[P.px, pCol], [P.fx, tint]]) {
       const lg = ctx.createLinearGradient(0, 0, 0, P.feet);
       lg.addColorStop(0, rgb(c, 0.02));
       lg.addColorStop(1, rgb(c, 0.2));
@@ -1584,7 +1598,20 @@
       ctx.restore();
     }
     B.screen = { p: pr, f: fr };
+    if (ap >= 0.6 && Math.random() < dt * (ap - 0.5) * 30) {
+      D.particles.push({ x: Math.random() * W, y: -10, vx: 0, vy: 20 * U, life: 1, kind: "confetti", color: ["#ff4fa3", "#ffd23f", "#8fe9ff", "#a6d94a"][(Math.random() * 4) | 0], s: (3 + Math.random() * 3) * U, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 10 });
+    }
     particlesStep(dt);
+    if (B.anim.show && t - B.anim.show < 0.7) {
+      const k = 1 - (t - B.anim.show) / 0.7;
+      ctx.fillStyle = `rgba(255,230,140,${0.45 * k})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (B.anim.heckle && t - B.anim.heckle < 0.5) {
+      const k = 1 - (t - B.anim.heckle) / 0.5;
+      ctx.fillStyle = `rgba(60,30,90,${0.35 * k})`;
+      ctx.fillRect(0, 0, W, H);
+    }
   };
 
   D.clear = function () {

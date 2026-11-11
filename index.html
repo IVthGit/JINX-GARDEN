@@ -357,7 +357,7 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
 .piles { font-family: var(--chunk); font-size: 0.6rem; color: var(--bone-dim); display: grid; gap: 4px; justify-items: center; margin-top: 6px; }
 .left-tray { display: grid; justify-items: center; }
 #hand { display: flex; justify-content: center; align-items: flex-end; min-height: 180px; padding-top: 14px; min-width: 0; }
-#hand .card { margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 5) * 9px, 40px)); }
+#hand .card { margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 5) * 7px, 26px)); }
 .right-tray { display: grid; gap: 8px; justify-items: end; }
 .keys { font-size: 0.7rem; color: var(--bone-dim); }
 @media (max-width: 760px), (max-height: 560px) {
@@ -383,6 +383,35 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
   .plate .pn { font-size: 0.95rem; }
 }
 
+/* ---------- crowd, will and form ---------- */
+#applause { display: grid; gap: 4px; width: 190px; }
+.ap-label { font-family: var(--chunk); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bone-dim); display: flex; justify-content: space-between; }
+#applauseNum { color: var(--gold); }
+.ap-bar { position: relative; height: 14px; background: #120818; border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); overflow: hidden;
+  background-image: repeating-linear-gradient(90deg, transparent 0 18px, rgba(239,230,210,0.15) 18px 19px); }
+.ap-bar i { position: absolute; inset: 0 auto 0 0; width: 0; transition: width 0.35s cubic-bezier(.3,1.6,.5,1);
+  background: linear-gradient(90deg, #ff4fa3, #ffd23f); box-shadow: inset 0 3px 0 rgba(255,255,255,0.35); }
+#applause.full .ap-bar i { background: repeating-linear-gradient(90deg, #ffd23f 0 10px, #fff6c2 10px 20px); animation: marquee 0.6s linear infinite; }
+#applause.full .ap-label { color: var(--gold); }
+@keyframes marquee { from { background-position: 0 0; } to { background-position: 20px 0; } }
+.btn.showstop { color: var(--ink); text-shadow: none; display: grid; line-height: 1.1; text-align: center; font-size: 0.95rem;
+  background: linear-gradient(180deg, #fff6c2 0%, #ffd23f 45%, #c99a0e 52%, #ffd23f 100%); animation: pulse 1s ease-in-out infinite; }
+.btn.showstop small { font-family: var(--marker); font-size: 0.8rem; color: #5a1030; text-transform: none; letter-spacing: 0; }
+.card.wild { border-color: transparent; background-clip: padding-box;
+  box-shadow: 4px 4px 0 var(--ink), 0 0 0 3px #ff4fa3, 0 0 0 6px #ffd23f, 0 0 22px rgba(255,79,163,0.7); }
+.wildtag { position: absolute; top: -12px; right: -8px; z-index: 1; font-family: var(--chunk); font-size: 0.55rem; color: #fff; background: #ff4fa3;
+  border: 2px solid var(--ink); padding: 2px 6px; transform: rotate(8deg); box-shadow: 2px 2px 0 var(--ink); }
+.st-res.sludge { color: var(--sludge); border-style: dashed; } .st-res.stardust { color: var(--ether); border-style: dashed; } .st-res.harlequin { color: var(--pink); border-style: dashed; }
+.in-heckle { background: #6a4a7a; color: #fff; }
+.ring { display: grid; gap: 4px; font-size: 0.82rem; padding: 8px 10px; border-left: 3px solid var(--pink); background: rgba(255,79,163,0.07); }
+.ring b { font-family: var(--marker); font-size: 0.9rem; color: var(--bone); }
+#youTag { cursor: help; }
+@media (max-width: 640px) {
+  #applause { width: 140px; }
+  .right-tray { grid-auto-flow: row; }
+  .btn.showstop { font-size: 0.75rem; }
+}
+
 /* ---------- toast ---------- */
 #toast {
   position: absolute; z-index: 60; left: 50%; bottom: 28px; transform: translate(-50%, 40px) rotate(-1deg);
@@ -395,7 +424,7 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
 body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
 
 @media (prefers-reduced-motion: reduce) {
-  .node.can .ng, .in-charge { animation: none; }
+  .node.can .ng, .in-charge, .btn.showstop, #applause.full .ap-bar i { animation: none; }
   .btn, .card, #toast { transition: none; }
 }
 </style>
@@ -438,7 +467,7 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
   <section id="battle" hidden>
     <div class="plates">
       <div class="plate you">
-        <span class="ptag">Performing</span>
+        <span class="ptag" id="youTag">Performing</span>
         <span class="pn" id="youName"></span>
         <div class="hpline" id="youHp"></div>
         <div class="sts" id="youSt"></div>
@@ -458,8 +487,13 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
       </div>
       <div id="hand"></div>
       <div class="right-tray">
+        <div id="applause" title="Applause fills as you play a mix of cards, land big hits and avoid damage. Hits, hecklers and doing nothing drain it. When it's full, use your Showstopper.">
+          <span class="ap-label">Applause <span id="applauseNum">0</span></span>
+          <span class="ap-bar"><i></i></span>
+        </div>
+        <button class="btn showstop" id="showstop" hidden>Showstopper</button>
         <button class="btn" id="endTurn">End turn</button>
-        <span class="keys">Keys: 1&ndash;9 play, E ends turn</span>
+        <span class="keys">Keys: 1&ndash;9 play, S showstopper, E ends turn</span>
       </div>
     </div>
   </section>
