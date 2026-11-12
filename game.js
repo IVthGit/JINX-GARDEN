@@ -7,7 +7,7 @@
   const rand = Math.random;
   const pick = (a) => a[(rand() * a.length) | 0];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sleep = (ms) => (JG.fast ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));   // JG.fast: automated play-tests skip the waits
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   let uid = 1;
 
@@ -629,6 +629,10 @@
         <li>Food raises stats. Cotton Comets and Angel Floss lean a Jinx toward Stardust; Sludge Pops and Black Hole Gum lean it toward Sludge.</li>
         <li>After 3 shows a child grows up. How it leans, and its best stat, decide what it becomes.</li>
         <li>On a run, the cards you play train the matching stat: attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.</li>
+        <li>Card order matters. Many cards have a bonus for being played first, played after two others, or played right after a certain kind of card. A card glows when its bonus is live.</li>
+        <li>You can hold one card when you end your turn. It stays in your hand instead of a new draw, so you can save a Guard for a big hit.</li>
+        <li>Watch what the foe will do next. Guard when a hit is coming. When it winds up, deal enough damage that turn to make it flinch. When it takes a Counter stance, don't hit it.</li>
+        <li>Foes can be weak to Attacks, Ether or Sludge, or shrug one of them off. Play 3 different kinds of card in a turn for a Hat Trick: 1 extra energy next turn.</li>
         <li>In a fight, the crowd's Applause fills as you play a mix of cards and avoid hits. When it's full, use your Showstopper.</li>
         <li>Each Jinx has a trait, and the more Love it has, the more often it improvises a free move. A sad Jinx sometimes phones it in.</li>
         <li>How a Jinx leans changes how it fights: Sludge builds Corruption, Stardust builds Starlight, and Harlequins get a Wild card every turn.</li>
@@ -651,9 +655,9 @@
   // =====================================================================
   // Runs
   // =====================================================================
-  function maxHpFor(j, charms) { return 24 + j.stats.grit.lv * 2 + (charms.includes("heart") ? 12 : 0); }
+  function maxHpFor(j, charms) { return JG.TUNE.baseHp + j.stats.grit.lv * 2 + (charms.includes("heart") ? 12 : 0); }
   function starterDeck(j) {
-    const d = ["pie", "pie", "pie", "pie", "cart", "cart", "cart"];
+    const d = ["pie", "pie", "pie", "pie", "cart", "cart", "cart", "cart"];
     d.push(j.align > 0.33 ? "halohum" : j.align < -0.33 ? "gunkspit" : "honk");
     if (j.stage === "adult") {
       const best = D.jinxLook(j).best;
@@ -688,10 +692,11 @@
       const row = [];
       for (let i = 0; i < n; i++) {
         let type = "fight";
-        if (f === 4) type = rand() < 0.6 ? "rest" : "shop";
+        if (f === 4) type = rand() < 0.55 ? "rest" : rand() < 0.5 ? "shop" : "fight";
+        else if (f === 1) type = rand() < 0.7 ? "fight" : "event";
         else if (f > 0) {
           const r = rand();
-          type = r < 0.42 ? "fight" : r < 0.66 ? "event" : r < 0.77 ? "shop" : r < 0.87 ? "rest" : f >= 2 ? "elite" : "fight";
+          type = r < 0.5 ? "fight" : r < 0.7 ? "event" : r < 0.8 ? "shop" : r < 0.87 ? "rest" : "elite";
         }
         row.push({ type, x: (i + 1) / (n + 1) + (rand() - 0.5) * 0.04, next: [] });
       }
@@ -818,24 +823,59 @@
     const s = j.stats;
     return { atk: Math.floor(s.juggle.lv / 5), blk: Math.floor(s.tumble.lv / 5), heal: Math.floor(s.glow.lv / 6), gunk: Math.floor(s.glow.lv / 8) };
   }
-  function dmgValue(base, B) {
+  const TYPE_NAME = { atk: "Attacks", eth: "Ether", gunk: "Sludge" };
+  // 1.5 if the foe is weak to this kind of card, 0.5 if it shrugs it off
+  function typeMult(B, type) {
+    if (!B || !type) return 1;
+    const d = B.foe.def;
+    return d.weak === type ? 1.5 : d.resist === type ? 0.5 : 1;
+  }
+  function dmgValue(base, B, type) {
     // shown and dealt damage per hit, from the player's point of view
     const j = B ? B.jinx : runJinx();
     let d = base + bonuses(j).atk + (B ? B.p.st.hype || 0 : 0);
     if (B && B.p.st.dazed) d *= 0.75;
     if (B && B.foe.st.pied) d *= 1.5;
+    d *= typeMult(B, type);
     return Math.max(0, Math.floor(d));
   }
+  // Which order bonus a card has, and whether it is live right now.
+  function comboOf(c, B) {
+    let label = null, fx = null, on = false;
+    if (c.opener) { label = "First card this turn"; fx = c.opener; on = !!B && B.played === 0; }
+    else if (c.finisher) { label = "After 2 other cards"; fx = c.finisher; on = !!B && B.played >= 2; }
+    else if (c.after) { label = `Right after ${{ atk: "an Attack", blk: "a Guard", eth: "an Ether card", gunk: "a Sludge card", trick: "a Trick" }[c.after[0]]}`; fx = c.after[1]; on = !!B && B.played > 0 && B.lastType === c.after[0]; }
+    return fx ? { label, fx, on } : null;
+  }
+  function effFx(c, B) {
+    const k = comboOf(c, B);
+    if (!k || !k.on) return c.fx;
+    const o = Object.assign({}, c.fx);
+    for (const key in k.fx) o[key] = (o[key] || (key === "hits" ? 1 : 0)) + k.fx[key];
+    return o;
+  }
+  function bonusText(fx) {
+    const p = [];
+    if (fx.dmg) p.push(`+${fx.dmg} damage`);
+    if (fx.hits) p.push(`${fx.hits} more hit`);
+    if (fx.block) p.push(`+${fx.block} Block`);
+    if (fx.heal) p.push(`+${fx.heal} healing`);
+    if (fx.gunk) p.push(`+${fx.gunk} Gunk`);
+    if (fx.hype) p.push(`+${fx.hype} Hype`);
+    if (fx.draw) p.push(`draw ${fx.draw}`);
+    if (fx.energy) p.push(`+${fx.energy} energy`);
+    return p.join(", ");
+  }
   function cardText(id, B) {
-    const c = JG.CARDS[id], fx = c.fx, j = B ? B.jinx : runJinx(), bo = bonuses(j);
+    const c = JG.CARDS[id], fx = effFx(c, B), j = B ? B.jinx : runJinx(), bo = bonuses(j);
     const p = [];
     if (fx.selfdmg) p.push(`Lose ${fx.selfdmg} health.`);
-    if (fx.dmg) p.push(`Deal ${dmgValue(fx.dmg, B)}${fx.hits > 1 ? ` ×${fx.hits}` : ""}.`);
+    if (fx.dmg) p.push(`Deal ${dmgValue(fx.dmg, B, c.type)}${fx.hits > 1 ? ` ×${fx.hits}` : ""}.`);
     if (fx.blockHit) p.push(`Deal damage equal to your Block${B ? ` (${B.p.block})` : ""}.`);
     if (fx.piedHit) p.push(`If the foe is Pied, hit again.`);
     if (fx.block) p.push(`Block ${fx.block + bo.blk}.`);
     if (fx.heal) p.push(`Heal ${fx.heal + bo.heal}.`);
-    if (fx.gunk) p.push(`Apply ${fx.gunk + bo.gunk} Gunk.`);
+    if (fx.gunk) p.push(`Apply ${gunkValue(fx.gunk + bo.gunk, B)} Gunk.`);
     if (fx.doubleGunk) p.push(`Double the foe's Gunk.`);
     if (fx.dazed) p.push(`Daze ${fx.dazed}.`);
     if (fx.pied) p.push(`Pie ${fx.pied}.`);
@@ -845,13 +885,16 @@
     if (c.exhaust) p.push(`<em>Once per fight.</em>`);
     return p.join(" ");
   }
+  function gunkValue(n, B) { const m = typeMult(B, "gunk"); return m > 1 ? Math.ceil(n * m) : m < 1 ? Math.max(1, Math.floor(n * m)) : n; }
   function cardHtml(id, o) {
     o = o || {};
     const c = JG.CARDS[id], T = JG.TYPE_INFO[c.type];
     const rar = ["Starter", "Common", "Uncommon", "Rare"][c.rarity];
-    return `<button class="card t-${c.type}${o.dim ? " dim" : ""}${o.wild ? " wild" : ""}" style="--tc:${T.color}" ${o.act ? `data-act="${o.act}"` : ""} ${o.i !== undefined ? `data-i="${o.i}"` : ""} ${o.disabled ? "disabled" : ""}>
+    const k = comboOf(c, o.B), live = k && k.on && !!o.B;
+    const bonus = k ? `<span class="cbonus${live ? " on" : ""}">${live ? "\u2605 " : ""}${k.label}: ${bonusText(k.fx)}</span>` : "";
+    return `<button class="card t-${c.type}${o.dim ? " dim" : ""}${o.wild ? " wild" : ""}${live ? " ready" : ""}" style="--tc:${T.color}" ${o.act ? `data-act="${o.act}"` : ""} ${o.i !== undefined ? `data-i="${o.i}"` : ""} ${o.disabled ? "disabled" : ""}>
       ${o.wild ? `<span class="wildtag">Wild \u00D72</span>` : ""}<span class="cost">${c.cost}</span><span class="cname">${esc(c.name)}</span><span class="cart">${T.glyph}</span>
-      <span class="ctext">${cardText(id, o.B)}</span><span class="ctype">${T.label} · ${rar}${o.price ? ` · <b>${o.price} Tix</b>` : ""}</span></button>`;
+      <span class="ctext">${cardText(id, o.B)}</span>${bonus}<span class="ctype">${T.label} · ${rar}${o.price ? ` · <b>${o.price} Tix</b>` : ""}</span></button>`;
   }
   function rewardCards(kind) {
     const j = runJinx();
@@ -887,7 +930,7 @@
 
   function startBattle(foeId, kind) {
     const r = G.run, j = runJinx(), def = JG.FOES[foeId];
-    const hp = def.hp[0] + ((rand() * (def.hp[1] - def.hp[0] + 1)) | 0);
+    const hp = Math.round((def.hp[0] + ((rand() * (def.hp[1] - def.hp[0] + 1)) | 0)) * JG.TUNE.hp[r.act - 1]);
     const B = (G.B = {
       act: r.act, kind, jinx: j, form: leanForm(j),
       foe: { id: foeId, def, hp, maxHp: hp, block: 0, st: {}, mi: 0, charge: false, mimic: j },
@@ -957,11 +1000,14 @@
   function startTurn(first) {
     const B = G.B, r = G.run, j = B.jinx;
     B.turn++;
-    if (!first && B.tookDmg === 0) addApplause(10, "Flawless!");
+    if (!first && B.tookDmg === 0) addApplause(6, "Flawless!");
     B.tookDmg = 0;
     B.played = 0;
+    B.turnDmg = 0;
+    B.types = [];
     B.p.block = first && r.charms.includes("bell") ? 6 : 0;
-    B.p.energy = 3 + (first && r.charms.includes("glowstick") ? 1 : 0);
+    B.p.energy = 3 + (first && r.charms.includes("glowstick") ? 1 : 0) + (B.hatTrick ? 1 : 0);
+    if (B.hatTrick) { D.float(scr("p").x, scr("p").y - 60, "Hat Trick: +1 energy", "#ffd23f"); B.hatTrick = false; }
     if (B.p.st.gunk) {
       const g = B.p.st.gunk;
       hurtPlayer(g, true);
@@ -969,11 +1015,11 @@
       if (B.over) return;
     }
     if (B.form === "stardust" && B.res) {
-      B.p.block += B.res * 2;
+      B.p.block += B.res * 3;
       const pp = scr("p");
-      D.float(pp.x, pp.y - 30, `◆ ${B.res * 2} Starlight`, "#8fe9ff");
+      D.float(pp.x, pp.y - 30, `◆ ${B.res * 3} Starlight`, "#8fe9ff");
     }
-    let n = 5 + (r.charms.includes("shoes") ? 1 : 0);
+    let n = 5 + (r.charms.includes("shoes") ? 1 : 0) - B.hand.length;   // a held card takes the place of a draw
     if (j.trait === "daydream" && rand() < 0.2) { n++; D.float(scr("p").x, scr("p").y - 90, "Daydream: +1 card", "#c9b8ff"); }
     drawCards(n);
     if (j.trait === "daydream" && !first && B.hand.length > 2 && rand() < 0.1) {
@@ -991,23 +1037,25 @@
     if (st.dazed) out.push(`<span class="st st-dazed" title="Dazed: deals 25% less damage. Lasts ${st.dazed} more turn(s)">✵ Dazed ${st.dazed}</span>`);
     if (st.pied) out.push(`<span class="st st-pied" title="Pied: takes 50% more damage. Lasts ${st.pied} more turn(s)">● Pied ${st.pied}</span>`);
     if (st.gunk) out.push(`<span class="st st-gunk" title="Gunk: loses ${st.gunk} health at the start of each turn, then it drops by 1">☣ Gunk ${st.gunk}</span>`);
+    if (st.counter) out.push(`<span class="st st-counter" title="Counter: every hit on it this turn hurts you for ${st.counter}. Guard, Sludge and Tricks are safe.">↩ Counter ${st.counter}</span>`);
     return out.join("");
   }
   function resHtml(B) {
-    if (B.form === "sludge") return `<span class="st st-res sludge" title="${esc(JG.FORMS.sludge.desc)}">☣ Corruption ${B.res}${B.res >= 10 ? " · hits add Gunk" : ""}</span>`;
+    if (B.form === "sludge") return `<span class="st st-res sludge" title="${esc(JG.FORMS.sludge.desc)}">☣ Corruption ${B.res}${B.res >= 6 ? " · hits add Gunk" : ""}</span>`;
     if (B.form === "stardust") return `<span class="st st-res stardust" title="${esc(JG.FORMS.stardust.desc)}">☾ Starlight ${B.res}/5</span>`;
     return `<span class="st st-res harlequin" title="${esc(JG.FORMS.harlequin.desc)}">♠ One Wild card each turn</span>`;
   }
   function foeHitValue(base) {
     const B = G.B;
-    let d = base + (B.foe.st.hype || 0);
+    let d = Math.round(base * JG.TUNE.dmg[B.act - 1]) + (B.foe.st.hype || 0);
     if (B.foe.st.dazed) d *= 0.75;
     if (B.p.st.pied) d *= 1.5;
     return Math.floor(d);
   }
   function intentHtml(m) {
     const p = [];
-    if (m.charge) p.push(`<span class="in in-charge">⚡︎ Charging up</span>`);
+    if (m.charge) p.push(`<span class="in in-charge" title="It is winding up a big hit for the turn after">⚡︎ Winds up</span>`);
+    if (m.counter) p.push(`<span class="in in-counter" title="Next turn, every hit on it will hurt you back">↩ Counter</span>`);
     if (m.atk) p.push(`<span class="in in-atk">✶ Attack ${foeHitValue(m.atk)}${m.n > 1 ? "×" + m.n : ""}</span>`);
     if (m.blk) p.push(`<span class="in in-blk">◆ Block</span>`);
     if (m.heal) p.push(`<span class="in in-heal">✚ Heal</span>`);
@@ -1029,11 +1077,19 @@
     $("#youTag").title = T ? T.desc : "";
     $("#foeHp").innerHTML = `${bar(B.foe.hp, B.foe.maxHp, "#a6d94a")}<b>${Math.max(0, B.foe.hp)}/${B.foe.maxHp}</b>`;
     $("#foeSt").innerHTML = statusHtml(B.foe.st, B.foe.block);
-    $("#intent").innerHTML = B.over ? "" : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}`;
+    const fl = B.foe.charge && B.foe.flinchNeed
+      ? `<span class="flinch" title="Deal this much damage in one turn and it loses the big hit"><b>Make it flinch:</b> ${Math.min(B.turnDmg || 0, B.foe.flinchNeed)}/${B.foe.flinchNeed} damage this turn<span class="fbar"><i style="width:${Math.min(100, ((B.turnDmg || 0) / B.foe.flinchNeed) * 100)}%"></i></span></span>` : "";
+    $("#intent").innerHTML = B.over ? "" : B.foe.stunned ? `<span class="in in-heal">Stunned: it loses its turn</span>` : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}${fl}`;
+    const d = B.foe.def;
+    $("#foeTraits").innerHTML = (d.weak ? `<span class="weak">Weak to ${TYPE_NAME[d.weak]}</span>` : "") + (d.resist ? `<span class="resist">Shrugs off ${TYPE_NAME[d.resist]}</span>` : "");
+    const types = B.types || [];
+    $("#combo").innerHTML = `<span>Hat Trick</span>` + [0, 1, 2].map((i) => `<i style="${types[i] ? "background:" + JG.TYPE_INFO[types[i]].color : ""}"></i>`).join("");
+    $("#combo").classList.toggle("done", types.length >= 3);
+    $("#combo").title = "Play 3 different kinds of card in one turn for 1 extra energy next turn";
     $("#energy").innerHTML = `<b>${B.p.energy}</b><small>energy</small>`;
     $("#pileDraw").textContent = `Draw ${B.draw.length}`;
     $("#pileDisc").textContent = `Used ${B.disc.length}`;
-    $("#hand").innerHTML = B.hand.map((c, i) => cardHtml(c.id, { i, act: "play", B, wild: c.u === B.wild, dim: JG.CARDS[c.id].cost > B.p.energy, disabled: B.busy || !!B.over })).join("");
+    $("#hand").innerHTML = B.hand.map((c, i) => `<span class="slot${c.u === B.hold ? " held" : ""}">${cardHtml(c.id, { i, act: "play", B, wild: c.u === B.wild, dim: JG.CARDS[c.id].cost > B.p.energy, disabled: B.busy || !!B.over })}<button class="holdtab" data-hold="${i}" ${B.busy || B.over ? "disabled" : ""} aria-pressed="${c.u === B.hold}" title="Hold this card: it stays in your hand for next turn instead of a new draw">${c.u === B.hold ? "Held" : "Hold"}</button></span>`).join("");
     $("#hand").style.setProperty("--n", B.hand.length);
     B.crowdY = $("#hand").getBoundingClientRect().top + 30;
     const full = B.applause >= 100;
@@ -1049,16 +1105,28 @@
     renderRunbar();
   }
   $("#hand").addEventListener("click", (e) => {
+    const h = e.target.closest(".holdtab");
+    if (h) { toggleHold(+h.dataset.hold); return; }
     const b = e.target.closest(".card");
     if (!b || b.disabled) return;
     playCard(+b.dataset.i);
   });
+  // Keep one card in hand when the turn ends, instead of drawing a new one.
+  function toggleHold(i) {
+    const B = G.B;
+    if (!B || B.busy || B.over || !B.hand[i]) return;
+    B.hold = B.hold === B.hand[i].u ? null : B.hand[i].u;
+    sfx("card");
+    renderBattle();
+  }
   $("#endTurn").addEventListener("click", () => endTurn());
   $("#showstop").addEventListener("click", () => showstopper());
   addEventListener("keydown", (e) => {
     if (G.mode !== "battle" || !G.B || G.B.busy || G.B.over || !$("#modal").hidden) return;
     if (e.key === "e" || e.key === "E") endTurn();
     if (e.key === "s" || e.key === "S") showstopper();
+    const dg = /^Digit([1-9])$/.exec(e.code || "");
+    if (dg && e.shiftKey) { toggleHold(+dg[1] - 1); return; }
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= 9) playCard(n - 1);
   });
@@ -1077,6 +1145,7 @@
     const j = B.jinx;
     const half = rand() < flubChance();
     const wild = card.u === B.wild;
+    const combo = comboOf(c, B), fx0 = effFx(c, B);   // worked out before this card counts as played
     B.busy = true;
     B.p.energy -= c.cost;
     B.hand.splice(i, 1);
@@ -1094,26 +1163,38 @@
     B.played++;
     const pp = scr("p");
     if (half) {
-      addApplause(2);
+      addApplause(1);
       D.float(pp.x, pp.y - 95, `${j.name} phones it in…`, "#9a8fb0");
     } else {
       const variety = B.lastType && B.lastType !== c.type;
-      addApplause(6 + (variety ? 6 : 0) + (j.trait === "showoff" ? 3 : 0));
+      addApplause(3 + (variety ? 3 : 0) + (j.trait === "showoff" ? 2 : 0));
     }
     if (wild) D.float(pp.x, pp.y - 95, "Wild! Twice!", "#ff5fa8", true);
+    if (combo && combo.on && !half) { D.float(pp.x, pp.y - 125, "Combo!", "#ffd23f"); addApplause(4); sfx("coin"); }
     B.lastType = c.type;
     B.lastCard = card.id;
+    if (!B.types.includes(c.type)) {
+      B.types.push(c.type);
+      if (B.types.length === 3) {
+        // three different kinds of card in one turn
+        B.hatTrick = true;
+        D.float(pp.x, pp.y - 150, "Hat Trick!", "#ffd23f", true);
+        addApplause(8);
+        D.fx.cheer(B, 3);
+        sfx("buff");
+      }
+    }
     if (B.form === "stardust" && c.type === "eth") gainRes(1);
-    const fx = half ? scaleFx(c.fx, 0.5) : c.fx;
+    const fx = half ? scaleFx(fx0, 0.5) : fx0;
     for (let rep = 0; rep < (wild ? 2 : 1); rep++) {
-      if (!(await applyFx(fx, CARD_STYLE[card.id]))) return;
+      if (!(await applyFx(fx, CARD_STYLE[card.id], c.type))) return;
       if (rep === 0 && wild) await sleep(200);
     }
     B.busy = false;
     renderBattle();
   }
   // Runs one card's effects. Returns false once the fight is over.
-  async function applyFx(fx, style) {
+  async function applyFx(fx, style, type) {
     const B = G.B, r = G.run, bo = bonuses(B.jinx), pp = scr("p"), fp = scr("f");
     if (fx.selfdmg) { hurtPlayer(fx.selfdmg, true); if (B.over) return false; }
     if (fx.hype) { B.p.st.hype = (B.p.st.hype || 0) + fx.hype; D.float(pp.x, pp.y - 50, `+${fx.hype} Hype`, "#ff8a3d"); sfx("buff"); }
@@ -1129,7 +1210,9 @@
     renderBattle();
     if (fx.dmg || fx.blockHit) {
       const hits = fx.hits || 1;
-      const hit = () => (fx.dmg ? dmgValue(fx.dmg, B) : Math.floor(B.p.block * (fx.blockScale || 1)));
+      const hit = () => (fx.dmg ? dmgValue(fx.dmg, B, type) : Math.floor(B.p.block * (fx.blockScale || 1) * typeMult(B, type)));
+      const m = typeMult(B, type);
+      if (m !== 1) D.float(fp.x, fp.y - 95, m > 1 ? "Weak spot!" : "Shrugged off", m > 1 ? "#ffd23f" : "#9a8fb0");
       for (let h = 0; h < hits; h++) {
         await D.fx.attack(style || "punch", "p", B);
         hurtFoe(hit());
@@ -1164,15 +1247,18 @@
   }
   function applyGunk(n) {
     const B = G.B, fp = scr("f");
+    const m = typeMult(B, "gunk");
+    if (m !== 1) D.float(fp.x, fp.y - 95, m > 1 ? "Weak spot!" : "Shrugged off", m > 1 ? "#ffd23f" : "#9a8fb0");
+    n = gunkValue(n, B);
     addFoeSt("gunk", n);
     sfx("gunk");
     D.burst(fp.x, fp.y, "drop", 10, "#a6d94a");
     if (B.form === "sludge") gainRes(Math.ceil(n / 2));
   }
-  // Sludge Jinxes at 10+ Corruption smear a little Gunk with every hit.
+  // Sludge Jinxes at 6+ Corruption smear a little Gunk with every hit.
   function sludgeTouch() {
     const B = G.B;
-    if (B.form === "sludge" && B.res >= 10 && !B.over) B.foe.st.gunk = (B.foe.st.gunk || 0) + 1;
+    if (B.form === "sludge" && B.res >= 6 && !B.over) B.foe.st.gunk = (B.foe.st.gunk || 0) + 1;
   }
   function addFoeSt(k, n) {
     const B = G.B, fp = scr("f");
@@ -1180,9 +1266,10 @@
     const label = { gunk: "Gunk", dazed: "Dazed", pied: "Pied" }[k];
     D.float(fp.x, fp.y - 60, `${label} +${n}`, { gunk: "#a6d94a", dazed: "#c9b8ff", pied: "#efe6d2" }[k]);
   }
-  function hurtFoe(n, isGunk) {
+  function hurtFoe(n, isGunk, quiet) {
     const B = G.B, f = B.foe, fp = scr("f");
     let dmg = n;
+    B.turnDmg = (B.turnDmg || 0) + (isGunk ? 0 : n);
     if (!isGunk && f.block) { const ab = Math.min(f.block, dmg); f.block -= ab; dmg -= ab; if (ab) D.float(fp.x + 30, fp.y - 20, `◆${ab}`, "#ffd23f"); }
     f.hp -= dmg;
     B.anim.fHurt = G.t;
@@ -1190,16 +1277,33 @@
     D.burst(fp.x, fp.y, isGunk ? "drop" : "star", dmg >= 15 ? 14 : 6, isGunk ? "#a6d94a" : "#ffd23f");
     sfx(dmg ? "hit" : "block");
     if (dmg && !isGunk) D.fx.impact("f", dmg, B);
-    if (!isGunk && dmg >= 15) { addApplause(8, "Ooooh!"); D.fx.cheer(B, 3); }
+    if (!isGunk && dmg >= 15) { addApplause(6, "Ooooh!"); D.fx.cheer(B, 3); }
     renderBattle();
-    if (f.hp <= 0) winBattle();
+    if (f.hp <= 0) { winBattle(); return; }
+    // hit it hard enough while it winds up and it loses its nerve
+    if (f.charge && f.flinchNeed && B.turnDmg >= f.flinchNeed) {
+      f.charge = false;
+      f.flinchNeed = 0;
+      f.stunned = true;
+      f.st.pied = (f.st.pied || 0) + 1;
+      D.float(fp.x, fp.y - 110, "It flinched!", "#ffd23f", true);
+      addApplause(12);
+      D.fx.cheer(B, 4);
+      sfx("win");
+      renderBattle();
+    }
+    // a foe in a counter stance hits back
+    if (!isGunk && !quiet && f.st.counter && !B.over) {
+      D.float(fp.x, fp.y - 80, "Counter!", "#ff8a3d");
+      hurtPlayer(f.st.counter);
+    }
   }
   function hurtPlayer(n, unblockable) {
     const B = G.B, r = G.run, pp = scr("p");
     let dmg = n;
     if (!unblockable) {
       const dodge = Math.min(0.15, B.jinx.stats.tumble.lv * 0.004);
-      if (rand() < dodge) { D.float(pp.x, pp.y - 40, "Dodged!", "#ffd23f"); sfx("dodge"); addApplause(8); return; }
+      if (rand() < dodge) { D.float(pp.x, pp.y - 40, "Dodged!", "#ffd23f"); sfx("dodge"); addApplause(5); return; }
       if (B.p.block) { const ab = Math.min(B.p.block, dmg); B.p.block -= ab; dmg -= ab; if (ab) D.float(pp.x - 30, pp.y - 20, `◆${ab}`, "#ffd23f"); }
     }
     r.hp -= dmg;
@@ -1210,7 +1314,7 @@
       D.float(pp.x, pp.y - 40, `-${dmg}`, "#ff5fa8", dmg >= 12);
       if (!unblockable) D.fx.impact("p", dmg, B);
       sfx("hit");
-      addApplause(-Math.floor(dmg / 2));
+      addApplause(-dmg);
       if (!unblockable && dmg >= 8 && B.jinx.trait === "hothead" && r.hp > 0) {
         B.p.st.hype = (B.p.st.hype || 0) + 1;
         D.float(pp.x, pp.y - 75, "Hothead! +1 Hype", "#ff8a3d");
@@ -1243,7 +1347,7 @@
     if (rand() < improviseChance(j)) {
       D.float(pp.x, pp.y - 120, `${j.name} improvises!`, "#ff8a3d", true);
       sfx("honk");
-      addApplause(8);
+      addApplause(5);
       renderBattle();
       await sleep(420);
       let fx;
@@ -1254,6 +1358,8 @@
         const best = j.trait === "showoff" ? "juggle" : D.jinxLook(j).best;
         fx = { juggle: { dmg: 4 }, tumble: { block: 5 }, glow: { heal: 3, block: 2 }, grit: { dmg: 3, hype: 1 } }[best];
       }
+      // it knows better than to hit a foe that will hit back
+      if (B.foe.st.counter && (fx.dmg || fx.blockHit)) fx = { block: 5 };
       await applyFx(fx);
     }
   }
@@ -1274,13 +1380,13 @@
     D.burst(pp.x, pp.y - 30, "confetti", 50, "multi");
     if (B.form === "sludge") {
       const c = B.res;
-      hurtFoe(8 + Math.floor(c * 1.5) + bo.atk * 2);
+      hurtFoe(8 + Math.floor(c * 1.5) + bo.atk * 2, false, true);
       if (B.over) return;
       applyGunk(6 + bo.gunk);
       B.res = 0;
     } else if (B.form === "stardust") {
       const s = B.res;
-      hurtFoe(6 + s * 4 + bo.atk * 2);
+      hurtFoe(6 + s * 4 + bo.atk * 2, false, true);
       if (B.over) return;
       const h = Math.min(r.maxHp - r.hp, 4 + s * 3 + bo.heal);
       r.hp += h;
@@ -1293,10 +1399,10 @@
       B.disc.push(...B.hand);
       B.hand = [];
       drawCards(5);
-      B.p.energy += 2;
+      B.p.energy += 1;
       B.p.st.hype = (B.p.st.hype || 0) + 1;
       B.wild = B.hand.length ? pick(B.hand).u : null;
-      D.float(pp.x, pp.y - 70, "New hand, +2 energy, +1 Hype", "#ff5fa8");
+      D.float(pp.x, pp.y - 70, "New hand, +1 energy, +1 Hype", "#ff5fa8");
       sfx("buff");
     }
     B.busy = false;
@@ -1308,8 +1414,10 @@
     if (!B || B.busy || B.over) return;
     B.busy = true;
     if (!B.played) addApplause(-10, "The crowd yawns…");
-    B.disc.push(...B.hand);
-    B.hand = [];
+    const kept = B.hand.filter((c) => c.u === B.hold);
+    B.disc.push(...B.hand.filter((c) => c.u !== B.hold));
+    B.hand = kept;
+    B.hold = null;
     B.wild = null;
     for (const k of ["dazed", "pied"]) if (B.p.st[k]) B.p.st[k]--;
     renderBattle();
@@ -1318,6 +1426,7 @@
     if (B.over) return;
     const f = B.foe, fp = scr("f");
     f.block = 0;
+    f.st.counter = 0;
     if (f.st.gunk) {
       const g = f.st.gunk;
       hurtFoe(g, true);
@@ -1326,8 +1435,23 @@
       if (B.over) return;
       await sleep(350);
     }
+    if (f.stunned) {
+      // it flinched: the big hit is lost, and it starts its routine over after it
+      f.stunned = false;
+      D.float(fp.x, fp.y - 60, "Stunned", "#c9b8ff");
+      const moves = f.def.moves;
+      let k = f.mi;
+      for (let i = 0; i < moves.length && !moves[k].atk; i++) k = (k + 1) % moves.length;
+      f.mi = (k + 1) % moves.length;
+      f.intent = moves[f.mi];
+      for (const q of ["dazed", "pied"]) if (f.st[q]) f.st[q]--;
+      await sleep(500);
+      startTurn(false);
+      return;
+    }
     const m = f.intent;
-    if (m.charge) { f.charge = true; D.float(fp.x, fp.y - 60, "Charging…", "#ffd23f"); sfx("buff"); }
+    if (m.charge) { f.charge = true; f.flinchNeed = Math.round((m.flinch || 0) * JG.TUNE.hp[B.act - 1]); D.float(fp.x, fp.y - 60, "Winding up…", "#ffd23f"); sfx("buff"); }
+    if (m.counter) { f.st.counter = Math.round(m.counter * JG.TUNE.dmg[B.act - 1]); D.float(fp.x, fp.y - 45, "Counter stance", "#ff8a3d"); sfx("block"); }
     if (m.blk) { f.block += m.blk; D.float(fp.x, fp.y - 30, `◆ ${m.blk}`, "#ffd23f"); sfx("block"); D.fx.guard("f"); }
     if (m.heal) { const h = Math.min(f.maxHp - f.hp, m.heal); f.hp += h; D.float(fp.x, fp.y - 60, `+${h}`, "#8fe9ff"); sfx("heal"); D.fx.heal("f"); }
     if (m.hype) { f.st.hype = (f.st.hype || 0) + m.hype; D.float(fp.x, fp.y - 80, `+${m.hype} Hype`, "#ff8a3d"); sfx("buff"); }
@@ -1341,6 +1465,7 @@
         if (B.over) return;
       }
       f.charge = false;
+      f.flinchNeed = 0;
     }
     const pp = scr("p");
     if (m.dazed) { B.p.st.dazed = (B.p.st.dazed || 0) + m.dazed; D.float(pp.x, pp.y - 60, `Dazed +${m.dazed}`, "#c9b8ff"); sfx("debuff"); }
@@ -1365,7 +1490,7 @@
     D.burst(fp.x, fp.y - 40, "confetti", 30, "multi");
     D.fx.cheer(B, 7);
     renderBattle();
-    setTimeout(() => showRewards(B.kind), 1100);
+    setTimeout(() => showRewards(B.kind), JG.fast ? 0 : 1100);
   }
   function loseBattle() {
     const B = G.B;
@@ -1374,7 +1499,7 @@
     B.busy = true;
     sfx("lose");
     renderBattle();
-    setTimeout(() => endRun(false), 1600);
+    setTimeout(() => endRun(false), JG.fast ? 0 : 1600);
   }
   function showRewards(kind) {
     const r = G.run, j = runJinx();
@@ -1393,7 +1518,7 @@
       if (charm) { addCharm(charm); lines.push(`<li><span class="glyph" style="color:${JG.CHARMS[charm].color}">${JG.CHARMS[charm].glyph}</span><b>${JG.CHARMS[charm].name}</b>: ${JG.CHARMS[charm].desc}</li>`); }
     }
     if (kind === "boss") {
-      const h = Math.round(r.maxHp * 0.4);
+      const h = Math.round(r.maxHp * JG.TUNE.bossHeal);
       r.hp = Math.min(r.maxHp, r.hp + h);
       lines.push(`<li>A breather between acts: healed up to ${r.hp}</li>`);
     }
@@ -1701,6 +1826,7 @@
     const dt = Math.min(0.05, now - last);
     last = now;
     G.t = now;
+    if (JG.fast) { requestAnimationFrame(frame); return; }
     if (G.mode === "garden" || G.mode === "title") {
       if (G.save) gardenStep(dt);
       G.hits = D.garden(now, dt, G);
@@ -1716,5 +1842,5 @@
   setMode("title");
   requestAnimationFrame(frame);
   // test hook for automated checks
-  JG.debug = { G, startBattle, endRun, enterMap, hatchEgg, persist };
+  JG.debug = { toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, effFx, dmgValue, foeHitValue, bonuses, typeMult, gunkValue };
 })();

@@ -42,7 +42,7 @@
       B.anim[from + "Cast"] = t;
       shots.push({ style, from, t0: t, dur, seed: Math.random() * 100 });
     }
-    return new Promise((res) => setTimeout(res, dur * 1000));
+    return JG.fast ? Promise.resolve() : new Promise((res) => setTimeout(res, dur * 1000));
   };
   FX.impact = function (target, dmg, B) {
     const t = now(), style = B.lastStyle || "punch";
@@ -73,7 +73,7 @@
     show = { form, t0: now(), B };
     B.anim.show = show.t0;
     B.lastStyle = form === "sludge" ? "goo" : form === "stardust" ? "beam" : "stars";
-    return new Promise((res) => setTimeout(res, reduced ? 500 : 1300));
+    return JG.fast ? Promise.resolve() : new Promise((res) => setTimeout(res, reduced ? 500 : 1300));
   };
 
   function actor(B, side) {
@@ -603,28 +603,28 @@
       if (!A) continue;
       const s = side === "p" ? B.p.st : B.foe.st, block = side === "p" ? B.p.block : B.foe.block, dir = side === "p" ? 1 : -1;
       const { x, y, r } = A;
-      const headY = side === "p" ? y - r * 2.5 : y - r * 1.7;
+      const headY = A.topY !== undefined ? A.topY : y - r * 1.7, faceY = A.faceY !== undefined ? A.faceY : y - r * 0.25, floorY = A.feetY !== undefined ? A.feetY : y + r;
       if (s.hype) {
         c.save();
         c.globalCompositeOperation = "lighter";
         const n = Math.min(7, 2 + s.hype);
         for (let i = 0; i < n; i++) {
           const fx = x + (i / (n - 1) - 0.5) * r * 2.2, hh = r * (0.9 + 0.5 * Math.sin(st * 9 + i * 2.3)) * (0.7 + Math.min(s.hype, 6) * 0.08);
-          const g = c.createLinearGradient(0, y + r * 0.9, 0, y + r * 0.9 - hh);
+          const g = c.createLinearGradient(0, floorY, 0, floorY - hh);
           g.addColorStop(0, "rgba(255,120,40,0.5)");
           g.addColorStop(1, "rgba(255,210,63,0)");
           c.fillStyle = g;
           c.beginPath();
-          c.moveTo(fx - r * 0.22, y + r * 0.9);
-          c.quadraticCurveTo(fx + Math.sin(st * 7 + i) * r * 0.2, y + r * 0.9 - hh * 0.6, fx, y + r * 0.9 - hh);
-          c.quadraticCurveTo(fx + r * 0.3, y + r * 0.9 - hh * 0.5, fx + r * 0.22, y + r * 0.9);
+          c.moveTo(fx - r * 0.22, floorY);
+          c.quadraticCurveTo(fx + Math.sin(st * 7 + i) * r * 0.2, floorY - hh * 0.6, fx, floorY - hh);
+          c.quadraticCurveTo(fx + r * 0.3, floorY - hh * 0.5, fx + r * 0.22, floorY);
           c.fill();
         }
         c.restore();
       }
       if (s.gunk) {
         c.fillStyle = "rgba(127,194,46,0.55)";
-        c.beginPath(); c.ellipse(x, y + r * (side === "p" ? 0.95 : 1.05), r * 1.2, r * 0.22, 0, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.ellipse(x, floorY, r * 1.2, r * 0.22, 0, 0, Math.PI * 2); c.fill();
         for (let i = 0; i < 5; i++) {
           const ph = (st * 0.6 + i * 0.23) % 1;
           c.strokeStyle = `rgba(200,255,140,${0.9 * (1 - ph)})`;
@@ -643,7 +643,7 @@
         }
       }
       if (s.pied) {
-        const fy = y - r * 0.25;
+        const fy = faceY;
         c.fillStyle = "#fff8e6";
         c.strokeStyle = "rgba(160,120,60,0.6)";
         c.lineWidth = 1.5;
@@ -693,6 +693,20 @@
         }
         c.restore();
       }
+      if (s.counter) {
+        c.strokeStyle = "#ff8a3d";
+        c.fillStyle = "rgba(255,138,61,0.85)";
+        c.lineWidth = 2;
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2 + st * 0.8, r0 = r * 1.35, r1 = r * (1.6 + 0.08 * Math.sin(st * 6 + i));
+          c.beginPath();
+          c.moveTo(x + Math.cos(a - 0.09) * r0, y + Math.sin(a - 0.09) * r0);
+          c.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+          c.lineTo(x + Math.cos(a + 0.09) * r0, y + Math.sin(a + 0.09) * r0);
+          c.fill();
+        }
+        c.beginPath(); c.arc(x, y, r * 1.35, 0, Math.PI * 2); c.stroke();
+      }
       if (side === "p" && B.res) {
         if (B.form === "stardust") {
           for (let i = 0; i < B.res; i++) {
@@ -702,7 +716,7 @@
           }
         } else if (B.form === "sludge") {
           const k = Math.min(1, B.res / 20);
-          X.glow(x, y + r * 0.6, r * (1.4 + k * 1.4), B.res >= 10 ? "#b6ff5c" : "#6f9a22", 0.12 + k * 0.22);
+          X.glow(x, y + r * 0.6, r * (1.4 + k * 1.4), B.res >= 6 ? "#b6ff5c" : "#6f9a22", 0.12 + k * 0.22);
         }
       }
     }

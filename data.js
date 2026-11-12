@@ -14,7 +14,7 @@ JG.ITEMS = {
   moonpie:   { name: "Moon Pie", desc: "Fills the belly. A little of everything.", color: "#e9d3a4", glyph: "◐", price: 8, belly: 40, mood: 8, xp: { juggle: 2, tumble: 2, glow: 2, grit: 2 } },
   plum:      { name: "Juggle Plum", desc: "Round and bouncy. Builds Juggle.", color: "#ff5fa8", glyph: "●", price: 14, belly: 15, xp: { juggle: 9 } },
   spring:    { name: "Springberry", desc: "Fizzy little coil-berries. Builds Tumble.", color: "#ffd23f", glyph: "❀", price: 14, belly: 15, xp: { tumble: 9 } },
-  comet:     { name: "Cotton Comet", atk: "fireball", desc: "Spun stardust. Builds Glow, leans Stardust.", color: "#c9b8ff", glyph: "✵", price: 14, belly: 15, xp: { glow: 9 }, align: 0.07 },
+  comet:     { name: "Cotton Comet", desc: "Spun stardust. Builds Glow, leans Stardust.", color: "#c9b8ff", glyph: "✵", price: 14, belly: 15, xp: { glow: 9 }, align: 0.07 },
   sludgepop: { name: "Sludge Pop", desc: "Green goo on a stick. Builds Grit, leans Sludge.", color: "#a6d94a", glyph: "♨", price: 14, belly: 15, xp: { grit: 9 }, align: -0.07 },
   floss:     { name: "Angel Floss", desc: "Tastes like a cloud's last thought. Big Stardust lean.", color: "#f4f0ff", glyph: "☁", price: 32, belly: 10, xp: { glow: 4 }, align: 0.22 },
   gum:       { name: "Black Hole Gum", desc: "Chewed by something huge. Big Sludge lean.", color: "#5d4a7a", glyph: "◉", price: 32, belly: 10, xp: { grit: 4 }, align: -0.22 },
@@ -30,40 +30,44 @@ JG.COMMON_ITEMS = ["moonpie", "plum", "spring", "comet", "sludgepop", "cd"];
 
 // Cards. type sets the color and which stat boosts it and grows from it.
 // fx: dmg (with hits), block, heal, gunk, dazed, pied, hype, draw, energy, selfdmg, blockHit, doubleGunk, piedHit.
+// Order matters. A card can carry one bonus that is added to fx when its condition holds:
+//   opener: it is the first card played this turn
+//   finisher: two or more cards were already played this turn
+//   after: [type, bonus]: the card played just before it this turn was of that type
 JG.CARDS = {
-  pie:       { name: "Pie Toss", cost: 1, type: "atk", rarity: 0, fx: { dmg: 6 } },
-  cart:      { name: "Cartwheel", cost: 1, type: "blk", rarity: 0, fx: { block: 5 } },
-  halohum:   { name: "Halo Hum", cost: 1, type: "eth", rarity: 0, fx: { heal: 3, block: 3 } },
-  gunkspit:  { name: "Gunk Spit", cost: 1, type: "gunk", rarity: 0, fx: { gunk: 4 } },
-  honk:      { name: "Honk!", cost: 0, type: "atk", rarity: 0, fx: { dmg: 3, dazed: 1 } },
+  pie:       { name: "Pie Toss", cost: 1, type: "atk", rarity: 0, fx: { dmg: 6 }, after: ["blk", { dmg: 4 }] },
+  cart:      { name: "Cartwheel", cost: 1, type: "blk", rarity: 0, fx: { block: 5 }, opener: { block: 3 } },
+  halohum:   { name: "Halo Hum", cost: 1, type: "eth", rarity: 0, fx: { heal: 3, block: 3 }, after: ["eth", { heal: 3 }] },
+  gunkspit:  { name: "Gunk Spit", cost: 1, type: "gunk", rarity: 0, fx: { gunk: 4 }, finisher: { gunk: 3 } },
+  honk:      { name: "Honk!", cost: 0, type: "atk", rarity: 0, fx: { dmg: 3, dazed: 1 }, opener: { draw: 1 } },
 
-  juggle:    { name: "Juggle Stars", cost: 1, type: "atk", rarity: 1, fx: { dmg: 3, hits: 3 } },
-  seltzer:   { name: "Seltzer Spray", cost: 1, type: "atk", rarity: 1, fx: { dmg: 4, pied: 2 } },
-  mallet:    { name: "Big Mallet", cost: 2, type: "atk", rarity: 1, fx: { dmg: 13 } },
-  chicken:   { name: "Rubber Chicken", cost: 0, type: "atk", rarity: 1, fx: { dmg: 3 } },
+  juggle:    { name: "Juggle Stars", cost: 1, type: "atk", rarity: 1, fx: { dmg: 3, hits: 3 }, finisher: { hits: 1 } },
+  seltzer:   { name: "Seltzer Spray", cost: 1, type: "atk", rarity: 1, fx: { dmg: 4, pied: 2 }, opener: { dmg: 3 } },
+  mallet:    { name: "Big Mallet", cost: 2, type: "atk", rarity: 1, fx: { dmg: 13 }, finisher: { dmg: 7 } },
+  chicken:   { name: "Rubber Chicken", cost: 0, type: "atk", rarity: 1, fx: { dmg: 3 }, after: ["atk", { dmg: 4 }] },
   kazoo:     { name: "Kazoo Wail", cost: 1, type: "blk", rarity: 1, fx: { block: 4, dazed: 2 } },
-  backflip:  { name: "Backflip", cost: 1, type: "blk", rarity: 1, fx: { block: 7, draw: 1 } },
-  pin:       { name: "Safety Pin", cost: 0, type: "blk", rarity: 1, fx: { block: 3 } },
-  bath:      { name: "Sludge Bath", cost: 1, type: "gunk", rarity: 1, fx: { gunk: 6 } },
-  veil:      { name: "Stardust Veil", cost: 1, type: "eth", rarity: 1, fx: { block: 6, heal: 2 } },
-  moonbeam:  { name: "Moonbeam", cost: 1, type: "eth", rarity: 1, fx: { dmg: 5, heal: 3 } },
-  mirror:    { name: "Mirror Gag", cost: 1, type: "trick", rarity: 1, fx: { pied: 2, dazed: 1 } },
+  backflip:  { name: "Backflip", cost: 1, type: "blk", rarity: 1, fx: { block: 7, draw: 1 }, after: ["atk", { block: 4 }] },
+  pin:       { name: "Safety Pin", cost: 0, type: "blk", rarity: 1, fx: { block: 3 }, after: ["blk", { block: 4 }] },
+  bath:      { name: "Sludge Bath", cost: 1, type: "gunk", rarity: 1, fx: { gunk: 6 }, opener: { gunk: 2 } },
+  veil:      { name: "Stardust Veil", cost: 1, type: "eth", rarity: 1, fx: { block: 6, heal: 2 }, after: ["eth", { block: 4 }] },
+  moonbeam:  { name: "Moonbeam", cost: 1, type: "eth", rarity: 1, fx: { dmg: 5, heal: 3 }, finisher: { dmg: 5 } },
+  mirror:    { name: "Mirror Gag", cost: 1, type: "trick", rarity: 1, fx: { pied: 2, dazed: 1 }, opener: { draw: 1 } },
 
-  chord:     { name: "Power Chord", cost: 1, type: "atk", rarity: 2, fx: { dmg: 6, hype: 1 } },
+  chord:     { name: "Power Chord", cost: 1, type: "atk", rarity: 2, fx: { dmg: 6, hype: 1 }, after: ["trick", { hype: 1 }] },
   mosh:      { name: "Mosh Pit", cost: 1, type: "atk", rarity: 2, fx: { blockHit: 1 } },
-  dive:      { name: "Stage Dive", cost: 1, type: "atk", rarity: 2, fx: { dmg: 13, selfdmg: 3 } },
+  dive:      { name: "Stage Dive", cost: 1, type: "atk", rarity: 2, fx: { dmg: 13, selfdmg: 3 }, finisher: { dmg: 5 } },
   feedback:  { name: "Feedback", cost: 1, type: "atk", rarity: 2, fx: { dmg: 5, piedHit: 1 } },
-  trapdoor:  { name: "Trapdoor", cost: 2, type: "blk", rarity: 2, fx: { block: 14 } },
+  trapdoor:  { name: "Trapdoor", cost: 2, type: "blk", rarity: 2, fx: { block: 14 }, opener: { block: 5 } },
   tightrope: { name: "Tightrope", cost: 1, type: "blk", rarity: 2, fx: { block: 5, hype: 1 } },
   encoregunk:{ name: "Toxic Encore", cost: 1, type: "gunk", rarity: 2, fx: { doubleGunk: 1 } },
-  seraph:    { name: "Seraph Strum", cost: 2, type: "eth", rarity: 2, fx: { heal: 7, block: 8 } },
+  seraph:    { name: "Seraph Strum", cost: 2, type: "eth", rarity: 2, fx: { heal: 7, block: 8 }, finisher: { heal: 4 } },
   wish:      { name: "Wish Upon a Star", cost: 1, type: "trick", rarity: 2, fx: { draw: 3 } },
   grease:    { name: "Greasepaint", cost: 0, type: "trick", rarity: 2, fx: { hype: 2 }, exhaust: true },
   encore:    { name: "Encore!", cost: 0, type: "trick", rarity: 2, fx: { energy: 1, draw: 1 }, exhaust: true },
 
   cannon:    { name: "Human Cannonball", cost: 3, type: "atk", rarity: 3, fx: { dmg: 28 }, exhaust: true },
   blackhole: { name: "Black Hole Gum", cost: 2, type: "gunk", rarity: 3, fx: { gunk: 5, dazed: 2, pied: 2 } },
-  haloburst: { name: "Halo Burst", cost: 2, type: "eth", rarity: 3, fx: { dmg: 10, heal: 6 } },
+  haloburst: { name: "Halo Burst", cost: 2, type: "eth", rarity: 3, fx: { dmg: 10, heal: 6 }, after: ["eth", { dmg: 8 }] },
   ringmaster:{ name: "Steal the Show", cost: 1, type: "trick", rarity: 3, fx: { hype: 3, selfdmg: 4 }, exhaust: true }
 };
 JG.TYPE_INFO = {
@@ -89,46 +93,50 @@ JG.CHARMS = {
   rose:     { name: "Thrown Rose", desc: "Start every fight with 25 Applause.", glyph: "✿", color: "#ff3b4a" }
 };
 
-// Foes. moves cycle in order. atk with n hits, blk, heal, hype, dazed, pied, gunk, charge.
-// look drives the procedural drawing in draw.js. atk picks the attack animation in stage.js.
+// Foes. moves cycle in order: atk with n hits, blk, heal, hype, dazed, pied, gunk, heckle, and two that ask for an answer:
+//   charge with flinch: it winds up a big hit. Deal that much damage in one turn and it flinches and loses the hit.
+//   counter: until its next turn, every hit on it hurts you back.
+// weak and resist name a card type (atk, eth or gunk): 50% more or 50% less from those cards.
+// atk picks the attack animation in stage.js. body and size place the drawing from draw.js.
 JG.FOES = {
-  mime:     { name: "Sad Mime", atk: "punch", hp: [22, 26], moves: [{ atk: 6 }, { atk: 3, dazed: 1 }, { blk: 5, atk: 4, heckle: 15 }],
-              look: { body: "tall", skin: "#f1ece4", paint: "#1b1726", hat: "beret", eyes: "tear", extra: "stripes", size: 1 } },
-  goblin:   { name: "Popcorn Goblin", atk: "popcorn", hp: [18, 22], moves: [{ atk: 3, n: 2 }, { atk: 3, n: 2 }, { gunk: 2, atk: 2 }],
-              look: { body: "round", skin: "#e9c46a", paint: "#d62839", hat: "cone", eyes: "spiral", extra: "popcorn", size: 0.8 } },
-  balloon:  { name: "Static Balloon", atk: "zap", hp: [16, 18], moves: [{ charge: 1 }, { charge: 1 }, { atk: 15 }],
-              look: { body: "balloon", skin: "#ff5fa8", paint: "#ffffff", hat: "none", eyes: "x", extra: "string", size: 0.95 } },
-  tearer:   { name: "Ticket Tearer", atk: "tickets", hp: [26, 30], moves: [{ blk: 6, heckle: 10 }, { atk: 8 }, { atk: 5, pied: 1 }],
-              look: { body: "wide", skin: "#c2b59b", paint: "#3d2a52", hat: "top", eyes: "hollow", extra: "tickets", size: 1 } },
-  strongman:{ name: "The Strongman Who Cries", atk: "smash", hp: [50, 54], elite: true, moves: [{ atk: 10 }, { hype: 3, blk: 8 }, { atk: 6, n: 2 }],
-              look: { body: "wide", skin: "#e8a17a", paint: "#1b1726", hat: "none", eyes: "tear", extra: "arms", size: 1.25 } },
-  calliope: { name: "Calliope Wraith", atk: "notes", hp: [88, 88], boss: true, moves: [{ dazed: 2, blk: 10, heckle: 20 }, { atk: 11 }, { atk: 4, n: 3 }, { heal: 10, hype: 2 }],
-              look: { body: "wisp", skin: "#d8d0ff", paint: "#5b2a86", hat: "horns", eyes: "hollow", extra: "pipes", size: 1.4 } },
+  mime:     { name: "Sad Mime", atk: "punch", hp: [28, 32], body: "tall", size: 1,
+              moves: [{ atk: 7 }, { counter: 4, blk: 4 }, { atk: 5, dazed: 1 }, { blk: 6, heckle: 15 }] },
+  goblin:   { name: "Popcorn Goblin", atk: "popcorn", hp: [24, 28], weak: "gunk", body: "round", size: 0.85,
+              moves: [{ atk: 3, n: 3 }, { hype: 1, blk: 5 }, { atk: 4, n: 2, gunk: 2 }] },
+  balloon:  { name: "Static Balloon", atk: "zap", hp: [20, 24], weak: "atk", resist: "gunk", body: "balloon", size: 0.95,
+              moves: [{ charge: 1, flinch: 12, blk: 4 }, { atk: 13 }, { atk: 5 }] },
+  tearer:   { name: "Ticket Tearer", atk: "tickets", hp: [30, 34], weak: "eth", body: "wide", size: 1,
+              moves: [{ blk: 8, heckle: 10 }, { atk: 10 }, { atk: 6, pied: 1 }] },
+  strongman:{ name: "The Strongman Who Cries", atk: "smash", hp: [58, 62], elite: true, weak: "eth", body: "wide", size: 1.25,
+              moves: [{ atk: 9 }, { charge: 1, flinch: 16, blk: 6 }, { atk: 15 }, { hype: 2, blk: 8 }, { atk: 6, n: 2 }] },
+  calliope: { name: "Calliope Wraith", atk: "notes", hp: [105, 105], boss: true, weak: "gunk", resist: "eth", body: "wisp", size: 1.4,
+              moves: [{ dazed: 2, blk: 10, heckle: 20 }, { atk: 11 }, { atk: 4, n: 3 }, { charge: 1, flinch: 20 }, { atk: 16 }, { heal: 10, hype: 2 }] },
 
-  seal:     { name: "Grease Seal", atk: "dive", hp: [34, 38], moves: [{ gunk: 3, atk: 5 }, { atk: 9 }, { blk: 8 }],
-              look: { body: "blob", skin: "#4a5a3a", paint: "#a6d94a", hat: "cone", eyes: "hollow", extra: "fins", size: 1.05 } },
-  glass:    { name: "Glass Juggler", atk: "glass", hp: [30, 34], moves: [{ atk: 4, n: 3 }, { blk: 10 }, { atk: 4, n: 3, pied: 1 }],
-              look: { body: "tall", skin: "#bdf3ff", paint: "#2a6f86", hat: "horns", eyes: "many", extra: "glassballs", size: 1 } },
-  moth:     { name: "Moth Acrobat", atk: "dive", hp: [36, 40], moves: [{ atk: 10 }, { blk: 9, hype: 1 }, { atk: 6, dazed: 1 }],
-              look: { body: "tall", skin: "#d9c7a7", paint: "#5a3e2b", hat: "none", eyes: "hollow", extra: "wings", size: 1.05 } },
-  double:   { name: "Funhouse Double", atk: "punch", hp: [40, 42], moves: [{ atk: 8, pied: 2 }, { atk: 12 }, { blk: 12, heckle: 15 }],
-              look: { body: "round", skin: "#ffb3e6", paint: "#1b1726", hat: "cone", eyes: "x", extra: "glitch", size: 1 } },
-  shadow:   { name: "Ringleader's Shadow", atk: "dark", hp: [78, 82], elite: true, moves: [{ atk: 14 }, { dazed: 2, pied: 2, heckle: 20 }, { atk: 5, n: 3 }, { hype: 2, blk: 10 }],
-              look: { body: "wisp", skin: "#2b2140", paint: "#ff3b4a", hat: "top", eyes: "hollow", extra: "glitch", size: 1.3 } },
-  mirrorrm: { name: "The Mirror Ringmaster", atk: "glass", hp: [150, 150], boss: true, moves: [{ atk: 8, n: 2 }, { blk: 16, hype: 2, heckle: 20 }, { atk: 20 }, { pied: 2, dazed: 2, gunk: 4 }],
-              look: { body: "tall", skin: "#e6f7ff", paint: "#d62839", hat: "top", eyes: "spiral", extra: "mirror", size: 1.5 } },
+  seal:     { name: "Grease Seal", atk: "dive", hp: [40, 44], weak: "atk", resist: "gunk", body: "blob", size: 1.05,
+              moves: [{ gunk: 3, atk: 6 }, { atk: 11 }, { blk: 10, hype: 1 }] },
+  glass:    { name: "Glass Juggler", atk: "glass", hp: [34, 38], weak: "atk", body: "tall", size: 1,
+              moves: [{ atk: 4, n: 3 }, { counter: 5, blk: 8 }, { atk: 5, n: 3, pied: 1 }] },
+  moth:     { name: "Moth Acrobat", atk: "dive", hp: [42, 46], weak: "eth", body: "tall", size: 1.05,
+              moves: [{ atk: 12 }, { blk: 9, hype: 1 }, { atk: 7, dazed: 1 }, { charge: 1, flinch: 18 }, { atk: 17 }] },
+  double:   { name: "Funhouse Double", atk: "punch", hp: [46, 50], body: "round", size: 1,
+              moves: [{ atk: 9, pied: 2 }, { counter: 5 }, { atk: 14 }, { blk: 12, heckle: 15 }] },
+  shadow:   { name: "Ringleader's Shadow", atk: "dark", hp: [92, 96], elite: true, weak: "eth", resist: "atk", body: "wisp", size: 1.3,
+              moves: [{ atk: 15 }, { dazed: 2, pied: 2, heckle: 20 }, { atk: 6, n: 3 }, { hype: 2, blk: 10 }] },
+  mirrorrm: { name: "The Mirror Ringmaster", atk: "glass", hp: [175, 175], boss: true, resist: "eth", body: "tall", size: 1.5,
+              moves: [{ atk: 9, n: 2 }, { counter: 6, blk: 14, hype: 1 }, { charge: 1, flinch: 26 }, { atk: 19 }, { pied: 2, dazed: 2, gunk: 4, heckle: 20 }] },
 
-  comet:    { name: "Comet Clown", hp: [48, 54], moves: [{ atk: 7, n: 2 }, { atk: 14 }, { charge: 1, blk: 10 }],
-              look: { body: "round", skin: "#fff1c2", paint: "#ff8a3d", hat: "cone", eyes: "spiral", extra: "tail", size: 1.05 } },
-  usher:    { name: "Void Usher", atk: "dark", hp: [55, 58], moves: [{ blk: 14, heckle: 15 }, { atk: 12, dazed: 1 }, { gunk: 5 }],
-              look: { body: "tall", skin: "#1a1230", paint: "#8fe9ff", hat: "top", eyes: "many", extra: "stripes", size: 1.15 } },
-  angel:    { name: "Static Angel", atk: "beam", hp: [50, 54], moves: [{ heal: 10, blk: 6 }, { atk: 6, n: 3 }, { atk: 16 }],
-              look: { body: "wisp", skin: "#f4f0ff", paint: "#8fe9ff", hat: "halo", eyes: "x", extra: "wings", size: 1.1 } },
-  trapeze:  { name: "The Last Trapeze", atk: "dive", hp: [118, 122], elite: true, moves: [{ atk: 9, n: 2 }, { blk: 14, hype: 2 }, { atk: 22 }, { dazed: 2, gunk: 4 }],
-              look: { body: "tall", skin: "#ffd6e8", paint: "#5b2a86", hat: "crown", eyes: "tear", extra: "ropes", size: 1.3 } },
-  mother:   { name: "Mother Static", atk: "static", hp: [240, 240], boss: true, moves: [{ atk: 10, n: 2 }, { gunk: 5, dazed: 2, heckle: 25 }, { blk: 20, hype: 3 }, { atk: 28 }, { heal: 20, pied: 2 }],
-              look: { body: "tv", skin: "#2b2140", paint: "#a6d94a", hat: "crown", eyes: "many", extra: "tentacles", size: 1.6 } }
+  comet:    { name: "Comet Clown", atk: "fireball", hp: [58, 64], weak: "gunk", body: "round", size: 1.05,
+              moves: [{ atk: 8, n: 2 }, { charge: 1, flinch: 22, blk: 10 }, { atk: 20 }] },
+  usher:    { name: "Void Usher", atk: "dark", hp: [64, 68], weak: "eth", resist: "gunk", body: "tall", size: 1.15,
+              moves: [{ blk: 14, heckle: 15 }, { atk: 14, dazed: 1 }, { gunk: 5, atk: 6 }] },
+  angel:    { name: "Static Angel", atk: "beam", hp: [58, 62], weak: "gunk", resist: "eth", body: "wisp", size: 1.1,
+              moves: [{ heal: 10, blk: 8 }, { atk: 7, n: 3 }, { counter: 6 }, { atk: 18 }] },
+  trapeze:  { name: "The Last Trapeze", atk: "dive", hp: [138, 142], elite: true, weak: "atk", body: "tall", size: 1.3,
+              moves: [{ atk: 10, n: 2 }, { blk: 14, hype: 2 }, { charge: 1, flinch: 28 }, { atk: 22 }, { dazed: 2, gunk: 4 }] },
+  mother:   { name: "Mother Static", atk: "static", hp: [280, 280], boss: true, body: "tv", size: 1.6,
+              moves: [{ atk: 11, n: 2 }, { gunk: 5, dazed: 2, heckle: 25 }, { counter: 7, blk: 20, hype: 2 }, { charge: 1, flinch: 34 }, { atk: 24 }, { heal: 20, pied: 2 }] }
 };
+for (const k in JG.FOES) JG.FOES[k].look = { body: JG.FOES[k].body, size: JG.FOES[k].size };
 
 JG.ACTS = [
   { name: "The Midway", tint: "#d62839", foes: ["mime", "goblin", "balloon", "tearer"], elite: ["strongman"], boss: "calliope" },
@@ -173,12 +181,15 @@ JG.TRAITS = {
 // How a Jinx fights depends on its lean. Child or adult, it's the same.
 JG.FORMS = {
   sludge: { name: "Sludge", res: "Corruption", show: "Sludge Flood", color: "#a6d94a",
-    desc: "Builds Corruption whenever it applies Gunk or Gunk eats away at a foe. At 10 or more, every hit adds 1 Gunk.",
+    desc: "Builds Corruption whenever it applies Gunk or Gunk eats away at a foe. At 6 or more, every hit adds 1 Gunk.",
     showDesc: "Deal 8 plus one and a half times your Corruption, apply 6 Gunk, and spend all the Corruption." },
   stardust: { name: "Stardust", res: "Starlight", show: "Supernova", color: "#8fe9ff",
-    desc: "Every Ether card adds 1 Starlight, up to 5. Each turn starts with 2 Block for every Starlight.",
+    desc: "Every Ether card adds 1 Starlight, up to 5. Each turn starts with 3 Block for every Starlight.",
     showDesc: "Deal 6 plus 4 per Starlight, heal 4 plus 3 per Starlight, shake off Dazed, Pied and Gunk, and spend the Starlight." },
   harlequin: { name: "Harlequin", res: null, show: "Harlequin Shuffle", color: "#ff5fa8",
     desc: "One card in every hand is Wild and plays twice.",
-    showDesc: "Swap your whole hand for 5 new cards, then gain 2 energy and 1 Hype." }
+    showDesc: "Swap your whole hand for 5 new cards, then gain 1 energy and 1 Hype." }
 };
+
+// Difficulty dials, set by play-testing with automated players (a careless one should faint in Act I).
+JG.TUNE = { hp: [1.5, 1.7, 2.1], dmg: [1.9, 1.9, 2.3], bossHeal: 0.25, baseHp: 30 };   // hp and dmg are per act

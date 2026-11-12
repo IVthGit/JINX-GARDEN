@@ -357,7 +357,7 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
 .piles { font-family: var(--chunk); font-size: 0.6rem; color: var(--bone-dim); display: grid; gap: 4px; justify-items: center; margin-top: 6px; }
 .left-tray { display: grid; justify-items: center; }
 #hand { display: flex; justify-content: center; align-items: flex-end; min-height: 180px; padding-top: 14px; min-width: 0; }
-#hand .card { margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 5) * 7px, 26px)); }
+
 .right-tray { display: grid; gap: 8px; justify-items: end; }
 .keys { font-size: 0.7rem; color: var(--bone-dim); }
 @media (max-width: 760px), (max-height: 560px) {
@@ -368,7 +368,7 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
   .card .ctype { font-size: 0.42rem; }
   .card .cost { width: 24px; height: 24px; font-size: 0.8rem; top: -8px; left: -8px; }
   #hand { min-height: 146px; }
-  #hand .card { margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 3) * 9px, 44px)); }
+  #hand .slot { margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 3) * 9px, 44px)); }
 }
 @media (max-width: 640px) {
   .tray { grid-template-columns: auto auto; grid-template-areas: "hand hand" "left right"; gap: 6px; }
@@ -382,6 +382,42 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
   .node .ng { width: 46px; height: 46px; font-size: 1.2rem; }
   .plate .pn { font-size: 0.95rem; }
 }
+
+/* ---------- order, answers and weak spots ---------- */
+#hand .slot { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 5) * 7px, 26px)); transition: transform 0.12s; }
+#hand .slot .card { margin: 0; }
+#hand .slot:hover { z-index: 3; }
+#hand .slot.held { transform: translateY(-16px); }
+#hand .slot.held .card { box-shadow: 4px 4px 0 var(--ink), 0 0 0 3px var(--ether), 0 0 18px rgba(143,233,255,0.7); }
+.holdtab { order: -1; margin-bottom: 4px; font-family: var(--chunk); font-size: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  color: var(--bone-dim); background: rgba(13,6,24,0.85); border: 1.5px dashed var(--bone-dim); padding: 2px 8px; }
+.holdtab:hover:not(:disabled) { color: var(--ether); border-color: var(--ether); }
+.holdtab[aria-pressed="true"] { color: var(--ink); background: var(--ether); border: 1.5px solid var(--ink); }
+.holdtab:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 760px), (max-height: 560px) {
+  #hand .slot { margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 3) * 9px, 44px)); }
+  .card .cbonus { font-size: 0.5rem; }
+  .card .cbonus.on { font-size: 0.44rem; }
+  .holdtab { font-size: 0.44rem; padding: 2px 6px; }
+}
+.card .cbonus { font-size: 0.6rem; line-height: 1.15; color: #6a4a7a; border-top: 1px dashed rgba(20,10,30,0.3); padding-top: 2px; }
+.card .cbonus.on { color: #8c1a2e; font-family: var(--chunk); font-size: 0.52rem; letter-spacing: 0.02em; }
+.card.ready { box-shadow: 4px 4px 0 var(--ink), 0 0 0 3px var(--gold), 0 0 18px rgba(255,210,63,0.75); }
+.card.ready.wild { box-shadow: 4px 4px 0 var(--ink), 0 0 0 3px #ff4fa3, 0 0 0 6px #ffd23f, 0 0 22px rgba(255,79,163,0.7); }
+.card { grid-template-rows: auto 1fr auto auto auto; }
+.traits { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; font-family: var(--chunk); font-size: 0.56rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.traits .weak { color: var(--ink); background: var(--gold); padding: 1px 6px; }
+.traits .resist { color: var(--bone-dim); border: 1px solid var(--bone-dim); padding: 0 6px; }
+.st-counter { color: #ff8a3d; }
+.in-counter { background: #ff8a3d; }
+.flinch { flex-basis: 100%; display: grid; gap: 3px; justify-items: end; font-size: 0.72rem; color: var(--bone); }
+.flinch b { color: var(--gold); }
+.fbar { display: block; position: relative; width: 150px; height: 8px; background: #120818; border: 1px solid var(--gold); }
+.fbar i { position: absolute; inset: 0 auto 0 0; background: var(--gold); }
+#combo { display: flex; align-items: center; gap: 4px; font-family: var(--chunk); font-size: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bone-dim); margin-top: 6px; cursor: help; }
+#combo i { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--bone-dim); background: transparent; }
+#combo.done { color: var(--gold); }
+#combo.done i { border-color: var(--gold); box-shadow: 0 0 8px var(--gold); }
 
 /* ---------- crowd, will and form ---------- */
 #applause { display: grid; gap: 4px; width: 190px; }
@@ -476,6 +512,7 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
         <span class="ptag" id="battleTitle">Heckler</span>
         <span class="pn" id="foeName"></span>
         <div class="hpline" id="foeHp"></div>
+        <div class="traits" id="foeTraits"></div>
         <div class="sts" id="foeSt"></div>
         <div id="intent"></div>
       </div>
@@ -483,6 +520,7 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
     <div class="tray">
       <div class="left-tray">
         <div id="energy"></div>
+        <div id="combo"></div>
         <div class="piles"><span id="pileDraw"></span><span id="pileDisc"></span></div>
       </div>
       <div id="hand"></div>
@@ -493,7 +531,7 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
         </div>
         <button class="btn showstop" id="showstop" hidden>Showstopper</button>
         <button class="btn" id="endTurn">End turn</button>
-        <span class="keys">Keys: 1&ndash;9 play, S showstopper, E ends turn</span>
+        <span class="keys">Keys: 1&ndash;9 play, Shift+1&ndash;9 hold, S showstopper, E ends turn</span>
       </div>
     </div>
   </section>
