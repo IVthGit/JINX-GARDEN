@@ -1251,7 +1251,8 @@
   };
 
   // ---------- foes ----------
-  // Every foe has its own drawing in ART, built from a few shared inked parts.
+  // Every foe has its own drawing in ART, built from shared inked parts: bodies with crosshatched
+  // shadows, gloved hands, big shoes, eyes and mouths that can make faces, and patterned cloth.
   const FINK = "#140a1e";
   for (const k in JG.FOES) JG.FOES[k].id = k;
   function fPaint(path, fill, lw) {
@@ -1261,24 +1262,33 @@
     ctx.lineWidth = lw;
     ctx.stroke(path);
   }
-  // flat shadow on the side away from the light, a thin rim of light inside the edge
+  // shadow on the side away from the light, crosshatched like a zine drawing, and a rim of light
   function fShade(path, r, lx, ly, k) {
     ctx.save();
     ctx.clip(path);
-    ctx.fillStyle = `rgba(20,8,45,${k || 0.24})`;
+    const sh = new Path2D();
+    sh.rect(-r * 5, -r * 5, r * 10, r * 10);
+    sh.arc(lx === undefined ? -r * 0.3 : lx, ly === undefined ? -r * 0.4 : ly, r * 1.2, 0, Math.PI * 2, true);
+    ctx.fillStyle = `rgba(20,8,45,${k || 0.26})`;
+    ctx.fill(sh, "evenodd");
+    ctx.save();
+    ctx.clip(sh, "evenodd");
+    ctx.strokeStyle = "rgba(20,8,45,0.3)";
+    ctx.lineWidth = Math.max(0.8, r * 0.02);
+    const st = Math.max(4, r * 0.11);
     ctx.beginPath();
-    ctx.rect(-r * 4, -r * 4, r * 8, r * 8);
-    ctx.arc(lx === undefined ? -r * 0.3 : lx, ly === undefined ? -r * 0.4 : ly, r * 1.25, 0, Math.PI * 2, true);
-    ctx.fill("evenodd");
-    ctx.strokeStyle = "rgba(255,255,255,0.16)";
-    ctx.lineWidth = r * 0.14;
+    for (let i = -40; i < 40; i++) { ctx.moveTo(i * st - r * 3, -r * 3); ctx.lineTo(i * st + r * 3, r * 3); }
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = r * 0.12;
     ctx.stroke(path);
     ctx.restore();
   }
-  function fBody(path, fill, r, lw, lx, ly) {
+  function fBody(path, fill, r, lw, lx, ly, k) {
     ctx.fillStyle = fill;
     ctx.fill(path);
-    fShade(path, r, lx, ly);
+    fShade(path, r, lx, ly, k);
     ctx.strokeStyle = FINK;
     ctx.lineWidth = lw;
     ctx.stroke(path);
@@ -1300,116 +1310,209 @@
       ctx.stroke();
     }
   }
-  function fEyes(kind, ex, ey, r, t, paint, eyeC) {
-    eyeC = eyeC || FINK;
-    if (kind === "tear") {
-      for (const s of [-1, 1]) {
-        ctx.fillStyle = rgb(paint, 0.9);
-        ctx.beginPath();
-        ctx.moveTo(s * ex, ey - r * 0.32); ctx.lineTo(s * ex + r * 0.1, ey); ctx.lineTo(s * ex, ey + r * 0.32); ctx.lineTo(s * ex - r * 0.1, ey);
-        ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath(); ctx.ellipse(s * ex, ey, r * 0.13, r * 0.1, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = eyeC;
-        ctx.beginPath(); ctx.arc(s * ex, ey + r * 0.02, r * 0.055, 0, Math.PI * 2); ctx.fill();
-        const tp = (t * 0.7 + (s > 0 ? 0.4 : 0)) % 1;
-        ctx.fillStyle = "#8fe9ff";
-        ctx.beginPath(); ctx.ellipse(s * ex, ey + r * 0.3 + tp * r * 0.5, r * 0.045, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
-      }
-    } else if (kind === "x") {
-      ctx.strokeStyle = eyeC;
-      ctx.lineWidth = r * 0.08;
-      ctx.lineCap = "round";
-      for (const s of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(s * ex - r * 0.11, ey - r * 0.11); ctx.lineTo(s * ex + r * 0.11, ey + r * 0.11);
-        ctx.moveTo(s * ex + r * 0.11, ey - r * 0.11); ctx.lineTo(s * ex - r * 0.11, ey + r * 0.11);
-        ctx.stroke();
-      }
-    } else if (kind === "hollow") {
-      for (const s of [-1, 1]) {
-        ctx.fillStyle = "#0a0414";
-        ctx.beginPath(); ctx.ellipse(s * ex, ey, r * 0.15, r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
-        glow(s * ex, ey, r * 0.22, paint, 0.9);
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath(); ctx.arc(s * ex, ey, r * 0.035, 0, Math.PI * 2); ctx.fill();
-      }
-    } else if (kind === "spiral") {
-      for (const s of [-1, 1]) {
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = FINK;
-        ctx.lineWidth = r * 0.03;
-        ctx.beginPath(); ctx.arc(s * ex, ey, r * 0.19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.strokeStyle = eyeC;
-        ctx.lineWidth = r * 0.04;
-        ctx.beginPath();
-        for (let k = 0; k < 24; k++) {
-          const a = k * 0.55 + t * 4 * s, rr = (k / 24) * r * 0.16;
-          const px = s * ex + Math.cos(a) * rr, py = ey + Math.sin(a) * rr;
-          k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-        }
-        ctx.stroke();
-      }
-    } else if (kind === "many") {
-      const pos = [[-0.4, -0.05], [0.4, -0.05], [0, -0.25], [-0.2, 0.12], [0.22, 0.14]];
-      pos.forEach((p, i) => {
-        const open = Math.sin(t * 1.7 + i * 1.9) > -0.85;
-        ctx.fillStyle = paint;
-        ctx.beginPath(); ctx.ellipse(p[0] * r, ey + p[1] * r, r * 0.1, open ? r * 0.1 : r * 0.015, 0, 0, Math.PI * 2); ctx.fill();
-        if (open) {
-          ctx.fillStyle = eyeC;
-          ctx.beginPath(); ctx.arc(p[0] * r + Math.sin(t + i) * r * 0.02, ey + p[1] * r, r * 0.045, 0, Math.PI * 2); ctx.fill();
-        }
-      });
-    }
-  }
-  function fMouth(frown, ey, r, col, lw) {
+  // cloth patterns, drawn inside a shape
+  function stripes(path, col, w, ang, x0) {
+    ctx.save();
+    ctx.clip(path);
+    ctx.rotate(ang || 0);
     ctx.fillStyle = col;
-    ctx.strokeStyle = FINK;
-    ctx.lineWidth = lw * 0.7;
-    ctx.beginPath();
-    if (frown) {
-      ctx.moveTo(-r * 0.3, ey + r * 0.5);
-      ctx.quadraticCurveTo(0, ey + r * 0.22, r * 0.3, ey + r * 0.5);
-      ctx.quadraticCurveTo(0, ey + r * 0.36, -r * 0.3, ey + r * 0.5);
-      ctx.fill();
-      ctx.stroke();
-    } else {
-      ctx.moveTo(-r * 0.4, ey + r * 0.25);
-      ctx.quadraticCurveTo(0, ey + r * 0.78, r * 0.4, ey + r * 0.25);
-      ctx.quadraticCurveTo(0, ey + r * 0.42, -r * 0.4, ey + r * 0.25);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#ffffff";
-      for (let k = -2; k <= 2; k++) ctx.fillRect(k * r * 0.11 - r * 0.04, ey + r * 0.35 + Math.abs(k) * -r * 0.015, r * 0.08, r * 0.08);
-    }
+    for (let i = -30; i < 30; i++) ctx.fillRect((x0 || 0) + i * w * 2, -w * 60, w, w * 120);
+    ctx.restore();
   }
-  function fNose(x, y, r, lw) {
-    ctx.fillStyle = "#ff3b4a";
+  function diamonds(path, c1, c2, s, ox, oy) {
+    ctx.save();
+    ctx.clip(path);
+    for (let i = -8; i <= 8; i++) for (let k = -8; k <= 8; k++) {
+      const x = (ox || 0) + i * s + (k % 2 ? s / 2 : 0), y = (oy || 0) + k * s * 0.8;
+      ctx.fillStyle = (i + k) % 2 ? c1 : c2;
+      ctx.beginPath(); ctx.moveTo(x, y - s * 0.8); ctx.lineTo(x + s / 2, y); ctx.lineTo(x, y + s * 0.8); ctx.lineTo(x - s / 2, y); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function dots(path, col, s, rr) {
+    ctx.save();
+    ctx.clip(path);
+    ctx.fillStyle = col;
+    for (let i = -10; i <= 10; i++) for (let k = -10; k <= 10; k++) {
+      ctx.beginPath(); ctx.arc(i * s + (k % 2 ? s / 2 : 0), k * s * 0.85, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // a cartoon glove: palm, three fingers, a thumb and a cuff
+  function glove(x, y, s, rot, fill, lw) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot || 0);
+    const p = new Path2D();
+    p.moveTo(-s * 0.7, s * 0.5);
+    p.lineTo(-s * 0.75, -s * 0.2);
+    for (let i = 0; i < 3; i++) {
+      const fx = -s * 0.5 + i * s * 0.5;
+      p.quadraticCurveTo(fx - s * 0.28, -s * (1.0 + (i === 1 ? 0.15 : 0)), fx, -s * (1.05 + (i === 1 ? 0.15 : 0)));
+      p.quadraticCurveTo(fx + s * 0.28, -s * (1.0 + (i === 1 ? 0.15 : 0)), fx + s * 0.25, -s * 0.25);
+    }
+    p.quadraticCurveTo(s * 1.25, -s * 0.5, s * 1.2, -s * 0.05);
+    p.quadraticCurveTo(s * 1.0, s * 0.2, s * 0.7, s * 0.5);
+    p.closePath();
+    fPaint(p, fill || "#fbf8f2", lw);
+    ctx.lineWidth = lw * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.25, -s * 0.3); ctx.lineTo(-s * 0.25, s * 0.1);
+    ctx.moveTo(s * 0.25, -s * 0.3); ctx.lineTo(s * 0.25, s * 0.1);
+    ctx.stroke();
+    const cuff = new Path2D();
+    cuff.roundRect(-s * 0.85, s * 0.42, s * 1.7, s * 0.4, s * 0.15);
+    fPaint(cuff, fill || "#fbf8f2", lw);
+    ctx.restore();
+  }
+  // a big clown shoe pointing along dir
+  function shoe(x, y, s, dir, fill, lw) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    const p = new Path2D();
+    p.moveTo(-s * 0.7, -s * 0.5);
+    p.quadraticCurveTo(-s * 0.85, 0, -s * 0.5, 0);
+    p.lineTo(s * 1.0, 0);
+    p.quadraticCurveTo(s * 1.7, -s * 0.05, s * 1.6, -s * 0.6);
+    p.quadraticCurveTo(s * 1.3, -s * 1.05, s * 0.8, -s * 0.7);
+    p.quadraticCurveTo(s * 0.3, -s * 0.5, -s * 0.1, -s * 0.75);
+    p.closePath();
+    fPaint(p, fill, lw);
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.beginPath(); ctx.ellipse(s * 1.15, -s * 0.6, s * 0.28, s * 0.14, -0.4, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = FINK;
     ctx.lineWidth = lw * 0.6;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath(); ctx.moveTo(-s * 0.6, -s * 0.12); ctx.lineTo(s * 1.5, -s * 0.12); ctx.stroke();
+    ctx.restore();
+  }
+  // one eye. o: iris, look [x,y], lid (0 open to 1 shut), slant (angry < 0 < sad), kind, white, glow
+  function eye(x, y, w, h, o) {
+    o = o || {};
+    const kind = o.kind || "round", lk = o.look || [0, 0];
+    ctx.save();
+    ctx.translate(x, y);
+    if (o.glow) glow(0, 0, w * 2.4, o.glow, 0.6);
+    const p = new Path2D();
+    p.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+    if (kind === "x") {
+      ctx.strokeStyle = o.iris || FINK;
+      ctx.lineWidth = w * 0.45;
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-w, -h); ctx.lineTo(w, h); ctx.moveTo(w, -h); ctx.lineTo(-w, h); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    fPaint(p, o.white || "#ffffff", Math.max(1, w * 0.18));
+    ctx.save();
+    ctx.clip(p);
+    const px = lk[0] * w * 0.35, py = lk[1] * h * 0.35;
+    if (kind === "spiral") {
+      ctx.strokeStyle = o.iris || FINK;
+      ctx.lineWidth = w * 0.2;
+      ctx.beginPath();
+      for (let k = 0; k < 30; k++) { const a = k * 0.5 + (o.t || 0) * 4, rr = (k / 30) * w * 0.95; k ? ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.moveTo(0, 0); }
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = o.iris || "#3a2a52";
+      ctx.beginPath(); ctx.ellipse(px, py, w * 0.62, h * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = FINK;
+      ctx.beginPath();
+      if (kind === "slit") ctx.ellipse(px, py, w * 0.14, h * 0.55, 0, 0, Math.PI * 2);
+      else ctx.ellipse(px, py, w * 0.32, h * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(px - w * 0.22, py - h * 0.25, w * 0.16, 0, Math.PI * 2); ctx.fill();
+    }
+    const lid = o.lid || 0, sl = o.slant || 0;
+    if (lid > 0 || sl) {
+      ctx.fillStyle = o.lidColor || "#d9c7a7";
+      ctx.beginPath();
+      ctx.moveTo(-w * 1.3, -h * 1.3); ctx.lineTo(w * 1.3, -h * 1.3);
+      ctx.lineTo(w * 1.3, -h + lid * h * 2 + sl * h * 0.7); ctx.lineTo(-w * 1.3, -h + lid * h * 2 - sl * h * 0.7);
+      ctx.fill();
+      ctx.strokeStyle = FINK;
+      ctx.lineWidth = Math.max(1, w * 0.2);
+      ctx.beginPath(); ctx.moveTo(-w * 1.3, -h + lid * h * 2 - sl * h * 0.7); ctx.lineTo(w * 1.3, -h + lid * h * 2 + sl * h * 0.7); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+  // a mouth. o: curve (+ smile, - frown), open (0 to 1), teeth ("flat", "sharp", none), fill, tongue
+  function mouth(x, y, w, o, lw) {
+    o = o || {};
+    const cv = (o.curve === undefined ? 1 : o.curve) * w * 0.45, op = (o.open === undefined ? 0.6 : o.open) * w * 0.5;
+    const p = new Path2D();
+    p.moveTo(x - w, y - cv);
+    p.quadraticCurveTo(x, y + cv, x + w, y - cv);
+    p.quadraticCurveTo(x, y + cv + op * 2, x - w, y - cv);
+    p.closePath();
+    fPaint(p, o.fill || "#4a0f24", lw);
+    ctx.save();
+    ctx.clip(p);
+    if (o.tongue) { ctx.fillStyle = "#ff6b8f"; ctx.beginPath(); ctx.ellipse(x, y + cv * 0.4 + op * 1.3, w * 0.45, op * 0.8, 0, 0, Math.PI * 2); ctx.fill(); }
+    if (o.teeth) {
+      ctx.fillStyle = "#fffdf2";
+      ctx.strokeStyle = FINK;
+      ctx.lineWidth = lw * 0.4;
+      const n = o.n || 7;
+      for (let i = 0; i < n; i++) {
+        const k = (i + 0.5) / n, tx = x - w + k * w * 2, ty = y - cv + (1 - Math.pow(2 * k - 1, 2)) * cv * 2 * 0.5 - cv * 0.0;
+        ctx.beginPath();
+        if (o.teeth === "sharp") { ctx.moveTo(tx - w / n, ty - op * 0.2); ctx.lineTo(tx, ty + op * 0.9); ctx.lineTo(tx + w / n, ty - op * 0.2); }
+        else ctx.rect(tx - (w / n) * 0.85, ty - op * 0.3, (w / n) * 1.7, op * 0.85);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function brow(x, y, w, ang, lw) {
+    ctx.strokeStyle = FINK;
+    ctx.lineWidth = lw;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x - Math.cos(ang) * w, y - Math.sin(ang) * w);
+    ctx.lineTo(x + Math.cos(ang) * w, y + Math.sin(ang) * w);
+    ctx.stroke();
+  }
+  function fNose(x, y, r, lw) {
+    const p = new Path2D();
+    p.arc(x, y, r, 0, Math.PI * 2);
+    fPaint(p, "#ff3b4a", lw * 0.6);
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.28, 0, Math.PI * 2); ctx.fill();
+  }
+  function ruffle(x, y, w, n, r, c1, c2, lw) {
+    for (let i = 0; i < n; i++) {
+      const xx = x + (i - (n - 1) / 2) * (w / n), sc = new Path2D();
+      sc.arc(xx, y - Math.abs(xx - x) * 0.12, r, 0, Math.PI);
+      sc.closePath();
+      fPaint(sc, i % 2 ? c1 : c2, lw * 0.7);
+    }
   }
   function fCone(x, top, r, paint, lw, tilt) {
     ctx.save();
     ctx.translate(x, top);
     ctx.rotate(tilt || 0);
     const p = new Path2D();
-    p.moveTo(-r * 0.45, r * 0.1); p.lineTo(r * 0.05, -r * 1.1); p.lineTo(r * 0.45, r * 0.1); p.closePath();
+    p.moveTo(-r * 0.45, r * 0.1); p.quadraticCurveTo(-r * 0.1, -r * 0.6, r * 0.05, -r * 1.1); p.quadraticCurveTo(r * 0.3, -r * 0.5, r * 0.45, r * 0.1); p.closePath();
     ctx.fillStyle = "#efe6d2";
     ctx.fill(p);
     ctx.save();
     ctx.clip(p);
     ctx.fillStyle = paint;
     for (let i = 0; i < 6; i++) ctx.fillRect(-r, -r * 1.1 + i * r * 0.24, r * 2, r * 0.12);
+    ctx.fillStyle = "rgba(20,8,45,0.2)";
+    ctx.fillRect(r * 0.1, -r * 1.2, r, r * 1.4);
     ctx.restore();
     ctx.strokeStyle = FINK;
     ctx.lineWidth = lw;
     ctx.stroke(p);
-    ctx.fillStyle = "#ffd23f";
-    ctx.beginPath(); ctx.arc(r * 0.05, -r * 1.12, r * 0.14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    for (let i = 0; i < 5; i++) { const pm = new Path2D(); pm.arc(-r * 0.4 + i * r * 0.2, r * 0.1, r * 0.11, 0, Math.PI * 2); fPaint(pm, "#fbf8f2", lw * 0.5); }
+    const pom = new Path2D();
+    pom.arc(r * 0.05, -r * 1.12, r * 0.15, 0, Math.PI * 2);
+    fPaint(pom, "#ffd23f", lw * 0.7);
     ctx.restore();
   }
   function fTopHat(x, top, r, paint, lw, tilt) {
@@ -1417,15 +1520,16 @@
     ctx.translate(x, top);
     ctx.rotate(tilt || 0);
     const p = new Path2D();
-    p.rect(-r * 0.4, -r * 0.95, r * 0.8, r * 0.95);
-    fPaint(p, "#1a1024", lw);
+    p.moveTo(-r * 0.4, 0); p.lineTo(-r * 0.46, -r * 0.92); p.quadraticCurveTo(0, -r * 1.02, r * 0.46, -r * 0.92); p.lineTo(r * 0.4, 0); p.closePath();
+    fBody(p, "#1f1430", r * 0.6, lw, -r * 0.2, -r * 0.6, 0.35);
     ctx.fillStyle = paint;
-    ctx.fillRect(-r * 0.4, -r * 0.3, r * 0.8, r * 0.16);
-    ctx.fillStyle = "rgba(255,255,255,0.14)";
-    ctx.fillRect(-r * 0.32, -r * 0.9, r * 0.12, r * 0.55);
+    ctx.fillRect(-r * 0.41, -r * 0.32, r * 0.82, r * 0.18);
+    const bk = new Path2D();
+    bk.rect(-r * 0.09, -r * 0.34, r * 0.18, r * 0.22);
+    fPaint(bk, "#ffd23f", lw * 0.5);
     const b = new Path2D();
-    b.ellipse(0, 0, r * 0.66, r * 0.12, 0, 0, Math.PI * 2);
-    fPaint(b, "#1a1024", lw);
+    b.ellipse(0, 0, r * 0.7, r * 0.13, 0, 0, Math.PI * 2);
+    fPaint(b, "#1f1430", lw);
     ctx.restore();
   }
   function fHorns(top, r, paint, lw, t) {
@@ -1437,17 +1541,24 @@
       p.quadraticCurveTo(s * r * 0.5, top - r * 0.3, s * r * 0.5, top + r * 0.2);
       p.closePath();
       fPaint(p, s < 0 ? paint : "#1a1024", lw);
-      ctx.fillStyle = "#ffd23f";
-      ctx.beginPath(); ctx.arc(tx, ty, r * 0.12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      diamonds(p, "rgba(255,210,63,0.75)", "rgba(0,0,0,0)", r * 0.22, s * r * 0.1, top);
+      const bl = new Path2D();
+      bl.arc(tx, ty, r * 0.13, 0, Math.PI * 2);
+      fPaint(bl, "#ffd23f", lw * 0.7);
     }
   }
   function fPillbox(x, top, r, col, lw) {
     const p = new Path2D();
     p.roundRect(x - r * 0.42, top - r * 0.42, r * 0.84, r * 0.46, r * 0.08);
-    fPaint(p, col, lw);
+    fBody(p, col, r * 0.5, lw, x - r * 0.2, top - r * 0.4, 0.3);
     ctx.fillStyle = "#ffd23f";
     ctx.fillRect(x - r * 0.42, top - r * 0.14, r * 0.84, r * 0.09);
-    ctx.beginPath(); ctx.arc(x, top - r * 0.42, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    const bt = new Path2D();
+    bt.arc(x, top - r * 0.44, r * 0.08, 0, Math.PI * 2);
+    fPaint(bt, "#ffd23f", lw * 0.6);
+    ctx.strokeStyle = FINK;
+    ctx.lineWidth = lw * 0.5;
+    ctx.beginPath(); ctx.arc(x, top + r * 0.3, r * 0.52, Math.PI * 1.15, Math.PI * 1.85, true); ctx.stroke();
   }
   function fHalo(top, r, paint, t) {
     ctx.strokeStyle = "#ffffff";
@@ -1465,7 +1576,8 @@
     for (let k = 0; k <= 4; k++) p.lineTo(x - r * 0.6 + k * r * 0.3, top - r * (k % 2 ? 0.25 : 0.62));
     p.lineTo(x + r * 0.6, top + r * 0.1);
     p.closePath();
-    fPaint(p, "#e8b923", lw);
+    fBody(p, "#e8b923", r * 0.6, lw, x - r * 0.2, top - r * 0.4, 0.3);
+    for (let k = 0; k <= 4; k += 2) { const j = new Path2D(); j.arc(x - r * 0.6 + k * r * 0.3, top - r * 0.62, r * 0.07, 0, Math.PI * 2); fPaint(j, paint, lw * 0.5); }
     ctx.fillStyle = paint;
     ctx.beginPath(); ctx.arc(x, top - r * 0.08, r * 0.09, 0, Math.PI * 2); ctx.fill();
   }
@@ -1476,88 +1588,127 @@
       ctx.fillRect(x + Math.random() * w, y + Math.random() * h, w * 0.18, Math.max(1.5, h * 0.03));
     }
   }
+  function tear(x, y, s, t, ph) {
+    const k = (t * 0.8 + ph) % 1;
+    ctx.fillStyle = `rgba(143,233,255,${1 - k * 0.5})`;
+    ctx.strokeStyle = "rgba(20,40,80,0.6)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + k * s * 5 - s * 1.2);
+    ctx.quadraticCurveTo(x + s, y + k * s * 5 + s * 0.6, x, y + k * s * 5 + s);
+    ctx.quadraticCurveTo(x - s, y + k * s * 5 + s * 0.6, x, y + k * s * 5 - s * 1.2);
+    ctx.fill();
+    ctx.stroke();
+  }
 
   const ART = {
     mime(f, r, t, lw, ft) {
+      const sway = Math.sin(t * 1.4) * r * 0.04;
       for (const s of [-1, 1]) {
-        limb([[s * r * 0.24, r * 0.5], [s * r * 0.26, ft - r * 0.08]], r * 0.2, "#1a1024", lw * 0.5);
-        const sh = new Path2D();
-        sh.ellipse(s * r * 0.3 - r * 0.06, ft - r * 0.05, r * 0.24, r * 0.1, 0, 0, Math.PI * 2);
-        fPaint(sh, "#1a1024", lw * 0.6);
+        limb([[s * r * 0.22, r * 0.55], [s * r * 0.3, r * 0.85], [s * r * 0.28, ft - r * 0.1]], r * 0.19, "#1a1024", lw * 0.5);
+        shoe(s * r * 0.26 - r * 0.1, ft, r * 0.2, -1, "#1a1024", lw * 0.8);
       }
       const torso = new Path2D();
-      torso.roundRect(-r * 0.58, -r * 0.28, r * 1.16, r * 0.98, r * 0.28);
+      torso.moveTo(-r * 0.5, -r * 0.3);
+      torso.quadraticCurveTo(-r * 0.68, r * 0.2, -r * 0.5, r * 0.66);
+      torso.lineTo(r * 0.5, r * 0.66);
+      torso.quadraticCurveTo(r * 0.68, r * 0.2, r * 0.5, -r * 0.3);
+      torso.quadraticCurveTo(0, -r * 0.45, -r * 0.5, -r * 0.3);
       ctx.fillStyle = "#f4efe6";
       ctx.fill(torso);
       ctx.save();
       ctx.clip(torso);
       ctx.fillStyle = "#1a1024";
-      for (let i = 0; i < 7; i++) ctx.fillRect(-r, -r * 0.2 + i * r * 0.17, r * 2, r * 0.08);
+      for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.ellipse(0, -r * 0.24 + i * r * 0.15, r * 0.9, r * 0.045, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
-      fShade(torso, r, -r * 0.3, -r * 0.5);
-      ctx.strokeStyle = "#d62839";
-      ctx.lineWidth = r * 0.07;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.3, -r * 0.28); ctx.lineTo(-r * 0.22, r * 0.68);
-      ctx.moveTo(r * 0.3, -r * 0.28); ctx.lineTo(r * 0.22, r * 0.68);
-      ctx.stroke();
+      fShade(torso, r * 0.9, -r * 0.3, -r * 0.3);
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw;
       ctx.stroke(torso);
+      const belt = new Path2D();
+      belt.rect(-r * 0.52, r * 0.52, r * 1.04, r * 0.16);
+      fPaint(belt, "#1a1024", lw * 0.7);
+      ctx.strokeStyle = "#d62839";
+      ctx.lineWidth = r * 0.075;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.28, -r * 0.32); ctx.lineTo(-r * 0.22, r * 0.52);
+      ctx.moveTo(r * 0.28, -r * 0.32); ctx.lineTo(r * 0.22, r * 0.52);
+      ctx.stroke();
+      for (const s of [-1, 1]) { const bt = new Path2D(); bt.arc(s * r * 0.22, r * 0.5, r * 0.05, 0, Math.PI * 2); fPaint(bt, "#ffd23f", lw * 0.4); }
+      // head
+      const head = new Path2D();
+      head.ellipse(sway, -r * 0.74, r * 0.4, r * 0.44, 0, 0, Math.PI * 2);
+      fBody(head, "#fbf8f2", r * 0.5, lw, sway - r * 0.12, -r * 0.9);
+      for (const s of [-1, 1]) {
+        ctx.fillStyle = "#1a1024";
+        ctx.beginPath();
+        ctx.moveTo(sway + s * r * 0.17, -r * 1.0); ctx.lineTo(sway + s * r * 0.23, -r * 0.8); ctx.lineTo(sway + s * r * 0.17, -r * 0.56); ctx.lineTo(sway + s * r * 0.11, -r * 0.8);
+        ctx.fill();
+        eye(sway + s * r * 0.17, -r * 0.8, r * 0.085, r * 0.075, { look: [-0.8, 0.3], lid: 0.25, slant: s * 0.5, lidColor: "#fbf8f2" });
+        brow(sway + s * r * 0.17, -r * 0.96, r * 0.09, s * 0.5, lw * 0.6);
+        ctx.fillStyle = "rgba(214,40,57,0.55)";
+        ctx.beginPath(); ctx.arc(sway + s * r * 0.26, -r * 0.62, r * 0.055, 0, Math.PI * 2); ctx.fill();
+      }
+      tear(sway + r * 0.2, -r * 0.68, r * 0.035, t, 0);
+      mouth(sway, -r * 0.5, r * 0.11, { curve: -0.8, open: 0.25, fill: "#1a1024" }, lw * 0.6);
+      const beret = new Path2D();
+      beret.moveTo(sway - r * 0.42, -r * 1.02);
+      beret.bezierCurveTo(sway - r * 0.5, -r * 1.35, sway + r * 0.55, -r * 1.42, sway + r * 0.5, -r * 1.05);
+      beret.quadraticCurveTo(sway, -r * 1.12, sway - r * 0.42, -r * 1.02);
+      fBody(beret, "#1f1430", r * 0.5, lw, sway - r * 0.1, -r * 1.3, 0.3);
+      ctx.fillStyle = FINK;
+      ctx.fillRect(sway + r * 0.08, -r * 1.46, r * 0.05, r * 0.1);
       // hands pressed flat against a wall that isn't there
       for (const s of [-1, 1]) {
-        const hx = -r * 0.95 + (s > 0 ? r * 0.5 : 0) + Math.sin(t * 1.4 + s) * r * 0.05, hy = -r * (s > 0 ? 0.55 : 0.05) + Math.cos(t * 1.4 + s) * r * 0.06;
-        limb([[s * r * 0.5, -r * 0.12], [(s * r * 0.5 + hx) / 2, hy + r * 0.3], [hx + r * 0.1, hy + r * 0.05]], r * 0.15, "#f4efe6", lw * 0.5);
-        const g = new Path2D();
-        g.roundRect(hx - r * 0.1, hy - r * 0.2, r * 0.2, r * 0.36, r * 0.07);
-        fPaint(g, "#ffffff", lw * 0.7);
-        ctx.strokeStyle = "rgba(143,233,255,0.5)";
+        const hx = -r * 1.0 + (s > 0 ? r * 0.32 : 0) + Math.sin(t * 1.4 + s) * r * 0.05, hy = -r * (s > 0 ? 0.62 : 0.02) + Math.cos(t * 1.4 + s) * r * 0.06;
+        limb([[s * r * 0.46, -r * 0.16], [(s * r * 0.46 + hx) / 2 - r * 0.05, hy + r * 0.34], [hx + r * 0.16, hy + r * 0.04]], r * 0.15, "#f4efe6", lw * 0.5);
+        glove(hx, hy, r * 0.15, -Math.PI / 2 + 0.1 * s, "#ffffff", lw * 0.7);
+        ctx.strokeStyle = `rgba(143,233,255,${0.35 + 0.25 * Math.sin(t * 3 + s)})`;
         ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(hx - r * 0.12, hy, r * (0.25 + 0.1 * Math.sin(t * 3 + s)), Math.PI * 0.7, Math.PI * 1.3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(hx - r * 0.2, hy - r * 0.3); ctx.lineTo(hx - r * 0.2, hy + r * 0.3); ctx.stroke();
       }
-      const head = new Path2D();
-      head.arc(0, -r * 0.72, r * 0.42, 0, Math.PI * 2);
-      fBody(head, "#fbf8f2", r * 0.45, lw, -r * 0.1, -r * 0.85);
-      fEyes("tear", r * 0.17, -r * 0.76, r * 0.5, t, "#1a1024");
-      ctx.fillStyle = "#1a1024";
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.1, -r * 0.5); ctx.quadraticCurveTo(0, -r * 0.58, r * 0.1, -r * 0.5); ctx.quadraticCurveTo(0, -r * 0.54, -r * 0.1, -r * 0.5);
-      ctx.fill();
-      ctx.fillStyle = "rgba(214,40,57,0.5)";
-      ctx.beginPath(); ctx.arc(-r * 0.27, -r * 0.6, r * 0.06, 0, Math.PI * 2); ctx.arc(r * 0.27, -r * 0.6, r * 0.06, 0, Math.PI * 2); ctx.fill();
-      const beret = new Path2D();
-      beret.ellipse(r * 0.06, -r * 1.08, r * 0.5, r * 0.17, -0.15, 0, Math.PI * 2);
-      fPaint(beret, "#1a1024", lw);
-      ctx.fillRect(r * 0.03, -r * 1.3, r * 0.06, r * 0.1);
     },
 
     goblin(f, r, t, lw, ft) {
-      for (const s of [-1, 1]) limb([[s * r * 0.3, r * 0.7], [s * r * 0.36, ft - r * 0.04], [s * r * 0.36 - r * 0.16, ft - r * 0.03]], r * 0.14, "#7fae3a", lw * 0.5);
-      // the goblin, peeking out of its box
+      for (const s of [-1, 1]) {
+        limb([[s * r * 0.3, r * 0.7], [s * r * 0.36, ft - r * 0.1]], r * 0.15, "#7fae3a", lw * 0.5);
+        shoe(s * r * 0.36 - r * 0.12, ft, r * 0.17, -1, "#d62839", lw * 0.7);
+      }
+      const pk = Math.sin(t * 2) * r * 0.05;
       for (const s of [-1, 1]) {
         const ear = new Path2D();
-        ear.moveTo(s * r * 0.4, -r * 0.7); ear.lineTo(s * r * 1.15, -r * 1.05 + Math.sin(t * 5 + s) * r * 0.05); ear.lineTo(s * r * 0.5, -r * 0.35); ear.closePath();
-        fPaint(ear, "#8fc24a", lw);
+        ear.moveTo(s * r * 0.42, -r * 0.72 + pk);
+        ear.quadraticCurveTo(s * r * 0.9, -r * 1.25 + pk, s * r * 1.25, -r * 1.0 + pk + Math.sin(t * 5 + s) * r * 0.06);
+        ear.quadraticCurveTo(s * r * 0.85, -r * 0.7 + pk, s * r * 0.52, -r * 0.4 + pk);
+        ear.closePath();
+        fBody(ear, "#9fd052", r * 0.6, lw, s * r * 0.6, -r * 0.9);
+        ctx.fillStyle = "rgba(255,95,168,0.5)";
+        ctx.beginPath(); ctx.ellipse(s * r * 0.78, -r * 0.82 + pk, r * 0.16, r * 0.07, s * -0.5, 0, Math.PI * 2); ctx.fill();
       }
       const head = new Path2D();
-      head.arc(0, -r * 0.45, r * 0.6, Math.PI, 0);
-      head.lineTo(r * 0.6, -r * 0.1); head.lineTo(-r * 0.6, -r * 0.1); head.closePath();
-      fBody(head, "#9fd052", r * 0.6, lw, -r * 0.15, -r * 0.7);
-      fEyes("spiral", r * 0.25, -r * 0.6, r * 0.75, t, "#ffd23f", "#d62839");
-      fMouth(false, -r * 0.72, r * 0.62, "#5a1030", lw);
-      fNose(0, -r * 0.44, r * 0.09, lw);
-      fCone(r * 0.05, -r * 0.98, r * 0.55, "#d62839", lw, 0.2);
-      // popcorn heaped on top
-      for (let i = 0; i < 9; i++) {
-        const px = (i - 4) * r * 0.2, pop = Math.max(0, Math.sin(t * 3 + i * 1.7)) * r * (i % 3 === 0 ? 0.5 : 0.06);
+      head.moveTo(-r * 0.62, -r * 0.1);
+      head.bezierCurveTo(-r * 0.7, -r * 0.9 + pk, -r * 0.3, -r * 1.12 + pk, 0, -r * 1.1 + pk);
+      head.bezierCurveTo(r * 0.3, -r * 1.12 + pk, r * 0.7, -r * 0.9 + pk, r * 0.62, -r * 0.1);
+      head.closePath();
+      fBody(head, vgrad("#b6e36a", "#7fae3a", -r * 1.1, -r * 0.1), r * 0.7, lw, -r * 0.2, -r * 0.8 + pk);
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = "rgba(60,100,20,0.5)"; ctx.beginPath(); ctx.arc((hashN(i + 3) - 0.5) * r * 0.9, -r * 0.95 + pk + hashN(i + 8) * r * 0.25, r * 0.03, 0, Math.PI * 2); ctx.fill(); }
+      for (const s of [-1, 1]) {
+        eye(s * r * 0.25, -r * 0.66 + pk, r * 0.17, r * 0.19, { iris: "#ffd23f", kind: "slit", look: [-0.7, 0.2], lid: 0.1, slant: -s * 0.55, lidColor: "#9fd052", t });
+      }
+      mouth(0, -r * 0.34 + pk, r * 0.36, { curve: 0.7, open: 0.55, teeth: "sharp", n: 8 }, lw * 0.7);
+      fNose(0, -r * 0.5 + pk, r * 0.09, lw);
+      fCone(r * 0.1, -r * 1.02 + pk, r * 0.5, "#d62839", lw, 0.25);
+      // popcorn heaped on top, some of it popping
+      for (let i = 0; i < 11; i++) {
+        const px = (i - 5) * r * 0.17, pop = Math.max(0, Math.sin(t * 3 + i * 1.7)) * r * (i % 3 === 0 ? 0.55 : 0.05);
         for (let q = 0; q < 3; q++) {
           const pc = new Path2D();
-          pc.arc(px + (q - 1) * r * 0.07, -r * 0.14 - pop + (q % 2) * r * 0.05 + (i % 2) * r * 0.06, r * 0.1, 0, Math.PI * 2);
-          fPaint(pc, "#fff6d8", lw * 0.5);
+          pc.arc(px + (q - 1) * r * 0.07, -r * 0.13 - pop + (q % 2) * r * 0.05 + (i % 2) * r * 0.07, r * 0.1, 0, Math.PI * 2);
+          fPaint(pc, q === 1 ? "#fff6d8" : "#ffe9a8", lw * 0.5);
         }
       }
       const box = new Path2D();
-      box.moveTo(-r * 0.92, -r * 0.1); box.lineTo(r * 0.92, -r * 0.1); box.lineTo(r * 0.68, r * 0.85); box.lineTo(-r * 0.68, r * 0.85); box.closePath();
+      box.moveTo(-r * 0.95, -r * 0.1); box.lineTo(r * 0.95, -r * 0.1); box.lineTo(r * 0.7, r * 0.86); box.lineTo(-r * 0.7, r * 0.86); box.closePath();
       ctx.fillStyle = "#fbf8f2";
       ctx.fill(box);
       ctx.save();
@@ -1566,31 +1717,30 @@
       for (let i = -4; i <= 4; i++) {
         if (i % 2 === 0) continue;
         ctx.beginPath();
-        ctx.moveTo(i * r * 0.21, -r * 0.1); ctx.lineTo((i + 1) * r * 0.21, -r * 0.1); ctx.lineTo((i + 1) * r * 0.155, r * 0.85); ctx.lineTo(i * r * 0.155, r * 0.85);
+        ctx.moveTo(i * r * 0.21, -r * 0.1); ctx.lineTo((i + 1) * r * 0.21, -r * 0.1); ctx.lineTo((i + 1) * r * 0.155, r * 0.86); ctx.lineTo(i * r * 0.155, r * 0.86);
         ctx.fill();
       }
+      ctx.fillStyle = "rgba(180,120,40,0.25)";
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc((hashN(i) - 0.5) * r * 1.4, r * (0.1 + hashN(i + 5) * 0.7), r * 0.09, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
-      fShade(box, r, -r * 0.4, -r * 0.6);
+      fShade(box, r, -r * 0.4, -r * 0.5);
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw;
       ctx.stroke(box);
+      const rim = new Path2D();
+      rim.roundRect(-r * 1.0, -r * 0.16, r * 2.0, r * 0.13, r * 0.05);
+      fPaint(rim, "#fbf8f2", lw * 0.8);
       const badge = new Path2D();
-      badge.ellipse(0, r * 0.38, r * 0.38, r * 0.22, 0, 0, Math.PI * 2);
+      badge.ellipse(0, r * 0.4, r * 0.42, r * 0.24, -0.08, 0, Math.PI * 2);
       fPaint(badge, "#ffd23f", lw * 0.7);
       ctx.fillStyle = "#d62839";
-      ctx.font = `${r * 0.24}px "Bungee", sans-serif`;
+      ctx.font = `${r * 0.27}px "Bungee", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("POP", 0, r * 0.4);
+      ctx.fillText("POP", 0, r * 0.42);
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
-      for (const s of [-1, 1]) {
-        for (let q = 0; q < 3; q++) {
-          const fg = new Path2D();
-          fg.arc(s * r * (0.72 + q * 0.07), -r * 0.1, r * 0.07, 0, Math.PI * 2);
-          fPaint(fg, "#8fc24a", lw * 0.5);
-        }
-      }
+      for (const s of [-1, 1]) glove(s * r * 0.8, -r * 0.12, r * 0.13, Math.PI + s * 0.2, "#9fd052", lw * 0.6);
     },
 
     balloon(f, r, t, lw, ft) {
@@ -1598,332 +1748,455 @@
       ctx.lineWidth = lw * 0.6;
       ctx.beginPath();
       ctx.moveTo(0, r * 1.2);
-      for (let k = 1; k <= 10; k++) ctx.lineTo(Math.sin(t * 3 + k) * r * 0.08, r * 1.2 + (k / 10) * (ft - r * 1.25));
+      for (let k = 1; k <= 12; k++) ctx.lineTo(Math.sin(t * 3 + k) * r * 0.1, r * 1.2 + (k / 12) * (ft - r * 1.35));
       ctx.stroke();
+      const tag = new Path2D();
+      tag.roundRect(-r * 0.16, ft - r * 0.2, r * 0.32, r * 0.2, r * 0.03);
+      fPaint(tag, "#efe6d2", lw * 0.6);
+      const sq = 1 + Math.sin(t * 2.6) * 0.03 + (f.charge ? Math.sin(t * 18) * 0.03 : 0);
+      ctx.save();
+      ctx.scale(sq, 1 / sq);
       const b = new Path2D();
-      b.ellipse(0, 0, r, r * 1.12, 0, 0, Math.PI * 2);
-      const g = ctx.createRadialGradient(-r * 0.35, -r * 0.45, r * 0.1, 0, 0, r * 1.2);
-      g.addColorStop(0, "#ffb3d6");
-      g.addColorStop(0.6, "#ff5fa8");
-      g.addColorStop(1, "#b02a6e");
+      b.moveTo(0, r * 1.12);
+      b.bezierCurveTo(-r * 1.25, r * 0.6, -r * 1.2, -r * 1.12, 0, -r * 1.12);
+      b.bezierCurveTo(r * 1.2, -r * 1.12, r * 1.25, r * 0.6, 0, r * 1.12);
+      const g = ctx.createRadialGradient(-r * 0.35, -r * 0.45, r * 0.1, 0, 0, r * 1.25);
+      g.addColorStop(0, "#ffc4e0");
+      g.addColorStop(0.55, f.charge ? "#ff8a3d" : "#ff5fa8");
+      g.addColorStop(1, "#a0205e");
       fBody(b, g, r, lw);
       const knot = new Path2D();
-      knot.moveTo(-r * 0.13, r * 1.24); knot.lineTo(r * 0.13, r * 1.24); knot.lineTo(0, r * 1.08); knot.closePath();
+      knot.moveTo(-r * 0.14, r * 1.26); knot.lineTo(r * 0.14, r * 1.26); knot.lineTo(0, r * 1.08); knot.closePath();
       fPaint(knot, "#d6408a", lw * 0.7);
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.beginPath(); ctx.ellipse(-r * 0.45, -r * 0.55, r * 0.2, r * 0.32, 0.5, 0, Math.PI * 2); ctx.fill();
-      fEyes("x", r * 0.33, -r * 0.1, r, t, "#fff", "#ffffff");
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.beginPath(); ctx.ellipse(-r * 0.48, -r * 0.55, r * 0.17, r * 0.34, 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-r * 0.62, -r * 0.08, r * 0.06, 0, Math.PI * 2); ctx.fill();
+      // a stitched-on face
+      for (const s of [-1, 1]) {
+        eye(s * r * 0.34, -r * 0.12, r * 0.13, r * 0.13, { kind: "x", iris: "#ffffff" });
+        brow(s * r * 0.34, -r * 0.4, r * 0.16, -s * (f.charge ? 0.6 : 0.2), lw * 0.9);
+      }
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = r * 0.07;
       ctx.lineJoin = "round";
       ctx.beginPath();
-      for (let k = 0; k <= 6; k++) { const px = (k - 3) * r * 0.11, py = r * 0.35 + (k % 2 ? -1 : 1) * r * 0.06; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+      for (let k = 0; k <= 8; k++) { const px = (k - 4) * r * 0.1, py = r * 0.36 + (k % 2 ? -1 : 1) * r * (f.charge ? 0.11 : 0.06); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
       ctx.stroke();
+      ctx.restore();
       // crackling static
-      const n = f.charge ? 9 : 4;
-      ctx.strokeStyle = "#fffbe0";
-      ctx.lineWidth = lw * 0.6;
+      const n = f.charge ? 12 : 5;
+      ctx.lineJoin = "miter";
       for (let i = 0; i < n; i++) {
-        const sd = Math.floor(t * 10) * 7 + i * 13, a = (Math.sin(sd * 12.9898) * 43758.5453 % 1) * Math.PI * 2, rr = r * 1.15;
+        const sd = Math.floor(t * 10) * 7 + i * 13, a = hashN(sd) * Math.PI * 2, rr = r * 1.18;
+        ctx.strokeStyle = i % 2 ? "#fffbe0" : "#8fe9ff";
+        ctx.lineWidth = lw * 0.6;
         ctx.beginPath();
-        for (let k = 0; k < 4; k++) {
-          const q = rr + k * r * 0.12, aa = a + (k % 2 ? 0.12 : -0.08);
+        for (let k = 0; k < 5; k++) {
+          const q = rr + k * r * 0.11, aa = a + (k % 2 ? 0.13 : -0.09);
           k ? ctx.lineTo(Math.cos(aa) * q, Math.sin(aa) * q * 1.1) : ctx.moveTo(Math.cos(aa) * q, Math.sin(aa) * q * 1.1);
         }
         ctx.stroke();
       }
+      if (f.charge) glow(0, 0, r * 1.6, "#ffd23f", 0.25 + 0.15 * Math.sin(t * 14));
     },
 
     tearer(f, r, t, lw, ft) {
-      for (const s of [-1, 1]) limb([[s * r * 0.45, r * 0.7], [s * r * 0.48, ft - r * 0.05], [s * r * 0.48 - r * 0.2, ft - r * 0.04]], r * 0.22, "#1a1024", lw * 0.5);
+      for (const s of [-1, 1]) {
+        limb([[s * r * 0.45, r * 0.7], [s * r * 0.48, ft - r * 0.12]], r * 0.24, "#1a1024", lw * 0.5);
+        shoe(s * r * 0.48 - r * 0.14, ft, r * 0.22, -1, "#1a1024", lw * 0.8);
+      }
       const body = new Path2D();
-      body.ellipse(0, 0, r * 1.3, r * 1.0, 0, 0, Math.PI * 2);
-      fBody(body, vgrad("#b02a42", "#6a1428", -r, r), r * 1.2, lw);
+      body.moveTo(0, -r * 0.95);
+      body.bezierCurveTo(r * 1.5, -r * 0.95, r * 1.6, r * 0.9, 0, r * 0.98);
+      body.bezierCurveTo(-r * 1.6, r * 0.9, -r * 1.5, -r * 0.95, 0, -r * 0.95);
+      fBody(body, vgrad("#c2334d", "#6a1428", -r, r), r * 1.25, lw);
+      ctx.save();
+      ctx.clip(body);
+      ctx.strokeStyle = "#ffd23f";
+      ctx.lineWidth = r * 0.05;
+      ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
       ctx.fillStyle = "#ffd23f";
-      ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw * 0.5;
-      for (let i = 0; i < 3; i++) for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * r * 0.62, -r * 0.45 + i * r * 0.3, r * 0.07, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      ctx.fillRect(-r * 2, r * 0.72, r * 4, r * 0.08);
+      ctx.restore();
+      for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { const bt = new Path2D(); bt.arc(s * r * (0.3 + i * 0.07), -r * 0.6 + i * r * 0.3, r * 0.075, 0, Math.PI * 2); fPaint(bt, "#ffd23f", lw * 0.5); }
       for (const s of [-1, 1]) {
         const ep = new Path2D();
-        ep.ellipse(s * r * 1.02, -r * 0.6, r * 0.34, r * 0.14, s * 0.5, 0, Math.PI * 2);
+        ep.ellipse(s * r * 1.0, -r * 0.62, r * 0.36, r * 0.15, s * 0.5, 0, Math.PI * 2);
         fPaint(ep, "#ffd23f", lw * 0.8);
-        limb([[s * r * 1.12, -r * 0.35], [s * r * 1.4, r * 0.25 + Math.sin(t * 2 + s) * r * 0.05]], r * 0.24, "#8f2238", lw * 0.5);
-        const gl = new Path2D();
-        gl.arc(s * r * 1.42, r * 0.36 + Math.sin(t * 2 + s) * r * 0.05, r * 0.17, 0, Math.PI * 2);
-        fPaint(gl, "#ffffff", lw * 0.7);
+        ctx.strokeStyle = "#c99a0e";
+        ctx.lineWidth = lw * 0.6;
+        for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(s * r * (0.82 + k * 0.1), -r * 0.52 + k * s * 0.0 + k * r * 0.02); ctx.lineTo(s * r * (0.86 + k * 0.1), -r * 0.34 + k * r * 0.03); ctx.stroke(); }
+        limb([[s * r * 1.12, -r * 0.38], [s * r * 1.45, r * 0.0], [s * r * 1.38, r * 0.3 + Math.sin(t * 2 + s) * r * 0.05]], r * 0.26, "#8f2238", lw * 0.5);
+        glove(s * r * 1.38, r * 0.42 + Math.sin(t * 2 + s) * r * 0.05, r * 0.16, Math.PI + s * 0.3, "#ffffff", lw * 0.7);
       }
-      // a ticket slot for a mouth, spitting out a strip
+      // a ticket slot for a mouth, feeding out a strip
       const slot = new Path2D();
-      slot.roundRect(-r * 0.45, r * 0.05, r * 0.9, r * 0.34, r * 0.08);
+      slot.roundRect(-r * 0.5, r * 0.02, r * 1.0, r * 0.4, r * 0.1);
       fPaint(slot, "#12080f", lw);
       ctx.fillStyle = "#efe6d2";
-      for (let k = 0; k < 7; k++) {
+      ctx.strokeStyle = FINK;
+      ctx.lineWidth = lw * 0.4;
+      for (let k = 0; k < 8; k++) {
         ctx.beginPath();
-        ctx.moveTo(-r * 0.42 + k * r * 0.12, r * 0.05); ctx.lineTo(-r * 0.36 + k * r * 0.12, r * 0.17); ctx.lineTo(-r * 0.3 + k * r * 0.12, r * 0.05);
-        ctx.fill();
+        ctx.moveTo(-r * 0.47 + k * r * 0.12, r * 0.03); ctx.lineTo(-r * 0.41 + k * r * 0.12, r * 0.16 + (k % 2) * r * 0.03); ctx.lineTo(-r * 0.35 + k * r * 0.12, r * 0.03);
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.47 + k * r * 0.12, r * 0.41); ctx.lineTo(-r * 0.41 + k * r * 0.12, r * 0.3); ctx.lineTo(-r * 0.35 + k * r * 0.12, r * 0.41);
+        ctx.fill(); ctx.stroke();
       }
-      for (let k = 0; k < 6; k++) {
+      for (let k = 0; k < 7; k++) {
         ctx.save();
-        ctx.translate(-r * 0.1 - k * r * 0.26, r * 0.3 + k * r * 0.1 + Math.sin(t * 4 + k) * r * 0.05);
-        ctx.rotate(-0.35 + Math.sin(t * 4 + k) * 0.15);
+        ctx.translate(-r * 0.1 - k * r * 0.27, r * 0.28 + k * r * 0.11 + Math.sin(t * 4 + k) * r * 0.05);
+        ctx.rotate(-0.38 + Math.sin(t * 4 + k) * 0.15);
         const tk = new Path2D();
-        tk.rect(-r * 0.13, -r * 0.08, r * 0.26, r * 0.16);
+        tk.roundRect(-r * 0.14, -r * 0.085, r * 0.28, r * 0.17, r * 0.02);
         fPaint(tk, k % 2 ? "#efe6d2" : "#ff8a9a", lw * 0.5);
+        ctx.fillStyle = "rgba(20,10,30,0.5)";
+        ctx.fillRect(-r * 0.08, -r * 0.02, r * 0.16, r * 0.04);
         ctx.restore();
       }
       const head = new Path2D();
-      head.arc(0, -r * 0.92, r * 0.38, 0, Math.PI * 2);
-      fBody(head, "#c9bfa6", r * 0.4, lw, -r * 0.1, -r);
-      fEyes("hollow", r * 0.15, -r * 0.92, r * 0.5, t, "#ff3b4a");
+      head.ellipse(0, -r * 0.96, r * 0.38, r * 0.36, 0, 0, Math.PI * 2);
+      fBody(head, "#d5ccb4", r * 0.45, lw, -r * 0.1, -r * 1.05);
+      for (const s of [-1, 1]) {
+        eye(s * r * 0.15, -r * 0.97, r * 0.1, r * 0.12, { white: "#0a0414", iris: "#ff3b4a", glow: "#ff3b4a", look: [-0.6, 0.2], lid: 0.2, slant: -s * 0.4, lidColor: "#d5ccb4" });
+      }
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw * 0.7;
-      ctx.beginPath(); ctx.moveTo(-r * 0.12, -r * 0.7); ctx.lineTo(r * 0.12, -r * 0.7); ctx.stroke();
-      fPillbox(0, -r * 1.22, r * 0.9, "#b02a42", lw);
+      ctx.lineWidth = lw * 0.8;
+      ctx.beginPath(); ctx.moveTo(-r * 0.13, -r * 0.74); ctx.lineTo(r * 0.13, -r * 0.74); ctx.stroke();
+      const mst = new Path2D();
+      mst.moveTo(0, -r * 0.82); mst.quadraticCurveTo(-r * 0.2, -r * 0.74, -r * 0.3, -r * 0.84); mst.quadraticCurveTo(-r * 0.15, -r * 0.84, 0, -r * 0.82);
+      mst.quadraticCurveTo(r * 0.2, -r * 0.74, r * 0.3, -r * 0.84); mst.quadraticCurveTo(r * 0.15, -r * 0.84, 0, -r * 0.82);
+      fPaint(mst, "#1a1024", lw * 0.4);
+      fPillbox(0, -r * 1.24, r * 0.95, "#c2334d", lw);
     },
 
     strongman(f, r, t, lw, ft) {
-      const lift = Math.sin(t * 1.6) * r * 0.06;
+      const lift = Math.sin(t * 1.6) * r * 0.06, sob = Math.sin(t * 6) * r * 0.015;
       for (const s of [-1, 1]) {
-        limb([[s * r * 0.35, r * 0.6], [s * r * 0.4, ft - r * 0.1]], r * 0.34, "#e8a17a", lw * 0.5);
+        limb([[s * r * 0.35, r * 0.62], [s * r * 0.42, ft - r * 0.14]], r * 0.36, "#e8a17a", lw * 0.5);
         const boot = new Path2D();
-        boot.roundRect(s * r * 0.4 - r * 0.28, ft - r * 0.2, r * 0.5, r * 0.2, r * 0.06);
-        fPaint(boot, "#1a1024", lw * 0.7);
+        boot.roundRect(s * r * 0.42 - r * 0.3, ft - r * 0.3, r * 0.56, r * 0.3, r * 0.08);
+        fBody(boot, "#1f1430", r * 0.3, lw * 0.8, s * r * 0.3, ft - r * 0.3, 0.3);
+        ctx.strokeStyle = "#efe6d2";
+        ctx.lineWidth = lw * 0.5;
+        for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(s * r * 0.42 - r * 0.1, ft - r * 0.25 + k * r * 0.07); ctx.lineTo(s * r * 0.42 + r * 0.1, ft - r * 0.25 + k * r * 0.07); ctx.stroke(); }
       }
       // barbell, held up and shaking
+      const by0 = -r * 1.66 + lift;
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = r * 0.13;
-      ctx.beginPath(); ctx.moveTo(-r * 2.0, -r * 1.62 + lift); ctx.lineTo(r * 2.0, -r * 1.62 + lift); ctx.stroke();
+      ctx.lineWidth = r * 0.14;
+      ctx.beginPath(); ctx.moveTo(-r * 2.05, by0); ctx.quadraticCurveTo(0, by0 + r * 0.12, r * 2.05, by0); ctx.stroke();
       ctx.strokeStyle = "#cfc6d8";
-      ctx.lineWidth = r * 0.06;
+      ctx.lineWidth = r * 0.07;
       ctx.stroke();
       for (const s of [-1, 1]) {
-        const wt = new Path2D();
-        wt.arc(s * r * 1.9, -r * 1.62 + lift, r * 0.36, 0, Math.PI * 2);
-        fBody(wt, "#2a2236", r * 0.36, lw, s * r * 1.8, -r * 1.75);
-        ctx.fillStyle = "#cfc6d8";
-        ctx.beginPath(); ctx.arc(s * r * 1.9, -r * 1.62 + lift, r * 0.07, 0, Math.PI * 2); ctx.fill();
-        limb([[s * r * 1.05, -r * 0.5], [s * r * 1.5, -r * 0.95], [s * r * 1.25, -r * 1.55 + lift]], r * 0.36, "#e8a17a", lw * 0.5);
+        for (const [dx, rr] of [[1.72, 0.4], [1.95, 0.32]]) {
+          const wt = new Path2D();
+          wt.ellipse(s * r * dx, by0, r * 0.13, r * rr, 0, 0, Math.PI * 2);
+          fBody(wt, "#2a2236", r * 0.4, lw, s * r * dx - r * 0.1, by0 - r * 0.2, 0.3);
+        }
+        limb([[s * r * 1.08, -r * 0.5], [s * r * 1.55, -r * 0.92], [s * r * 1.3, by0 + r * 0.1]], r * 0.4, "#e8a17a", lw * 0.5);
+        ctx.strokeStyle = "rgba(120,60,40,0.5)";
+        ctx.lineWidth = lw * 0.5;
+        ctx.beginPath(); ctx.arc(s * r * 1.42, -r * 0.8, r * 0.16, s > 0 ? 3.4 : 5.2, s > 0 ? 5.0 : 6.8); ctx.stroke();
+        glove(s * r * 1.3, by0 + r * 0.02, r * 0.17, 0, "#e8a17a", lw * 0.7);
       }
       const torso = new Path2D();
       torso.moveTo(-r * 1.3, -r * 0.55);
-      torso.quadraticCurveTo(-r * 1.4, -r * 0.2, -r * 0.6, r * 0.75);
-      torso.lineTo(r * 0.6, r * 0.75);
-      torso.quadraticCurveTo(r * 1.4, -r * 0.2, r * 1.3, -r * 0.55);
-      torso.quadraticCurveTo(0, -r * 0.95, -r * 1.3, -r * 0.55);
-      ctx.fillStyle = "#e8a17a";
+      torso.quadraticCurveTo(-r * 1.45, -r * 0.1, -r * 0.6, r * 0.78);
+      torso.lineTo(r * 0.6, r * 0.78);
+      torso.quadraticCurveTo(r * 1.45, -r * 0.1, r * 1.3, -r * 0.55);
+      torso.quadraticCurveTo(0, -r * 0.98, -r * 1.3, -r * 0.55);
+      ctx.fillStyle = vgrad("#f0b08c", "#d98a66", -r, r);
       ctx.fill(torso);
       ctx.save();
       ctx.clip(torso);
       // leopard singlet with one strap
+      const sg = new Path2D();
+      sg.moveTo(-r * 1.5, r * 0.9); sg.lineTo(-r * 0.95, -r * 0.05); sg.quadraticCurveTo(-r * 0.2, -r * 0.2, r * 0.15, -r * 0.95); sg.lineTo(r * 0.75, -r * 0.95); sg.quadraticCurveTo(r * 0.5, -r * 0.2, r * 1.0, r * 0.1); sg.lineTo(r * 1.5, r * 0.9);
       ctx.fillStyle = "#e8b923";
-      ctx.beginPath();
-      ctx.moveTo(-r * 1.5, r * 0.9); ctx.lineTo(-r * 0.9, -r * 0.05); ctx.lineTo(r * 0.15, -r * 0.9); ctx.lineTo(r * 0.75, -r * 0.9); ctx.lineTo(r * 0.5, r * 0.0); ctx.lineTo(r * 1.5, r * 0.9);
-      ctx.fill();
-      ctx.fillStyle = "#6a3a14";
-      for (let i = 0; i < 14; i++) {
-        const px = (Math.sin(i * 12.9) * 0.5) * r * 1.6, py = r * (-0.2 + (i % 5) * 0.2);
-        ctx.beginPath(); ctx.ellipse(px, py, r * 0.08, r * 0.055, i, 0, Math.PI * 2); ctx.fill();
+      ctx.fill(sg);
+      ctx.save();
+      ctx.clip(sg);
+      for (let i = 0; i < 22; i++) {
+        const px = (hashN(i * 3) - 0.5) * r * 2.2, py = r * (-0.7 + hashN(i * 7) * 1.5);
+        ctx.fillStyle = "#6a3a14";
+        ctx.beginPath(); ctx.ellipse(px, py, r * 0.09, r * 0.06, i, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#c98a2a";
+        ctx.beginPath(); ctx.ellipse(px, py, r * 0.045, r * 0.03, i, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
-      fShade(torso, r * 1.2, -r * 0.4, -r * 0.6);
+      // chest hair and a belly button
+      ctx.strokeStyle = "rgba(90,40,20,0.6)";
+      ctx.lineWidth = lw * 0.5;
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(-r * 0.55 + i * r * 0.08, -r * 0.45 + (i % 2) * r * 0.08, r * 0.05, 0.3, 2.6); ctx.stroke(); }
+      ctx.restore();
+      fShade(torso, r * 1.25, -r * 0.4, -r * 0.6);
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw;
       ctx.stroke(torso);
       const belt = new Path2D();
-      belt.rect(-r * 0.64, r * 0.56, r * 1.28, r * 0.2);
-      fPaint(belt, "#1a1024", lw * 0.7);
-      sparkle(0, r * 0.66, r * 0.07, "#ffd23f");
+      belt.rect(-r * 0.66, r * 0.56, r * 1.32, r * 0.22);
+      fPaint(belt, "#1f1430", lw * 0.7);
+      const bk = new Path2D();
+      bk.roundRect(-r * 0.17, r * 0.52, r * 0.34, r * 0.3, r * 0.05);
+      fPaint(bk, "#ffd23f", lw * 0.7);
+      sparkle(0, r * 0.67, r * 0.06, "#d62839");
       const head = new Path2D();
-      head.arc(0, -r * 1.0, r * 0.36, 0, Math.PI * 2);
-      fBody(head, "#eeb08a", r * 0.4, lw, -r * 0.1, -r * 1.1);
-      fEyes("tear", r * 0.15, -r * 1.05, r * 0.42, t, "#e8a17a");
-      // worried brows and a handlebar moustache
+      head.ellipse(0, -r * 1.0 + sob, r * 0.36, r * 0.38, 0, 0, Math.PI * 2);
+      fBody(head, "#f0b08c", r * 0.42, lw, -r * 0.1, -r * 1.1);
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw * 0.8;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.26, -r * 1.2); ctx.lineTo(-r * 0.08, -r * 1.27);
-      ctx.moveTo(r * 0.26, -r * 1.2); ctx.lineTo(r * 0.08, -r * 1.27);
-      ctx.stroke();
-      ctx.lineWidth = lw * 1.3;
-      ctx.beginPath();
-      ctx.moveTo(0, -r * 0.86);
-      ctx.quadraticCurveTo(-r * 0.2, -r * 0.76, -r * 0.3, -r * 0.92);
-      ctx.moveTo(0, -r * 0.86);
-      ctx.quadraticCurveTo(r * 0.2, -r * 0.76, r * 0.3, -r * 0.92);
-      ctx.stroke();
+      ctx.lineWidth = lw * 0.7;
+      ctx.beginPath(); ctx.arc(r * 0.02, -r * 1.36 + sob, r * 0.1, Math.PI * 0.9, Math.PI * 2.2); ctx.stroke();
+      for (const s of [-1, 1]) {
+        eye(s * r * 0.15, -r * 1.05 + sob, r * 0.085, r * 0.07, { iris: "#5a3e2b", look: [-0.5, 0.4], lid: 0.2, slant: s * 0.7, lidColor: "#f0b08c" });
+        brow(s * r * 0.16, -r * 1.2 + sob, r * 0.1, s * 0.6, lw * 0.9);
+        tear(s * r * 0.2, -r * 0.94 + sob, r * 0.04, t, s > 0 ? 0 : 0.5);
+        ctx.fillStyle = "rgba(255,95,140,0.4)";
+        ctx.beginPath(); ctx.arc(s * r * 0.24, -r * 0.92 + sob, r * 0.06, 0, Math.PI * 2); ctx.fill();
+      }
+      mouth(0, -r * 0.76 + sob, r * 0.1, { curve: -0.9, open: 0.5 + 0.3 * Math.sin(t * 6), fill: "#4a0f24" }, lw * 0.6);
+      const ms = new Path2D();
+      ms.moveTo(0, -r * 0.88 + sob);
+      ms.bezierCurveTo(-r * 0.15, -r * 0.78 + sob, -r * 0.34, -r * 0.8 + sob, -r * 0.36, -r * 0.98 + sob);
+      ms.bezierCurveTo(-r * 0.28, -r * 0.86 + sob, -r * 0.12, -r * 0.9 + sob, 0, -r * 0.9 + sob);
+      ms.bezierCurveTo(r * 0.12, -r * 0.9 + sob, r * 0.28, -r * 0.86 + sob, r * 0.36, -r * 0.98 + sob);
+      ms.bezierCurveTo(r * 0.34, -r * 0.8 + sob, r * 0.15, -r * 0.78 + sob, 0, -r * 0.88 + sob);
+      fPaint(ms, "#1a1024", lw * 0.4);
     },
 
     calliope(f, r, t, lw, ft) {
-      // brass pipes rising behind
-      for (let i = -3; i <= 3; i++) {
-        const h = r * (1.5 + (3 - Math.abs(i)) * 0.38), px = i * r * 0.34;
+      // brass pipes rising behind, puffing in turn
+      for (let i = -4; i <= 4; i++) {
+        const h = r * (1.4 + (4 - Math.abs(i)) * 0.34), px = i * r * 0.3;
         const pg = ctx.createLinearGradient(px - r * 0.12, 0, px + r * 0.12, 0);
         pg.addColorStop(0, "#6a5a2a");
-        pg.addColorStop(0.45, "#f7dc8a");
+        pg.addColorStop(0.35, "#fff1b0");
+        pg.addColorStop(0.55, "#e8c45a");
         pg.addColorStop(1, "#5a4a1a");
         const p = new Path2D();
-        p.roundRect(px - r * 0.13, -h - r * 0.1, r * 0.26, h, r * 0.05);
+        p.roundRect(px - r * 0.12, -h - r * 0.1, r * 0.24, h, r * 0.04);
         fPaint(p, pg, lw * 0.8);
+        const lip = new Path2D();
+        lip.ellipse(px, -h - r * 0.1, r * 0.15, r * 0.05, 0, 0, Math.PI * 2);
+        fPaint(lip, "#3a2a10", lw * 0.6);
         ctx.fillStyle = FINK;
-        ctx.fillRect(px - r * 0.07, -h * 0.55, r * 0.14, r * 0.07);
-        const puff = (t * 0.8 + Math.abs(i) * 0.25) % 1;
-        ctx.fillStyle = `rgba(232,224,255,${0.6 * (1 - puff)})`;
-        ctx.beginPath(); ctx.arc(px + Math.sin(puff * 5) * r * 0.1, -h - r * 0.2 - puff * r * 0.9, r * (0.1 + puff * 0.22), 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(px - r * 0.07, -h * 0.55); ctx.lineTo(px + r * 0.07, -h * 0.55); ctx.lineTo(px, -h * 0.55 + r * 0.12); ctx.fill();
+        const on = Math.floor(t * 5) % 9 === i + 4, puff = (t * 0.8 + Math.abs(i) * 0.25) % 1;
+        ctx.fillStyle = `rgba(232,224,255,${(on ? 0.85 : 0.5) * (1 - puff)})`;
+        ctx.beginPath(); ctx.arc(px + Math.sin(puff * 5) * r * 0.1, -h - r * 0.2 - puff * r * 0.9, r * (0.1 + puff * 0.24), 0, Math.PI * 2); ctx.fill();
       }
       const body = new Path2D();
-      body.moveTo(-r * 0.95, 0);
-      body.arc(0, 0, r * 0.95, Math.PI, 0);
-      for (let k = 0; k <= 12; k++) { const kk = k / 12; body.lineTo(r * 0.95 * (1 - kk * 0.85) + Math.sin(t * 3 + kk * 6) * r * 0.14, kk * r * 1.5); }
-      for (let k = 12; k >= 0; k--) { const kk = k / 12; body.lineTo(-r * 0.95 * (1 - kk * 0.85) + Math.sin(t * 3 + kk * 6 + 1) * r * 0.14, kk * r * 1.5); }
+      body.moveTo(-r * 0.98, 0);
+      body.bezierCurveTo(-r * 1.0, -r * 1.25, r * 1.0, -r * 1.25, r * 0.98, 0);
+      for (let k = 0; k <= 12; k++) { const kk = k / 12; body.lineTo(r * 0.98 * (1 - kk * 0.85) + Math.sin(t * 3 + kk * 6) * r * 0.16, kk * r * 1.5); }
+      for (let k = 12; k >= 0; k--) { const kk = k / 12; body.lineTo(-r * 0.98 * (1 - kk * 0.85) + Math.sin(t * 3 + kk * 6 + 1) * r * 0.16, kk * r * 1.5); }
       body.closePath();
-      ctx.globalAlpha = 0.93;
-      fBody(body, vgrad("#efe9ff", "#8f7fd6", -r, r * 1.5), r * 1.1, lw);
+      ctx.globalAlpha = 0.94;
+      fBody(body, vgrad("#f4efff", "#8672d6", -r, r * 1.5), r * 1.15, lw);
       ctx.globalAlpha = 1;
-      fHorns(-r * 0.82, r, "#5b2a86", lw, t);
-      fEyes("hollow", r * 0.36, -r * 0.3, r * 1.15, t, "#c9b8ff");
+      // sheet-music staves running across it
+      ctx.save();
+      ctx.clip(body);
+      ctx.strokeStyle = "rgba(91,42,134,0.3)";
+      ctx.lineWidth = lw * 0.4;
+      for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(-r, r * (0.65 + i * 0.07)); ctx.bezierCurveTo(-r * 0.3, r * (0.55 + i * 0.07), r * 0.3, r * (0.8 + i * 0.07), r, r * (0.65 + i * 0.07)); ctx.stroke(); }
+      ctx.fillStyle = "rgba(91,42,134,0.45)";
+      for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(-r * 0.6 + i * r * 0.3, r * (0.7 + (i % 3) * 0.07), r * 0.05, r * 0.035, -0.4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+      fHorns(-r * 0.86, r, "#5b2a86", lw, t);
+      for (const s of [-1, 1]) {
+        eye(s * r * 0.38, -r * 0.34, r * 0.2, r * 0.27, { white: "#160a2a", iris: "#c9b8ff", glow: "#c9b8ff", look: [-0.5, 0.2 + Math.sin(t) * 0.2], lid: 0.12, slant: -s * 0.35, lidColor: "#d9d0f8" });
+      }
       // a keyboard for a mouth
       const kb = new Path2D();
-      kb.roundRect(-r * 0.62, r * 0.12, r * 1.24, r * 0.36, r * 0.06);
+      kb.moveTo(-r * 0.7, r * 0.1); kb.quadraticCurveTo(0, r * 0.22, r * 0.7, r * 0.1); kb.lineTo(r * 0.62, r * 0.5); kb.quadraticCurveTo(0, r * 0.64, -r * 0.62, r * 0.5); kb.closePath();
       fPaint(kb, "#12080f", lw);
-      for (let k = 0; k < 8; k++) {
-        const down = Math.floor(t * 5 + k * 3) % 8 === k;
+      ctx.save();
+      ctx.clip(kb);
+      for (let k = 0; k < 9; k++) {
+        const down = Math.floor(t * 5 + k * 3) % 9 === k, kx = -r * 0.64 + k * r * 0.143, ky = r * 0.16 + (1 - Math.pow((k - 4) / 4.5, 2)) * r * 0.06;
         ctx.fillStyle = down ? "#c9b8ff" : "#fbf8f2";
-        ctx.fillRect(-r * 0.58 + k * r * 0.146, r * 0.16 + (down ? r * 0.04 : 0), r * 0.125, r * 0.28);
-        if (k % 7 !== 2 && k < 7) { ctx.fillStyle = "#12080f"; ctx.fillRect(-r * 0.49 + k * r * 0.146, r * 0.16, r * 0.08, r * 0.16); }
+        ctx.fillRect(kx, ky + (down ? r * 0.04 : 0), r * 0.125, r * 0.34);
+        if (k % 7 !== 2 && k % 7 !== 6 && k < 8) { ctx.fillStyle = "#12080f"; ctx.fillRect(kx + r * 0.09, ky, r * 0.08, r * 0.19); }
       }
+      ctx.restore();
       for (const s of [-1, 1]) {
-        const wv = Math.sin(t * 2.5 + s) * r * 0.2;
-        limb([[s * r * 0.85, r * 0.2], [s * r * 1.35, -r * 0.1 + wv], [s * r * 1.5, -r * 0.5 + wv]], r * 0.16, "#cfc4f4", lw * 0.5);
+        const wv = Math.sin(t * 2.5 + s) * r * 0.22;
+        limb([[s * r * 0.88, r * 0.2], [s * r * 1.4, -r * 0.05 + wv], [s * r * 1.55, -r * 0.5 + wv]], r * 0.17, "#d9d0f8", lw * 0.5);
+        glove(s * r * 1.56, -r * 0.6 + wv, r * 0.15, s * 0.3, "#f4efff", lw * 0.6);
       }
+      // conductor's baton
+      const wv = Math.sin(t * 2.5 - 1) * r * 0.22;
+      ctx.strokeStyle = FINK;
+      ctx.lineWidth = lw * 1.2;
+      ctx.beginPath(); ctx.moveTo(-r * 1.56, -r * 0.7 + wv); ctx.lineTo(-r * 1.95, -r * 1.3 + wv); ctx.stroke();
+      ctx.strokeStyle = "#fbf8f2";
+      ctx.lineWidth = lw * 0.5;
+      ctx.stroke();
     },
 
     seal(f, r, t, lw, ft) {
       const bob = Math.sin(t * 2.2) * r * 0.05;
-      // tail flukes
       for (const s of [-1, 1]) {
         const fl = new Path2D();
-        fl.ellipse(r * 1.32, r * 0.45 + s * r * 0.16, r * 0.34, r * 0.13, s * 0.6 - 0.5 + Math.sin(t * 3) * 0.2, 0, Math.PI * 2);
-        fPaint(fl, "#3d4a30", lw);
+        fl.ellipse(r * 1.34, r * 0.45 + s * r * 0.17, r * 0.36, r * 0.13, s * 0.6 - 0.5 + Math.sin(t * 3) * 0.2, 0, Math.PI * 2);
+        fBody(fl, "#3d4a30", r * 0.4, lw, r * 1.2, r * 0.3, 0.3);
       }
       const body = new Path2D();
       body.moveTo(-r * 0.92, -r * 0.3 + bob);
-      body.quadraticCurveTo(-r * 0.95, r * 0.5, -r * 0.55, r * 0.85);
-      body.lineTo(r * 0.7, r * 0.85);
-      body.quadraticCurveTo(r * 1.3, r * 0.8, r * 1.2, r * 0.45);
-      body.quadraticCurveTo(r * 0.5, r * 0.25, r * 0.15, -r * 0.4 + bob);
-      body.quadraticCurveTo(-r * 0.05, -r * 1.2 + bob, -r * 0.6, -r * 1.1 + bob);
-      body.quadraticCurveTo(-r * 1.15, -r * 0.95 + bob, -r * 0.92, -r * 0.3 + bob);
-      ctx.fillStyle = vgrad("#66784e", "#33402a", -r, r);
+      body.quadraticCurveTo(-r * 0.98, r * 0.5, -r * 0.55, r * 0.86);
+      body.lineTo(r * 0.7, r * 0.86);
+      body.quadraticCurveTo(r * 1.32, r * 0.8, r * 1.22, r * 0.45);
+      body.quadraticCurveTo(r * 0.5, r * 0.25, r * 0.18, -r * 0.4 + bob);
+      body.quadraticCurveTo(-r * 0.02, -r * 1.2 + bob, -r * 0.6, -r * 1.12 + bob);
+      body.quadraticCurveTo(-r * 1.18, -r * 0.98 + bob, -r * 0.92, -r * 0.3 + bob);
+      ctx.fillStyle = vgrad("#6f8256", "#2f3a26", -r, r);
       ctx.fill(body);
       ctx.save();
       ctx.clip(body);
-      // an oil-slick sheen
-      const cols = ["rgba(255,95,168,0.2)", "rgba(143,233,255,0.2)", "rgba(166,217,74,0.25)", "rgba(138,61,255,0.2)"];
-      for (let i = 0; i < 8; i++) {
+      const cols = ["rgba(255,95,168,0.24)", "rgba(143,233,255,0.24)", "rgba(166,217,74,0.3)", "rgba(138,61,255,0.24)"];
+      for (let i = 0; i < 9; i++) {
         ctx.strokeStyle = cols[i % 4];
-        ctx.lineWidth = r * 0.12;
+        ctx.lineWidth = r * 0.11;
         ctx.beginPath();
-        ctx.moveTo(-r * 1.5 + i * r * 0.4 + Math.sin(t + i) * r * 0.1, -r * 1.3);
-        ctx.quadraticCurveTo(-r * 0.8 + i * r * 0.4, 0, -r * 1.6 + i * r * 0.4, r);
+        ctx.moveTo(-r * 1.5 + i * r * 0.36 + Math.sin(t + i) * r * 0.1, -r * 1.3);
+        ctx.bezierCurveTo(-r * 0.8 + i * r * 0.36, -r * 0.3, -r * 1.9 + i * r * 0.36, r * 0.3, -r * 1.3 + i * r * 0.36, r);
         ctx.stroke();
       }
-      ctx.fillStyle = "rgba(220,230,190,0.28)";
-      ctx.beginPath(); ctx.ellipse(-r * 0.45, r * 0.35, r * 0.4, r * 0.55, 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(226,236,196,0.35)";
+      ctx.beginPath(); ctx.ellipse(-r * 0.5, r * 0.35, r * 0.4, r * 0.58, 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(20,30,10,0.4)";
+      for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(-r * 0.2 + hashN(i) * r * 1.2, -r * 0.2 + hashN(i + 4) * r * 0.9, r * (0.03 + hashN(i + 9) * 0.04), 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
       fShade(body, r * 1.2, -r * 0.5, -r * 0.6);
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw;
       ctx.stroke(body);
       const flip = new Path2D();
-      flip.ellipse(-r * 0.15, r * 0.62, r * 0.5, r * 0.17, 0.5 + Math.sin(t * 4) * 0.15, 0, Math.PI * 2);
-      fPaint(flip, "#3d4a30", lw);
-      // face, looking toward the player
-      fEyes("hollow", r * 0.2, -r * 0.72 + bob, r * 0.75, t, "#a6d94a");
+      flip.ellipse(-r * 0.12, r * 0.64, r * 0.52, r * 0.17, 0.5 + Math.sin(t * 4) * 0.15, 0, Math.PI * 2);
+      fBody(flip, "#3d4a30", r * 0.5, lw, -r * 0.3, r * 0.5, 0.3);
+      // a ruff, a face looking at the player
       ctx.save();
       ctx.translate(-r * 0.42, bob);
-      fNose(-r * 0.35, -r * 0.52, r * 0.1, lw);
-      ctx.strokeStyle = "rgba(239,230,210,0.8)";
-      ctx.lineWidth = 1.2;
-      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(-r * 0.25, -r * 0.45); ctx.lineTo(r * 0.15, -r * 0.4 + k * r * 0.1); ctx.stroke(); }
+      ctx.rotate(0.35);
+      ruffle(r * 0.1, -r * 0.1, r * 1.1, 6, r * 0.13, "#a6d94a", "#fbf8f2", lw);
       ctx.restore();
-      fCone(-r * 0.25, -r * 1.08 + bob, r * 0.5, "#a6d94a", lw, 0.25);
+      eye(-r * 0.66, -r * 0.74 + bob, r * 0.11, r * 0.14, { white: "#0a0414", iris: "#a6d94a", glow: "#a6d94a", look: [-0.7, 0.1], lid: 0.2, slant: 0.3, lidColor: "#6f8256" });
+      eye(-r * 0.3, -r * 0.8 + bob, r * 0.13, r * 0.16, { white: "#0a0414", iris: "#a6d94a", glow: "#a6d94a", look: [-0.7, 0.1], lid: 0.2, slant: -0.3, lidColor: "#6f8256" });
+      const snout = new Path2D();
+      snout.ellipse(-r * 0.72, -r * 0.5 + bob, r * 0.27, r * 0.18, 0.1, 0, Math.PI * 2);
+      fBody(snout, "#8a9c70", r * 0.3, lw * 0.8, -r * 0.8, -r * 0.6 + bob, 0.25);
+      fNose(-r * 0.9, -r * 0.56 + bob, r * 0.085, lw);
+      ctx.strokeStyle = "rgba(239,230,210,0.85)";
+      ctx.lineWidth = 1.3;
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(-r * 0.66, -r * 0.46 + bob); ctx.lineTo(-r * 0.22, -r * 0.42 + bob + k * r * 0.1); ctx.stroke(); }
+      mouth(-r * 0.72, -r * 0.4 + bob, r * 0.14, { curve: 0.6, open: 0.3, teeth: "sharp", n: 5 }, lw * 0.5);
+      fCone(-r * 0.28, -r * 1.1 + bob, r * 0.5, "#a6d94a", lw, 0.25);
       // a ball balanced on its nose
-      const bx = -r * 1.0, by2 = -r * 1.05 + bob - Math.abs(Math.sin(t * 2.2)) * r * 0.25;
+      const bx = -r * 1.02, by2 = -r * 1.05 + bob - Math.abs(Math.sin(t * 2.2)) * r * 0.28;
       const ball = new Path2D();
-      ball.arc(bx, by2, r * 0.3, 0, Math.PI * 2);
+      ball.arc(bx, by2, r * 0.32, 0, Math.PI * 2);
       ctx.fillStyle = "#fbf8f2";
       ctx.fill(ball);
       ctx.save();
       ctx.clip(ball);
       ctx.translate(bx, by2);
       ctx.rotate(t * 2);
-      ctx.fillStyle = "#d62839";
-      for (let k = 0; k < 3; k++) { ctx.rotate((Math.PI * 2) / 3); ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r * 0.4, 0, Math.PI / 3); ctx.fill(); }
+      for (let k = 0; k < 6; k++) { ctx.rotate(Math.PI / 3); ctx.fillStyle = ["#d62839", "#ffd23f", "#2f8f9a"][k % 3]; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r * 0.4, 0, Math.PI / 6); ctx.fill(); }
       ctx.restore();
-      fShade(ball, r * 0.3, bx - r * 0.1, by2 - r * 0.1);
+      fShade(ball, r * 0.32, bx - r * 0.1, by2 - r * 0.12);
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw * 0.8;
       ctx.stroke(ball);
-      ctx.fillStyle = "rgba(166,217,74,0.9)";
+      ctx.fillStyle = "rgba(166,217,74,0.92)";
+      ctx.strokeStyle = FINK;
+      ctx.lineWidth = lw * 0.5;
       for (let i = 0; i < 4; i++) {
         const len = r * (0.12 + 0.12 * Math.abs(Math.sin(t * 1.3 + i * 2)));
         ctx.beginPath();
-        ctx.moveTo(-r * 0.3 + i * r * 0.3 - r * 0.07, r * 0.85);
-        ctx.quadraticCurveTo(-r * 0.3 + i * r * 0.3, r * 0.85 + len * 2, -r * 0.3 + i * r * 0.3 + r * 0.07, r * 0.85);
-        ctx.fill();
+        ctx.moveTo(-r * 0.3 + i * r * 0.3 - r * 0.07, r * 0.86);
+        ctx.quadraticCurveTo(-r * 0.3 + i * r * 0.3, r * 0.86 + len * 2, -r * 0.3 + i * r * 0.3 + r * 0.07, r * 0.86);
+        ctx.fill(); ctx.stroke();
       }
     },
 
     glass(f, r, t, lw, ft) {
-      for (const s of [-1, 1]) limb([[s * r * 0.25, r * 0.9], [s * r * 0.3, ft - r * 0.03]], r * 0.1, "#bdf3ff", lw * 0.4);
+      for (const s of [-1, 1]) {
+        limb([[s * r * 0.25, r * 0.95], [s * r * 0.3, ft - r * 0.08]], r * 0.1, "#bdf3ff", lw * 0.4);
+        shoe(s * r * 0.3 - r * 0.1, ft, r * 0.16, -1, "#2a6f86", lw * 0.7);
+      }
       const body = new Path2D();
       body.moveTo(-r * 0.25, -r * 1.15);
       body.lineTo(r * 0.25, -r * 1.15);
-      body.quadraticCurveTo(r * 0.25, -r * 0.75, r * 0.7, -r * 0.45);
-      body.quadraticCurveTo(r * 0.8, r * 0.4, r * 0.62, r * 1.05);
-      body.lineTo(-r * 0.62, r * 1.05);
-      body.quadraticCurveTo(-r * 0.8, r * 0.4, -r * 0.7, -r * 0.45);
-      body.quadraticCurveTo(-r * 0.25, -r * 0.75, -r * 0.25, -r * 1.15);
-      ctx.fillStyle = "rgba(190,243,255,0.42)";
+      body.bezierCurveTo(r * 0.25, -r * 0.8, r * 0.78, -r * 0.7, r * 0.76, -r * 0.2);
+      body.bezierCurveTo(r * 0.84, r * 0.5, r * 0.7, r * 1.05, r * 0.5, r * 1.06);
+      body.lineTo(-r * 0.5, r * 1.06);
+      body.bezierCurveTo(-r * 0.7, r * 1.05, -r * 0.84, r * 0.5, -r * 0.76, -r * 0.2);
+      body.bezierCurveTo(-r * 0.78, -r * 0.7, -r * 0.25, -r * 0.8, -r * 0.25, -r * 1.15);
+      ctx.fillStyle = "rgba(190,243,255,0.4)";
       ctx.fill(body);
       ctx.save();
       ctx.clip(body);
-      // something teal sloshing inside
-      ctx.fillStyle = "rgba(47,183,201,0.6)";
+      // something teal sloshing inside, with bubbles
+      ctx.fillStyle = "rgba(47,183,201,0.65)";
       ctx.beginPath();
       ctx.moveTo(-r, r * 1.2);
-      for (let k = 0; k <= 10; k++) ctx.lineTo(-r + k * r * 0.2, r * 0.45 + Math.sin(t * 2.5 + k * 0.9) * r * 0.07);
+      for (let k = 0; k <= 10; k++) ctx.lineTo(-r + k * r * 0.2, r * 0.42 + Math.sin(t * 2.5 + k * 0.9) * r * 0.07);
       ctx.lineTo(r, r * 1.2);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.beginPath(); ctx.moveTo(-r * 0.55, -r * 0.4); ctx.lineTo(-r * 0.4, -r * 0.4); ctx.lineTo(-r * 0.5, r * 0.9); ctx.lineTo(-r * 0.62, r * 0.9); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.2)";
-      ctx.beginPath(); ctx.moveTo(r * 0.35, -r * 0.5); ctx.lineTo(r * 0.5, -r * 0.4); ctx.lineTo(r * 0.5, r * 0.3); ctx.lineTo(r * 0.38, r * 0.3); ctx.fill();
+      for (let i = 0; i < 6; i++) {
+        const k = (t * 0.4 + i * 0.17) % 1;
+        ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc((hashN(i) - 0.5) * r * 1.1, r * 1.0 - k * r * 0.55, r * (0.03 + hashN(i + 3) * 0.05), 0, Math.PI * 2); ctx.stroke();
+      }
+      // facets and shine
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = lw * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.25, -r * 0.8); ctx.lineTo(-r * 0.5, r * 0.2); ctx.lineTo(-r * 0.2, r * 1.06);
+      ctx.moveTo(r * 0.25, -r * 0.8); ctx.lineTo(r * 0.52, r * 0.1); ctx.lineTo(r * 0.3, r * 1.06);
+      ctx.moveTo(-r * 0.5, r * 0.2); ctx.lineTo(r * 0.52, r * 0.1);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath(); ctx.moveTo(-r * 0.6, -r * 0.35); ctx.lineTo(-r * 0.45, -r * 0.42); ctx.lineTo(-r * 0.5, r * 0.85); ctx.lineTo(-r * 0.64, r * 0.8); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.beginPath(); ctx.moveTo(r * 0.4, -r * 0.5); ctx.lineTo(r * 0.55, -r * 0.4); ctx.lineTo(r * 0.55, r * 0.3); ctx.lineTo(r * 0.42, r * 0.3); ctx.fill();
       ctx.restore();
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw;
+      ctx.lineWidth = lw * 1.4;
       ctx.stroke(body);
-      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
       ctx.lineWidth = lw * 0.5;
       ctx.stroke(body);
       const cork = new Path2D();
-      cork.roundRect(-r * 0.3, -r * 1.3, r * 0.6, r * 0.2, r * 0.05);
-      fPaint(cork, "#2a6f86", lw * 0.8);
-      fHorns(-r * 1.22, r * 0.75, "#2a6f86", lw, t);
-      fEyes("many", 0, -r * 0.05, r * 0.95, t, "#ffffff");
-      fMouth(false, -r * 0.05, r * 0.6, "#2a6f86", lw);
-      for (const s of [-1, 1]) limb([[s * r * 0.7, -r * 0.2], [s * r * 1.1, -r * 0.6], [s * r * 0.95, -r * 1.05 + Math.sin(t * 3.2 + s) * r * 0.1]], r * 0.1, "#bdf3ff", lw * 0.4);
-      for (let k = 0; k < 3; k++) {
-        const a = t * 3.2 + k * 2.09, px = Math.cos(a) * r * 0.95, py = -r * 1.75 - Math.abs(Math.sin(a)) * r * 0.9;
+      cork.roundRect(-r * 0.3, -r * 1.32, r * 0.6, r * 0.22, r * 0.05);
+      fBody(cork, "#b98a4a", r * 0.3, lw * 0.8, -r * 0.1, -r * 1.3, 0.3);
+      fHorns(-r * 1.24, r * 0.75, "#2a6f86", lw, t);
+      // a face made of too many eyes
+      const pos = [[-0.34, -0.2, 0.15], [0.34, -0.2, 0.15], [0, -0.42, 0.11], [-0.2, 0.08, 0.09], [0.24, 0.1, 0.1]];
+      pos.forEach((p, i) => {
+        const open = Math.sin(t * 1.7 + i * 1.9) > -0.85;
+        eye(p[0] * r, p[1] * r, r * p[2], r * p[2] * (open ? 1.15 : 0.15), { iris: "#2fb7c9", look: [-0.6 + Math.sin(t + i) * 0.3, 0.2] });
+      });
+      mouth(0, r * 0.26, r * 0.3, { curve: 0.6, open: 0.5, teeth: "flat", n: 6, fill: "#17424e" }, lw * 0.7);
+      for (const s of [-1, 1]) {
+        limb([[s * r * 0.72, -r * 0.2], [s * r * 1.12, -r * 0.6], [s * r * 0.97, -r * 1.05 + Math.sin(t * 3.2 + s) * r * 0.1]], r * 0.1, "#bdf3ff", lw * 0.4);
+        glove(s * r * 0.97, -r * 1.14 + Math.sin(t * 3.2 + s) * r * 0.1, r * 0.13, 0, "#eafcff", lw * 0.6);
+      }
+      for (let k = 0; k < 4; k++) {
+        const a = t * 3.2 + k * 1.57, px = Math.cos(a) * r * 0.97, py = -r * 1.85 - Math.abs(Math.sin(a)) * r * 0.9;
         const gb = new Path2D();
-        gb.arc(px, py, r * 0.22, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(191,243,255,0.5)";
+        gb.arc(px, py, r * 0.21, 0, Math.PI * 2);
+        ctx.fillStyle = ["rgba(191,243,255,0.5)", "rgba(255,180,220,0.5)"][k % 2];
         ctx.fill(gb);
         ctx.strokeStyle = FINK;
         ctx.lineWidth = lw * 0.7;
         ctx.stroke(gb);
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.beginPath(); ctx.arc(px - r * 0.07, py - r * 0.07, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.beginPath(); ctx.ellipse(px - r * 0.07, py - r * 0.08, r * 0.06, r * 0.035, -0.6, 0, Math.PI * 2); ctx.fill();
       }
     },
 
@@ -1935,44 +2208,52 @@
         ctx.rotate(flap * 0.6);
         const lower = new Path2D();
         lower.moveTo(r * 0.2, r * 0.1);
-        lower.bezierCurveTo(r * 1.3, r * 0.2, r * 1.5, r * 1.1, r * 0.9, r * 1.3);
-        lower.bezierCurveTo(r * 0.5, r * 1.2, r * 0.3, r * 0.7, r * 0.2, r * 0.1);
-        fBody(lower, "#8a6a4a", r, lw, r * 0.4, 0);
+        lower.bezierCurveTo(r * 1.3, r * 0.2, r * 1.6, r * 1.1, r * 0.95, r * 1.35);
+        lower.bezierCurveTo(r * 0.5, r * 1.25, r * 0.3, r * 0.7, r * 0.2, r * 0.1);
+        fBody(lower, vgrad("#a07a52", "#5a3e2b", 0, r * 1.3), r, lw, r * 0.4, 0);
+        for (let k = 0; k < 4; k++) { const sc = new Path2D(); sc.arc(r * (0.7 + k * 0.12), r * (1.3 - k * 0.02), r * 0.08, 0, Math.PI); fPaint(sc, "#e6d3ad", lw * 0.4); }
         const upper = new Path2D();
         upper.moveTo(r * 0.15, -r * 0.35);
-        upper.bezierCurveTo(r * 0.9, -r * 1.7, r * 2.3, -r * 1.3, r * 2.0, -r * 0.3);
-        upper.bezierCurveTo(r * 1.9, r * 0.3, r * 0.9, r * 0.5, r * 0.15, r * 0.15);
+        upper.bezierCurveTo(r * 0.9, -r * 1.75, r * 2.35, -r * 1.35, r * 2.05, -r * 0.3);
+        upper.bezierCurveTo(r * 1.95, r * 0.3, r * 0.9, r * 0.5, r * 0.15, r * 0.15);
         upper.closePath();
-        ctx.fillStyle = vgrad("#e6d3ad", "#9a7a52", -r * 1.5, r * 0.4);
+        ctx.fillStyle = vgrad("#f0dfbb", "#9a7a52", -r * 1.5, r * 0.4);
         ctx.fill(upper);
         ctx.save();
         ctx.clip(upper);
-        ctx.strokeStyle = "rgba(90,62,43,0.5)";
-        ctx.lineWidth = r * 0.04;
-        for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.moveTo(r * 0.15, -r * 0.1); ctx.lineTo(r * 2.3, -r * 1.4 + k * r * 0.4); ctx.stroke(); }
-        ctx.fillStyle = "rgba(90,62,43,0.55)";
-        ctx.beginPath(); ctx.ellipse(r * 1.9, -r * 0.6, r * 0.5, r * 1.1, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(90,62,43,0.55)";
+        ctx.lineWidth = r * 0.035;
+        for (let k = 0; k < 8; k++) { ctx.beginPath(); ctx.moveTo(r * 0.15, -r * 0.1); ctx.quadraticCurveTo(r * 1.2, -r * 1.0 + k * r * 0.22, r * 2.4, -r * 1.5 + k * r * 0.34); ctx.stroke(); }
+        ctx.fillStyle = "rgba(90,62,43,0.6)";
+        ctx.beginPath(); ctx.ellipse(r * 1.95, -r * 0.6, r * 0.42, r * 1.1, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.arc(r * (1.75 + (k % 2) * 0.12), -r * 1.15 + k * r * 0.24, r * 0.05, 0, Math.PI * 2); ctx.fill(); }
         ctx.restore();
         fShade(upper, r * 1.3, r * 0.8, -r * 0.9);
         ctx.strokeStyle = FINK;
         ctx.lineWidth = lw;
         ctx.stroke(upper);
-        // an eye spot
-        for (const [rr, col] of [[0.3, FINK], [0.22, "#ff8a3d"], [0.12, FINK], [0.05, "#ffffff"]]) {
+        for (const [rr, col] of [[0.34, FINK], [0.28, "#ffd23f"], [0.2, "#ff8a3d"], [0.12, FINK], [0.05, "#ffffff"]]) {
           ctx.fillStyle = col;
           ctx.beginPath(); ctx.arc(r * 1.3, -r * 0.55, r * rr, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
       }
-      for (const s of [-1, 1]) limb([[s * r * 0.15, r * 0.9], [s * r * 0.3, ft - r * 0.25], [s * r * 0.22, ft - r * 0.05]], r * 0.05, FINK, 0);
+      for (const s of [-1, 1]) {
+        limb([[s * r * 0.15, r * 0.9], [s * r * 0.34, ft - r * 0.3], [s * r * 0.24, ft - r * 0.06]], r * 0.06, FINK, 0);
+        limb([[s * r * 0.4, -r * 0.2], [s * r * 0.75, r * 0.1], [s * r * 0.6, r * 0.4 + Math.sin(t * 3 + s) * r * 0.05]], r * 0.07, FINK, 0);
+      }
       const abd = new Path2D();
-      abd.ellipse(0, r * 0.55, r * 0.34, r * 0.6, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#c9a26b";
+      abd.moveTo(-r * 0.32, r * 0.1);
+      abd.bezierCurveTo(-r * 0.45, r * 0.7, -r * 0.2, r * 1.2, 0, r * 1.22);
+      abd.bezierCurveTo(r * 0.2, r * 1.2, r * 0.45, r * 0.7, r * 0.32, r * 0.1);
+      abd.closePath();
+      ctx.fillStyle = "#d9b77a";
       ctx.fill(abd);
       ctx.save();
       ctx.clip(abd);
       ctx.fillStyle = "#5a3e2b";
-      for (let k = 0; k < 5; k++) ctx.fillRect(-r, r * 0.15 + k * r * 0.22, r * 2, r * 0.09);
+      for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.ellipse(0, r * 0.22 + k * r * 0.19, r * 0.5, r * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
       fShade(abd, r * 0.6, -r * 0.1, r * 0.3);
       ctx.strokeStyle = FINK;
@@ -1981,32 +2262,39 @@
       const thor = new Path2D();
       thor.ellipse(0, -r * 0.2, r * 0.46, r * 0.5, 0, 0, Math.PI * 2);
       fBody(thor, "#b02a6e", r * 0.5, lw, -r * 0.1, -r * 0.4);
-      for (let k = 0; k < 9; k++) {
-        const a = Math.PI + (k / 8) * Math.PI, fz = new Path2D();
-        fz.arc(Math.cos(a) * r * 0.42, -r * 0.55 - Math.sin(a) * r * -0.12, r * 0.13, 0, Math.PI * 2);
+      diamonds(thor, "rgba(255,210,63,0.8)", "rgba(0,0,0,0)", r * 0.26, 0, -r * 0.2);
+      ctx.strokeStyle = FINK;
+      ctx.lineWidth = lw;
+      ctx.stroke(thor);
+      for (let k = 0; k < 11; k++) {
+        const a = Math.PI + (k / 10) * Math.PI, fz = new Path2D();
+        fz.arc(Math.cos(a) * r * 0.44, -r * 0.56 + Math.sin(a) * r * 0.1, r * (0.12 + (k % 2) * 0.03), 0, Math.PI * 2);
         fPaint(fz, "#f4e8cf", lw * 0.5);
       }
       const head = new Path2D();
-      head.arc(0, -r * 0.92, r * 0.36, 0, Math.PI * 2);
-      fBody(head, "#d9c7a7", r * 0.4, lw, -r * 0.1, -r);
+      head.ellipse(0, -r * 0.95, r * 0.38, r * 0.36, 0, 0, Math.PI * 2);
+      fBody(head, "#e6d3ad", r * 0.42, lw, -r * 0.1, -r * 1.05);
       for (const s of [-1, 1]) {
-        ctx.fillStyle = "#0a0414";
-        ctx.beginPath(); ctx.ellipse(s * r * 0.17, -r * 0.95, r * 0.13, r * 0.17, s * 0.3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "rgba(255,138,61,0.9)";
-        ctx.beginPath(); ctx.arc(s * r * 0.14, -r * 1.0, r * 0.04, 0, Math.PI * 2); ctx.fill();
-        // feathery antennae
+        const ey = new Path2D();
+        ey.ellipse(s * r * 0.18, -r * 0.98, r * 0.15, r * 0.19, s * 0.3, 0, Math.PI * 2);
+        fPaint(ey, "#0a0414", lw * 0.5);
+        ctx.fillStyle = "rgba(255,138,61,0.95)";
+        ctx.beginPath(); ctx.arc(s * r * 0.15, -r * 1.04, r * 0.045, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        for (let q = 0; q < 3; q++) { ctx.beginPath(); ctx.arc(s * r * 0.2 + q * r * 0.03, -r * 0.92 + q * r * 0.03, r * 0.012, 0, Math.PI * 2); ctx.fill(); }
         ctx.strokeStyle = FINK;
-        ctx.lineWidth = lw * 0.7;
+        ctx.lineWidth = lw * 0.8;
         ctx.beginPath();
-        ctx.moveTo(s * r * 0.12, -r * 1.22);
-        ctx.quadraticCurveTo(s * r * 0.3, -r * 1.8, s * r * 0.75, -r * 1.75 + Math.sin(t * 2 + s) * r * 0.06);
+        ctx.moveTo(s * r * 0.12, -r * 1.26);
+        ctx.quadraticCurveTo(s * r * 0.3, -r * 1.85, s * r * 0.8, -r * 1.8 + Math.sin(t * 2 + s) * r * 0.06);
         ctx.stroke();
         ctx.lineWidth = lw * 0.4;
-        for (let k = 1; k < 6; k++) {
-          const kk = k / 6, px = s * r * (0.12 + kk * 0.6), py = -r * (1.25 + Math.sin(kk * Math.PI * 0.6) * 0.55);
-          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + s * r * 0.02, py + r * 0.14); ctx.stroke();
+        for (let k = 1; k < 8; k++) {
+          const kk = k / 8, px = s * r * (0.12 + kk * 0.65), py = -r * (1.28 + Math.sin(kk * Math.PI * 0.6) * 0.56);
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + s * r * 0.03, py + r * 0.15); ctx.moveTo(px, py); ctx.lineTo(px - s * r * 0.02, py - r * 0.1); ctx.stroke();
         }
       }
+      mouth(0, -r * 0.76, r * 0.08, { curve: 0.4, open: 0.3, fill: "#5a3e2b" }, lw * 0.5);
     },
 
     double(f, r, t, lw, ft) {
@@ -2015,6 +2303,19 @@
       const copy = Object.assign({}, m, { hue: (m.hue + 180) % 360, mood: 90, seed: (m.seed || 0) + 3 });
       const sc = r / (30 * U);
       const wob = 1 + Math.sin(t * 2.3) * 0.12;
+      // the funhouse mirror it stepped out of
+      const fr = new Path2D();
+      fr.moveTo(-r * 0.95, ft); fr.lineTo(-r * 0.95, -r * 0.9); fr.arc(0, -r * 0.9, r * 0.95, Math.PI, 0); fr.lineTo(r * 0.95, ft); fr.closePath();
+      ctx.fillStyle = "rgba(40,90,110,0.45)";
+      ctx.fill(fr);
+      ctx.save();
+      ctx.clip(fr);
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      const sx = ((t * 0.4) % 1.6) * r * 3 - r * 2;
+      ctx.beginPath(); ctx.moveTo(sx, -r * 2); ctx.lineTo(sx + r * 0.4, -r * 2); ctx.lineTo(sx - r * 0.5, ft); ctx.lineTo(sx - r * 0.9, ft); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = FINK; ctx.lineWidth = lw * 2.4; ctx.stroke(fr);
+      ctx.strokeStyle = "#b98ad6"; ctx.lineWidth = lw * 1.4; ctx.stroke(fr);
       ctx.save();
       ctx.translate(0, ft);
       ctx.scale(wob, 1 / wob);
@@ -2028,68 +2329,100 @@
     },
 
     shadow(f, r, t, lw, ft) {
+      // tattered coat-tails of smoke
       const body = new Path2D();
-      body.moveTo(-r * 0.85, -r * 0.5);
-      body.quadraticCurveTo(-r * 0.4, 0, -r * 0.75, r * 0.9);
-      for (let k = 0; k <= 8; k++) body.lineTo(-r * 0.9 + k * r * 0.225, r * (1.25 + (k % 2 ? 0.3 : 0)) + Math.sin(t * 4 + k) * r * 0.1);
-      body.lineTo(r * 0.75, r * 0.9);
-      body.quadraticCurveTo(r * 0.4, 0, r * 0.85, -r * 0.5);
-      body.quadraticCurveTo(0, -r * 0.9, -r * 0.85, -r * 0.5);
-      const g = vgrad("#2b1c48", "rgba(20,10,36,0.25)", -r * 0.6, r * 1.6);
-      ctx.fillStyle = g;
+      body.moveTo(-r * 0.9, -r * 0.5);
+      body.bezierCurveTo(-r * 0.55, 0, -r * 0.6, r * 0.5, -r * 0.95, r * 1.0);
+      for (let k = 0; k <= 10; k++) body.lineTo(-r * 1.0 + k * r * 0.2, r * (1.25 + (k % 2 ? 0.38 : 0)) + Math.sin(t * 4 + k) * r * 0.1);
+      body.bezierCurveTo(r * 0.6, r * 0.5, r * 0.55, 0, r * 0.9, -r * 0.5);
+      body.quadraticCurveTo(0, -r * 0.95, -r * 0.9, -r * 0.5);
+      ctx.fillStyle = vgrad("#34225a", "rgba(20,10,36,0.15)", -r * 0.6, r * 1.7);
       ctx.fill(body);
-      ctx.strokeStyle = "rgba(255,59,74,0.65)";
-      ctx.lineWidth = lw * 0.7;
+      ctx.save();
+      ctx.clip(body);
+      for (let i = 0; i < 8; i++) {
+        const k = (t * 0.3 + i * 0.13) % 1;
+        ctx.fillStyle = `rgba(90,50,140,${0.3 * (1 - k)})`;
+        ctx.beginPath(); ctx.arc((hashN(i) - 0.5) * r * 1.6, r * 1.4 - k * r * 1.6, r * (0.12 + k * 0.2), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+      ctx.strokeStyle = "rgba(255,59,74,0.7)";
+      ctx.lineWidth = lw * 0.8;
       ctx.stroke(body);
-      // lapels
-      ctx.strokeStyle = "rgba(255,59,74,0.4)";
-      ctx.beginPath(); ctx.moveTo(-r * 0.35, -r * 0.6); ctx.lineTo(0, r * 0.1); ctx.lineTo(r * 0.35, -r * 0.6); ctx.stroke();
-      // a whip of shadow
-      ctx.strokeStyle = "#1a1030";
-      ctx.lineWidth = lw * 1.4;
-      ctx.lineCap = "round";
+      // lapels, waistcoat buttons, a bow tie
+      ctx.strokeStyle = "rgba(255,59,74,0.5)";
+      ctx.lineWidth = lw * 0.6;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.8, -r * 0.2);
-      for (let k = 1; k <= 14; k++) { const kk = k / 14; ctx.lineTo(-r * 0.8 - kk * r * 1.5, -r * 0.2 - Math.sin(kk * 5 - t * 6) * r * 0.35 * kk - kk * r * 0.5); }
+      ctx.moveTo(-r * 0.4, -r * 0.62); ctx.lineTo(-r * 0.05, r * 0.2); ctx.lineTo(-r * 0.3, r * 0.9);
+      ctx.moveTo(r * 0.4, -r * 0.62); ctx.lineTo(r * 0.05, r * 0.2); ctx.lineTo(r * 0.3, r * 0.9);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(255,59,74,0.6)";
-      ctx.lineWidth = lw * 0.4;
-      ctx.stroke();
+      ctx.fillStyle = "rgba(255,59,74,0.8)";
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, r * (0.3 + i * 0.22), r * 0.04, 0, Math.PI * 2); ctx.fill(); }
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.5); ctx.lineTo(-r * 0.22, -r * 0.62); ctx.lineTo(-r * 0.22, -r * 0.38); ctx.lineTo(0, -r * 0.5); ctx.lineTo(r * 0.22, -r * 0.62); ctx.lineTo(r * 0.22, -r * 0.38); ctx.fill();
+      // a whip of shadow
+      ctx.lineCap = "round";
+      const whip = () => {
+        ctx.beginPath();
+        ctx.moveTo(-r * 1.05, -r * 0.05);
+        for (let k = 1; k <= 16; k++) { const kk = k / 16; ctx.lineTo(-r * 1.05 - kk * r * 1.6, -r * 0.05 - Math.sin(kk * 5 - t * 6) * r * 0.38 * kk - kk * r * 0.6); }
+        ctx.stroke();
+      };
+      ctx.strokeStyle = "#1a1030"; ctx.lineWidth = lw * 1.6; whip();
+      ctx.strokeStyle = "rgba(255,59,74,0.7)"; ctx.lineWidth = lw * 0.4; whip();
+      limb([[-r * 0.8, -r * 0.4], [-r * 1.1, -r * 0.2], [-r * 1.05, -r * 0.05]], r * 0.16, "#2b1c48", lw * 0.3);
+      limb([[r * 0.8, -r * 0.4], [r * 1.05, 0], [r * 0.7, r * 0.3]], r * 0.16, "#2b1c48", lw * 0.3);
       const head = new Path2D();
-      head.arc(0, -r * 0.95, r * 0.42, 0, Math.PI * 2);
-      ctx.fillStyle = "#22163a";
+      head.ellipse(0, -r * 0.98, r * 0.42, r * 0.44, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#2a1b48";
       ctx.fill(head);
-      ctx.strokeStyle = "rgba(255,59,74,0.65)";
-      ctx.lineWidth = lw * 0.7;
+      ctx.strokeStyle = "rgba(255,59,74,0.7)";
+      ctx.lineWidth = lw * 0.8;
       ctx.stroke(head);
       for (const s of [-1, 1]) {
-        glow(s * r * 0.17, -r * 1.0, r * 0.3, "#ff3b4a", 0.8);
-        ctx.fillStyle = "#ff6b7a";
+        glow(s * r * 0.17, -r * 1.02, r * 0.34, "#ff3b4a", 0.8);
+        ctx.fillStyle = "#ff8a94";
         ctx.beginPath();
-        ctx.moveTo(s * r * 0.06, -r * 0.96); ctx.lineTo(s * r * 0.3, -r * 1.08); ctx.lineTo(s * r * 0.28, -r * 0.94);
+        ctx.moveTo(s * r * 0.05, -r * 0.97); ctx.quadraticCurveTo(s * r * 0.2, -r * 1.15, s * r * 0.33, -r * 1.1); ctx.quadraticCurveTo(s * r * 0.28, -r * 0.94, s * r * 0.05, -r * 0.97);
         ctx.fill();
       }
+      const gr = new Path2D();
+      gr.moveTo(-r * 0.3, -r * 0.86); gr.quadraticCurveTo(0, -r * 0.6, r * 0.3, -r * 0.86); gr.quadraticCurveTo(0, -r * 0.74, -r * 0.3, -r * 0.86);
       ctx.fillStyle = "#ff3b4a";
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.26, -r * 0.82); ctx.quadraticCurveTo(0, -r * 0.6, r * 0.26, -r * 0.82); ctx.quadraticCurveTo(0, -r * 0.72, -r * 0.26, -r * 0.82);
-      ctx.fill();
-      fTopHat(0, -r * 1.3, r * 0.75, "#ff3b4a", lw * 0.6, -0.15);
+      ctx.fill(gr);
+      ctx.strokeStyle = "#2a1b48";
+      ctx.lineWidth = lw * 0.5;
+      for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(k * r * 0.07, -r * 0.84); ctx.lineTo(k * r * 0.07, -r * 0.7); ctx.stroke(); }
+      const ms = new Path2D();
+      ms.moveTo(0, -r * 0.9); ms.quadraticCurveTo(-r * 0.25, -r * 0.82, -r * 0.42, -r * 0.98); ms.quadraticCurveTo(-r * 0.2, -r * 0.93, 0, -r * 0.92);
+      ms.quadraticCurveTo(r * 0.2, -r * 0.93, r * 0.42, -r * 0.98); ms.quadraticCurveTo(r * 0.25, -r * 0.82, 0, -r * 0.9);
+      ctx.fillStyle = "#140a24";
+      ctx.fill(ms);
+      fTopHat(0, -r * 1.34, r * 0.8, "#ff3b4a", lw * 0.6, -0.15);
     },
 
     mirrorrm(f, r, t, lw, ft, hpK) {
-      // cape
       const cape = new Path2D();
       cape.moveTo(-r * 0.55, -r * 0.85);
-      cape.quadraticCurveTo(-r * 1.4, 0, -r * 1.05 + Math.sin(t * 2) * r * 0.1, ft - r * 0.05);
-      cape.lineTo(r * 1.05 + Math.sin(t * 2 + 1) * r * 0.1, ft - r * 0.05);
-      cape.quadraticCurveTo(r * 1.4, 0, r * 0.55, -r * 0.85);
+      cape.bezierCurveTo(-r * 1.5, -r * 0.3, -r * 1.3, r * 0.6, -r * 1.1 + Math.sin(t * 2) * r * 0.1, ft - r * 0.05);
+      for (let k = 0; k <= 8; k++) cape.lineTo(-r * 1.1 + k * r * 0.275 + Math.sin(t * 2 + k) * r * 0.05, ft - r * 0.05 - (k % 2) * r * 0.12);
+      cape.bezierCurveTo(r * 1.3, r * 0.6, r * 1.5, -r * 0.3, r * 0.55, -r * 0.85);
       cape.closePath();
-      fBody(cape, vgrad("#d62839", "#5a0f1f", -r, r * 1.2), r * 1.4, lw);
+      fBody(cape, vgrad("#e0304a", "#5a0f1f", -r, r * 1.2), r * 1.5, lw);
+      ctx.save();
+      ctx.clip(cape);
+      ctx.strokeStyle = "rgba(20,8,30,0.35)";
+      ctx.lineWidth = lw * 0.7;
+      for (let k = -3; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(k * r * 0.2, -r * 0.8); ctx.quadraticCurveTo(k * r * 0.5, r * 0.2, k * r * 0.4 + Math.sin(t * 2 + k) * r * 0.05, ft); ctx.stroke(); }
+      ctx.restore();
+      const col = new Path2D();
+      col.moveTo(-r * 0.7, -r * 0.8); col.quadraticCurveTo(-r * 1.0, -r * 1.25, -r * 0.5, -r * 1.2); col.lineTo(-r * 0.35, -r * 0.85); col.closePath();
+      fPaint(col, "#8c1a2e", lw * 0.8);
+      const col2 = new Path2D();
+      col2.moveTo(r * 0.7, -r * 0.8); col2.quadraticCurveTo(r * 1.0, -r * 1.25, r * 0.5, -r * 1.2); col2.lineTo(r * 0.35, -r * 0.85); col2.closePath();
+      fPaint(col2, "#8c1a2e", lw * 0.8);
       for (const s of [-1, 1]) {
-        limb([[s * r * 0.2, r * 0.95], [s * r * 0.24, ft - r * 0.1]], r * 0.12, "#1a1024", lw * 0.4);
-        const boot = new Path2D();
-        boot.roundRect(s * r * 0.24 - r * 0.2, ft - r * 0.14, r * 0.34, r * 0.14, r * 0.04);
-        fPaint(boot, "#1a1024", lw * 0.6);
+        limb([[s * r * 0.2, r * 0.95], [s * r * 0.24, ft - r * 0.14]], r * 0.13, "#1a1024", lw * 0.4);
+        shoe(s * r * 0.24 - r * 0.08, ft, r * 0.16, -1, "#1a1024", lw * 0.7);
       }
       // the body is a standing mirror
       const fr = new Path2D();
@@ -2098,26 +2431,39 @@
       fr.arc(0, -r * 0.5, r * 0.62, Math.PI, 0);
       fr.lineTo(r * 0.62, r * 1.0);
       fr.closePath();
-      ctx.fillStyle = vgrad("#e6f7ff", "#7fa8c4", -r * 1.1, r);
+      ctx.fillStyle = vgrad("#eefbff", "#6f9cc0", -r * 1.1, r);
       ctx.fill(fr);
       ctx.save();
       ctx.clip(fr);
-      const tones = ["rgba(255,255,255,0.35)", "rgba(40,70,110,0.28)", "rgba(143,233,255,0.3)", "rgba(20,30,60,0.25)"];
+      const tones = ["rgba(255,255,255,0.4)", "rgba(40,70,110,0.3)", "rgba(143,233,255,0.32)", "rgba(20,30,60,0.28)", "rgba(255,180,220,0.2)"];
       const pts = [[-0.7, -1.2], [0.1, -1.2], [0.7, -0.6], [0.7, 0.3], [0.2, 1.1], [-0.7, 1.1], [-0.7, 0]];
       pts.forEach((p, i) => {
         const q = pts[(i + 1) % pts.length];
-        ctx.fillStyle = tones[i % 4];
+        ctx.fillStyle = tones[i % 5];
         ctx.beginPath(); ctx.moveTo(0, -r * 0.1); ctx.lineTo(p[0] * r, p[1] * r); ctx.lineTo(q[0] * r, q[1] * r); ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, -r * 0.1); ctx.lineTo(p[0] * r, p[1] * r); ctx.stroke();
       });
       const sx = ((t * 0.5) % 2) * r * 3 - r * 2;
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
       ctx.beginPath(); ctx.moveTo(sx, -r * 1.3); ctx.lineTo(sx + r * 0.35, -r * 1.3); ctx.lineTo(sx - r * 0.4, r * 1.3); ctx.lineTo(sx - r * 0.75, r * 1.3); ctx.fill();
       ctx.restore();
-      fEyes("spiral", r * 0.26, -r * 0.5, r * 0.85, t, "#fff", "#d62839");
-      fMouth(false, -r * 0.5, r * 0.75, "#d62839", lw);
+      for (const s of [-1, 1]) {
+        eye(s * r * 0.26, -r * 0.5, r * 0.17, r * 0.19, { kind: "spiral", iris: "#d62839", t: t * s });
+        brow(s * r * 0.26, -r * 0.78, r * 0.17, -s * 0.45, lw);
+      }
+      mouth(0, -r * 0.2, r * 0.36, { curve: 0.75, open: 0.55, teeth: "flat", n: 8, fill: "#5a0f1f" }, lw * 0.8);
+      const ms = new Path2D();
+      ms.moveTo(0, -r * 0.3);
+      ms.bezierCurveTo(-r * 0.2, -r * 0.2, -r * 0.42, -r * 0.24, -r * 0.5, -r * 0.45);
+      ms.bezierCurveTo(-r * 0.36, -r * 0.3, -r * 0.16, -r * 0.34, 0, -r * 0.33);
+      ms.bezierCurveTo(r * 0.16, -r * 0.34, r * 0.36, -r * 0.3, r * 0.5, -r * 0.45);
+      ms.bezierCurveTo(r * 0.42, -r * 0.24, r * 0.2, -r * 0.2, 0, -r * 0.3);
+      fPaint(ms, "#1a1024", lw * 0.4);
       // it cracks as it gets hurt
-      const cracks = Math.round((1 - hpK) * 7);
-      ctx.strokeStyle = "rgba(20,10,30,0.85)";
+      const cracks = Math.round((1 - hpK) * 8);
+      ctx.strokeStyle = "rgba(20,10,30,0.9)";
       ctx.lineWidth = lw * 0.5;
       for (let i = 0; i < cracks; i++) {
         let px = (hashN(i * 3.1) - 0.5) * r * 0.9, py = (hashN(i * 7.7) - 0.5) * r * 1.6;
@@ -2126,170 +2472,218 @@
         for (let k = 0; k < 4; k++) { px += (hashN(i * 11 + k) - 0.5) * r * 0.4; py += (hashN(i * 13 + k) - 0.3) * r * 0.35; ctx.lineTo(px, py); }
         ctx.stroke();
       }
-      ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw * 2.6;
-      ctx.stroke(fr);
-      ctx.strokeStyle = "#e8b923";
-      ctx.lineWidth = lw * 1.6;
-      ctx.stroke(fr);
-      ctx.strokeStyle = "#fff1b0";
-      ctx.lineWidth = lw * 0.4;
-      ctx.stroke(fr);
-      for (const s of [-1, 1]) {
-        const hx = s * r * 1.0, hy = r * 0.15 + Math.sin(t * 2 + s) * r * 0.05;
-        limb([[s * r * 0.62, -r * 0.35], [s * r * 0.95, -r * 0.1], [hx, hy]], r * 0.14, "#b02a42", lw * 0.4);
-        const gl = new Path2D();
-        gl.arc(hx, hy + r * 0.06, r * 0.12, 0, Math.PI * 2);
-        fPaint(gl, "#ffffff", lw * 0.6);
+      ctx.strokeStyle = FINK; ctx.lineWidth = lw * 3; ctx.stroke(fr);
+      ctx.strokeStyle = "#e8b923"; ctx.lineWidth = lw * 1.9; ctx.stroke(fr);
+      ctx.strokeStyle = "#fff1b0"; ctx.lineWidth = lw * 0.5; ctx.stroke(fr);
+      for (let k = 0; k < 9; k++) {
+        const a = Math.PI + (k / 8) * Math.PI, st = new Path2D();
+        st.arc(Math.cos(a) * r * 0.62, -r * 0.5 + Math.sin(a) * r * 0.62, r * 0.05, 0, Math.PI * 2);
+        fPaint(st, "#d62839", lw * 0.4);
       }
-      // cane
+      for (const s of [-1, 1]) {
+        const hx = s * r * 1.02, hy = r * 0.15 + Math.sin(t * 2 + s) * r * 0.05;
+        limb([[s * r * 0.62, -r * 0.35], [s * r * 0.98, -r * 0.1], [hx, hy]], r * 0.15, "#b02a42", lw * 0.4);
+        glove(hx, hy + r * 0.1, r * 0.13, Math.PI, "#ffffff", lw * 0.6);
+      }
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = r * 0.09;
-      ctx.beginPath(); ctx.moveTo(-r * 1.0, r * 0.2); ctx.lineTo(-r * 1.15, ft - r * 0.03); ctx.stroke();
-      ctx.fillStyle = "#e8b923";
-      ctx.beginPath(); ctx.arc(-r * 1.0, r * 0.14, r * 0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      fTopHat(0, -r * 1.1, r * 0.8, "#d62839", lw, 0.08);
+      ctx.lineWidth = r * 0.1;
+      ctx.beginPath(); ctx.moveTo(-r * 1.02, r * 0.2); ctx.lineTo(-r * 1.18, ft - r * 0.03); ctx.stroke();
+      ctx.strokeStyle = "#3a2a52";
+      ctx.lineWidth = r * 0.05;
+      ctx.stroke();
+      const kn = new Path2D();
+      kn.arc(-r * 1.02, r * 0.16, r * 0.11, 0, Math.PI * 2);
+      fPaint(kn, "#e8b923", lw * 0.6);
+      fTopHat(0, -r * 1.1, r * 0.85, "#d62839", lw, 0.08);
     },
 
     comet(f, r, t, lw, ft) {
-      // hair of fire, streaming back
       for (let layer = 0; layer < 3; layer++) {
-        const p = new Path2D(), L2 = r * (2.6 - layer * 0.6), wd = r * (1.0 - layer * 0.22);
+        const p = new Path2D(), L2 = r * (2.7 - layer * 0.6), wd = r * (1.02 - layer * 0.22);
         p.moveTo(0, -wd);
-        for (let k = 1; k <= 10; k++) {
-          const kk = k / 10;
-          p.lineTo(kk * L2 + Math.sin(t * 9 + k * 1.3 + layer) * r * 0.12, -wd * (1 - kk) - kk * r * 0.5 + (k % 2 ? -1 : 1) * r * 0.14 * (1 - kk));
+        for (let k = 1; k <= 12; k++) {
+          const kk = k / 12;
+          p.lineTo(kk * L2 + Math.sin(t * 9 + k * 1.3 + layer) * r * 0.13, -wd * (1 - kk) - kk * r * 0.55 + (k % 2 ? -1 : 1) * r * 0.16 * (1 - kk));
         }
-        for (let k = 10; k >= 1; k--) {
-          const kk = k / 10;
-          p.lineTo(kk * L2 * 0.92 + Math.sin(t * 8 + k * 1.7 + layer) * r * 0.12, wd * (1 - kk) - kk * r * 0.3 + (k % 2 ? 1 : -1) * r * 0.14 * (1 - kk));
+        for (let k = 12; k >= 1; k--) {
+          const kk = k / 12;
+          p.lineTo(kk * L2 * 0.92 + Math.sin(t * 8 + k * 1.7 + layer) * r * 0.13, wd * (1 - kk) - kk * r * 0.3 + (k % 2 ? 1 : -1) * r * 0.16 * (1 - kk));
         }
         p.lineTo(0, wd);
         p.closePath();
-        fPaint(p, ["#d62839", "#ff8a3d", "#ffd23f"][layer], layer ? lw * 0.5 : lw);
+        fPaint(p, ["#d62839", "#ff8a3d", "#ffe680"][layer], layer ? lw * 0.5 : lw);
       }
-      glow(0, 0, r * 2, "#ff8a3d", 0.3);
+      for (let i = 0; i < 6; i++) {
+        const k = (t * 1.2 + i * 0.17) % 1;
+        sparkle(r * (1 + k * 2.2), -r * 0.6 * k + (hashN(i) - 0.5) * r, r * 0.07 * (1 - k), `rgba(255,236,150,${1 - k})`);
+      }
+      glow(0, 0, r * 2.2, "#ff8a3d", 0.3);
+      ruffle(0, r * 0.82, r * 1.9, 7, r * 0.2, "#ff8a3d", "#fbf8f2", lw);
       const head = new Path2D();
       head.arc(0, 0, r, 0, Math.PI * 2);
-      fBody(head, "#fff1c2", r, lw);
+      fBody(head, vgrad("#fffaf0", "#ffe2b0", -r, r), r, lw);
+      // craters, like a little moon in greasepaint
+      ctx.save();
+      ctx.clip(head);
+      ctx.fillStyle = "rgba(200,150,90,0.25)";
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse((hashN(i) - 0.5) * r * 1.6, (hashN(i + 7) - 0.5) * r * 1.6, r * 0.12, r * 0.09, i, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
       for (const s of [-1, 1]) {
         ctx.fillStyle = "#ff8a3d";
         ctx.beginPath();
-        ctx.moveTo(s * r * 0.36, -r * 0.6); ctx.lineTo(s * r * 0.36 + r * 0.14, -r * 0.2); ctx.lineTo(s * r * 0.36, r * 0.18); ctx.lineTo(s * r * 0.36 - r * 0.14, -r * 0.2);
+        ctx.moveTo(s * r * 0.36, -r * 0.68); ctx.lineTo(s * r * 0.36 + r * 0.16, -r * 0.2); ctx.lineTo(s * r * 0.36, r * 0.22); ctx.lineTo(s * r * 0.36 - r * 0.16, -r * 0.2);
         ctx.fill();
+        eye(s * r * 0.36, -r * 0.2, r * 0.21, r * 0.23, { kind: "spiral", iris: FINK, t: t * s });
+        brow(s * r * 0.36, -r * 0.56, r * 0.2, -s * 0.5, lw * 1.1);
+        ctx.fillStyle = "rgba(255,95,140,0.45)";
+        ctx.beginPath(); ctx.arc(s * r * 0.62, r * 0.2, r * 0.13, 0, Math.PI * 2); ctx.fill();
       }
-      fEyes("spiral", r * 0.36, -r * 0.2, r, t, "#fff", FINK);
-      fMouth(false, -r * 0.2, r, "#d62839", lw);
-      fNose(0, r * 0.02, r * 0.13, lw);
-      fCone(-r * 0.15, -r * 0.93, r * 0.7, "#ff8a3d", lw, -0.2);
-      for (let i = 0; i < 7; i++) {
-        const sc = new Path2D();
-        sc.arc((i - 3) * r * 0.27, r * 0.95 - Math.abs(i - 3) * r * 0.07, r * 0.17, 0, Math.PI);
-        sc.closePath();
-        fPaint(sc, i % 2 ? "#ff8a3d" : "#fbf8f2", lw * 0.7);
+      mouth(0, r * 0.3, r * 0.5, { curve: 0.8, open: 0.6, teeth: "flat", n: 9, tongue: true, fill: "#7a1020" }, lw * 0.8);
+      fNose(0, r * 0.02, r * 0.14, lw);
+      fCone(-r * 0.15, -r * 0.95, r * 0.72, "#ff8a3d", lw, -0.2);
+      for (const s of [-1, 1]) {
+        const tf = new Path2D();
+        tf.moveTo(s * r * 0.8, -r * 0.55);
+        for (let k = 0; k < 4; k++) tf.lineTo(s * r * (1.05 + (k % 2) * 0.22), -r * (0.6 - k * 0.2));
+        tf.lineTo(s * r * 0.92, r * 0.1);
+        tf.closePath();
+        fPaint(tf, "#d62839", lw * 0.7);
       }
     },
 
     usher(f, r, t, lw, ft) {
-      // flashlight beam
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
+      const sw = Math.sin(t * 1.2) * r * 0.3;
       const bg3 = ctx.createLinearGradient(-r * 0.9, r * 0.1, -r * 3.2, r * 0.9);
-      bg3.addColorStop(0, "rgba(143,233,255,0.45)");
+      bg3.addColorStop(0, "rgba(143,233,255,0.5)");
       bg3.addColorStop(1, "rgba(143,233,255,0)");
       ctx.fillStyle = bg3;
-      const sw = Math.sin(t * 1.2) * r * 0.3;
-      ctx.beginPath(); ctx.moveTo(-r * 0.9, r * 0.1); ctx.lineTo(-r * 3.4, r * 0.3 + sw); ctx.lineTo(-r * 3.2, r * 1.3 + sw); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-r * 1.1, r * 0.1); ctx.lineTo(-r * 3.4, r * 0.3 + sw); ctx.lineTo(-r * 3.2, r * 1.3 + sw); ctx.fill();
       ctx.restore();
       const body = new Path2D();
-      body.moveTo(-r * 0.55, -r * 0.75);
-      body.lineTo(r * 0.55, -r * 0.75);
-      body.quadraticCurveTo(r * 0.8, r * 0.3, r * 0.6, ft);
-      body.lineTo(-r * 0.6, ft);
-      body.quadraticCurveTo(-r * 0.8, r * 0.3, -r * 0.55, -r * 0.75);
+      body.moveTo(-r * 0.6, -r * 0.72);
+      body.quadraticCurveTo(0, -r * 0.86, r * 0.6, -r * 0.72);
+      body.bezierCurveTo(r * 0.72, -r * 0.2, r * 0.85, r * 0.5, r * 0.7, ft);
+      for (let k = 0; k <= 6; k++) body.lineTo(r * 0.7 - k * r * 0.233, ft - (k % 2) * r * 0.08);
+      body.bezierCurveTo(-r * 0.85, r * 0.5, -r * 0.72, -r * 0.2, -r * 0.6, -r * 0.72);
       ctx.fillStyle = "#080414";
       ctx.fill(body);
       ctx.save();
       ctx.clip(body);
-      // a window onto deep space
-      glow(-r * 0.2, r * 0.1, r * 0.9, "#8a3dff", 0.35);
-      glow(r * 0.3, r * 0.7, r * 0.7, "#2fb7c9", 0.3);
-      for (let i = 0; i < 26; i++) {
+      glow(-r * 0.2, r * 0.1, r * 0.9, "#8a3dff", 0.4);
+      glow(r * 0.3, r * 0.7, r * 0.7, "#2fb7c9", 0.35);
+      glow(r * 0.1, -r * 0.4, r * 0.5, "#ff5fa8", 0.2);
+      for (let i = 0; i < 34; i++) {
         const a = 0.3 + 0.7 * Math.abs(Math.sin(t * 1.5 + i * 2.1));
-        sparkle((hashN(i) - 0.5) * r * 1.3, -r * 0.7 + hashN(i + 30) * (ft + r * 0.7), r * 0.025 * (1 + a), `rgba(255,255,255,${a})`);
+        sparkle((hashN(i) - 0.5) * r * 1.5, -r * 0.7 + hashN(i + 30) * (ft + r * 0.7), r * 0.025 * (1 + a), `rgba(255,255,255,${a})`);
       }
+      // a tiny ringed planet drifting through
+      const px = ((t * 0.12) % 1.4 - 0.2) * r * 1.6 - r * 0.8, py = r * 0.45;
+      ctx.fillStyle = "#c9b8ff";
+      ctx.beginPath(); ctx.arc(px, py, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#ff5fa8";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(px, py, r * 0.17, r * 0.04, -0.4, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
-      ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw * 1.8;
-      ctx.stroke(body);
-      ctx.strokeStyle = "#8fe9ff";
-      ctx.lineWidth = lw * 0.6;
-      ctx.stroke(body);
-      ctx.fillStyle = "#ffd23f";
-      for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(0, -r * 0.5 + i * r * 0.3, r * 0.06, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = FINK; ctx.lineWidth = lw * 1.9; ctx.stroke(body);
+      ctx.strokeStyle = "#8fe9ff"; ctx.lineWidth = lw * 0.6; ctx.stroke(body);
+      for (let i = 0; i < 5; i++) for (const s of [-1, 1]) { const bt = new Path2D(); bt.arc(s * r * 0.14, -r * 0.5 + i * r * 0.3, r * 0.055, 0, Math.PI * 2); fPaint(bt, "#ffd23f", lw * 0.4); }
+      ctx.strokeStyle = "#ffd23f";
+      ctx.lineWidth = lw * 0.4;
+      for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(-r * 0.14, -r * 0.5 + i * r * 0.3); ctx.lineTo(r * 0.14, -r * 0.5 + i * r * 0.3); ctx.stroke(); }
       for (const s of [-1, 1]) {
+        const ep = new Path2D();
+        ep.ellipse(s * r * 0.58, -r * 0.72, r * 0.28, r * 0.11, s * 0.3, 0, Math.PI * 2);
+        fPaint(ep, "#1a1230", lw * 0.7);
         ctx.strokeStyle = "#8fe9ff";
-        ctx.lineWidth = lw * 0.6;
-        ctx.beginPath(); ctx.ellipse(s * r * 0.55, -r * 0.72, r * 0.26, r * 0.1, s * 0.3, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = lw * 0.5;
+        for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(s * r * (0.42 + k * 0.1), -r * 0.66); ctx.lineTo(s * r * (0.44 + k * 0.1), -r * 0.52); ctx.stroke(); }
       }
-      limb([[-r * 0.55, -r * 0.4], [-r * 0.95, -r * 0.05], [-r * 0.85, r * 0.12]], r * 0.14, "#080414", lw * 0.4);
+      limb([[-r * 0.58, -r * 0.42], [-r * 1.0, -r * 0.05], [-r * 0.92, r * 0.1]], r * 0.15, "#100826", lw * 0.4);
       const tor = new Path2D();
-      tor.roundRect(-r * 1.08, r * 0.02, r * 0.34, r * 0.16, r * 0.04);
-      fPaint(tor, "#cfc6d8", lw * 0.6);
+      tor.moveTo(-r * 0.82, r * 0.0); tor.lineTo(-r * 1.15, -r * 0.02); tor.lineTo(-r * 1.28, -r * 0.1); tor.lineTo(-r * 1.28, r * 0.28); tor.lineTo(-r * 1.15, r * 0.2); tor.lineTo(-r * 0.82, r * 0.18); tor.closePath();
+      fBody(tor, "#cfc6d8", r * 0.3, lw * 0.7, -r * 1.0, 0, 0.3);
+      glow(-r * 1.3, r * 0.09, r * 0.3, "#8fe9ff", 0.9);
+      glove(-r * 0.92, r * 0.1, r * 0.11, Math.PI / 2, "#ffffff", lw * 0.6);
+      limb([[r * 0.58, -r * 0.42], [r * 0.9, 0.0], [r * 0.8, r * 0.35]], r * 0.15, "#100826", lw * 0.4);
+      glove(r * 0.8, r * 0.42, r * 0.11, Math.PI, "#ffffff", lw * 0.6);
       // no face: just eyes in the dark under the cap
+      const hd = new Path2D();
+      hd.ellipse(0, -r * 0.98, r * 0.38, r * 0.32, 0, 0, Math.PI * 2);
       ctx.fillStyle = "#080414";
-      ctx.beginPath(); ctx.ellipse(0, -r * 0.95, r * 0.36, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
-      fEyes("many", 0, -r * 0.93, r * 0.62, t, "#8fe9ff", "#080414");
-      fPillbox(0, -r * 1.18, r * 0.9, "#1a1230", lw);
+      ctx.fill(hd);
+      ctx.strokeStyle = "#8fe9ff"; ctx.lineWidth = lw * 0.5; ctx.stroke(hd);
+      const pos = [[-0.2, -0.02, 0.08], [0.2, -0.02, 0.08], [0, -0.13, 0.06], [-0.1, 0.1, 0.05], [0.11, 0.11, 0.055]];
+      pos.forEach((p, i) => {
+        const open = Math.sin(t * 1.7 + i * 1.9) > -0.85;
+        eye(p[0] * r, -r * 0.96 + p[1] * r, r * p[2], r * p[2] * (open ? 1 : 0.15), { white: "#8fe9ff", iris: "#080414", glow: "#8fe9ff", look: [-0.6, 0.2] });
+      });
+      fPillbox(0, -r * 1.2, r * 0.95, "#1a1230", lw);
     },
 
     angel(f, r, t, lw, ft) {
-      // wings made of TV static
       for (const s of [-1, 1]) {
-        for (let k = 0; k < 6; k++) {
+        for (let k = 0; k < 7; k++) {
           ctx.save();
           ctx.scale(s, 1);
           ctx.translate(r * 0.45, -r * 0.15);
-          ctx.rotate(-1.0 + k * 0.34 + Math.sin(t * 5) * 0.1 * (1 - k * 0.1));
-          const fe = new Path2D();
-          fe.roundRect(0, -r * 0.13, r * (1.9 - k * 0.2), r * 0.26, r * 0.13);
-          ctx.fillStyle = "#cfd6e6";
+          ctx.rotate(-1.05 + k * 0.31 + Math.sin(t * 5) * 0.1 * (1 - k * 0.1));
+          const fe = new Path2D(), len = r * (2.0 - k * 0.2);
+          fe.moveTo(0, -r * 0.12); fe.quadraticCurveTo(len * 0.6, -r * 0.2, len, 0); fe.quadraticCurveTo(len * 0.6, r * 0.2, 0, r * 0.12); fe.closePath();
+          ctx.fillStyle = "#dbe2f0";
           ctx.fill(fe);
           ctx.save();
           ctx.clip(fe);
-          noiseRect(0, -r * 0.13, r * 1.9, r * 0.26, 16, false);
+          noiseRect(0, -r * 0.2, len, r * 0.4, 18, false);
           ctx.restore();
           ctx.strokeStyle = FINK;
           ctx.lineWidth = lw * 0.8;
           ctx.stroke(fe);
+          ctx.strokeStyle = "rgba(143,233,255,0.6)";
+          ctx.lineWidth = lw * 0.4;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(len * 0.95, 0); ctx.stroke();
           ctx.restore();
         }
       }
       const body = new Path2D();
-      body.moveTo(-r * 0.9, 0);
-      body.arc(0, 0, r * 0.9, Math.PI, 0);
-      for (let k = 0; k <= 12; k++) { const kk = k / 12; body.lineTo(r * 0.9 * (1 - kk) + Math.sin(t * 3 + kk * 6) * r * 0.13, kk * r * 1.5); }
-      for (let k = 12; k >= 0; k--) { const kk = k / 12; body.lineTo(-r * 0.9 * (1 - kk) + Math.sin(t * 3 + kk * 6 + 1) * r * 0.13, kk * r * 1.5); }
+      body.moveTo(-r * 0.92, 0);
+      body.bezierCurveTo(-r * 0.95, -r * 1.2, r * 0.95, -r * 1.2, r * 0.92, 0);
+      for (let k = 0; k <= 12; k++) { const kk = k / 12; body.lineTo(r * 0.92 * (1 - kk) + Math.sin(t * 3 + kk * 6) * r * 0.14, kk * r * 1.5); }
+      for (let k = 12; k >= 0; k--) { const kk = k / 12; body.lineTo(-r * 0.92 * (1 - kk) + Math.sin(t * 3 + kk * 6 + 1) * r * 0.14, kk * r * 1.5); }
       body.closePath();
-      fBody(body, vgrad("#ffffff", "#b9c8ea", -r, r * 1.4), r, lw);
-      fHalo(-r * 0.88, r, "#8fe9ff", t);
-      fEyes("x", r * 0.33, -r * 0.2, r, t, "#fff", "#2a6f86");
-      const mo = new Path2D();
-      mo.ellipse(0, r * 0.22, r * 0.12, r * (0.12 + 0.06 * Math.sin(t * 6)), 0, 0, Math.PI * 2);
-      fPaint(mo, "#2a6f86", lw * 0.7);
+      fBody(body, vgrad("#ffffff", "#aebfe6", -r, r * 1.4), r, lw);
+      // robe trim and scanlines
+      ctx.save();
+      ctx.clip(body);
+      ctx.strokeStyle = "rgba(143,233,255,0.35)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 20; i++) { ctx.beginPath(); ctx.moveTo(-r, -r + i * r * 0.13 + ((t * 20) % (r * 0.13))); ctx.lineTo(r, -r + i * r * 0.13 + ((t * 20) % (r * 0.13))); ctx.stroke(); }
+      ctx.restore();
+      fHalo(-r * 0.9, r, "#8fe9ff", t);
       for (const s of [-1, 1]) {
-        const hd = new Path2D();
-        hd.ellipse(s * r * 0.1, r * 0.6, r * 0.14, r * 0.2, s * 0.5, 0, Math.PI * 2);
-        fPaint(hd, "#ffffff", lw * 0.7);
+        eye(s * r * 0.33, -r * 0.2, r * 0.15, r * 0.15, { kind: "x", iris: "#2a6f86" });
+        brow(s * r * 0.33, -r * 0.48, r * 0.16, s * 0.3, lw * 0.9);
+        ctx.fillStyle = "rgba(143,233,255,0.5)";
+        ctx.beginPath(); ctx.arc(s * r * 0.55, r * 0.05, r * 0.1, 0, Math.PI * 2); ctx.fill();
       }
-      if (Math.sin(t * 9) > 0.8) { ctx.fillStyle = "rgba(143,233,255,0.4)"; ctx.fillRect(-r * 1.2, Math.sin(t * 40) * r, r * 2.4, r * 0.08); }
+      const mo = new Path2D();
+      mo.ellipse(0, r * 0.22, r * 0.13, r * (0.14 + 0.07 * Math.sin(t * 6)), 0, 0, Math.PI * 2);
+      fPaint(mo, "#2a6f86", lw * 0.7);
+      for (let i = 0; i < 3; i++) {
+        const k = (t * 0.6 + i / 3) % 1;
+        ctx.fillStyle = `rgba(143,233,255,${1 - k})`;
+        ctx.font = `${r * 0.3}px "Permanent Marker", serif`;
+        ctx.fillText(i % 2 ? "♪" : "♫", -r * 0.5 - k * r * 1.2, r * 0.1 - k * r * 0.8 + Math.sin(k * 8) * r * 0.1);
+      }
+      for (const s of [-1, 1]) glove(s * r * 0.12, r * 0.68, r * 0.13, s * -0.5, "#ffffff", lw * 0.6);
+      if (Math.sin(t * 9) > 0.8) { ctx.fillStyle = "rgba(143,233,255,0.45)"; ctx.fillRect(-r * 1.2, Math.sin(t * 40) * r, r * 2.4, r * 0.08); }
     },
 
     trapeze(f, r, t, lw, ft, hpK, topY) {
-      // hanging by the knees, swinging
       const sw = Math.sin(t * 1.5) * 0.13, barY = -r * 1.25;
       ctx.strokeStyle = "#d9cdb4";
-      ctx.lineWidth = lw * 0.6;
+      ctx.lineWidth = lw * 0.7;
       ctx.beginPath();
       ctx.moveTo(-r * 0.7, barY); ctx.lineTo(-r * 0.7 - sw * r * 4, topY);
       ctx.moveTo(r * 0.7, barY); ctx.lineTo(r * 0.7 - sw * r * 4, topY);
@@ -2298,146 +2692,165 @@
       ctx.translate(0, barY);
       ctx.rotate(sw);
       const bar = new Path2D();
-      bar.roundRect(-r * 0.9, -r * 0.06, r * 1.8, r * 0.12, r * 0.06);
-      fPaint(bar, "#c9a227", lw * 0.7);
-      for (const s of [-1, 1]) limb([[s * r * 0.22, r * 0.45], [s * r * 0.26, r * 0.0], [s * r * 0.3, -r * 0.3], [s * r * 0.22, -r * 0.55]], r * 0.17, "#ffd6e8", lw * 0.5);
-      // ponytail and arms hang past the head
-      ctx.fillStyle = "#5b2a86";
-      ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.2, r * 1.85);
-      ctx.quadraticCurveTo(-r * 0.35 - sw * r * 2, r * 2.4, -sw * r * 3, r * 2.75);
-      ctx.quadraticCurveTo(r * 0.35 - sw * r * 2, r * 2.4, r * 0.2, r * 1.85);
-      ctx.fill();
-      ctx.stroke();
+      bar.roundRect(-r * 0.9, -r * 0.07, r * 1.8, r * 0.14, r * 0.07);
+      fBody(bar, "#e8b923", r * 0.5, lw * 0.7, 0, -r * 0.2, 0.3);
       for (const s of [-1, 1]) {
-        const ax = s * r * 0.62 - sw * r * 2.5 - (s < 0 ? r * 0.25 : 0);
-        limb([[s * r * 0.4, r * 1.0], [s * r * 0.6, r * 1.6], [ax, r * 2.25 + Math.sin(t * 2 + s) * r * 0.06]], r * 0.14, "#ffd6e8", lw * 0.5);
+        limb([[s * r * 0.22, r * 0.45], [s * r * 0.27, r * 0.0], [s * r * 0.32, -r * 0.3], [s * r * 0.22, -r * 0.6]], r * 0.18, "#fbf8f2", lw * 0.5);
+        ctx.strokeStyle = "#ff5fa8";
+        ctx.lineWidth = r * 0.06;
+        for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(s * r * 0.15, r * 0.36 - k * r * 0.2); ctx.lineTo(s * r * 0.38, r * 0.34 - k * r * 0.2); ctx.stroke(); }
+        const sl = new Path2D();
+        sl.ellipse(s * r * 0.2, -r * 0.68, r * 0.13, r * 0.2, s * 0.3, 0, Math.PI * 2);
+        fPaint(sl, "#5b2a86", lw * 0.6);
+      }
+      // ponytail hangs past the head
+      const pt = new Path2D();
+      pt.moveTo(-r * 0.24, r * 1.85);
+      pt.bezierCurveTo(-r * 0.5 - sw * r * 2, r * 2.3, -r * 0.2 - sw * r * 3, r * 2.6, -sw * r * 3.5, r * 2.9);
+      pt.bezierCurveTo(r * 0.2 - sw * r * 3, r * 2.6, r * 0.5 - sw * r * 2, r * 2.3, r * 0.24, r * 1.85);
+      fBody(pt, "#7a3fc4", r * 0.6, lw, -r * 0.1, r * 2.1, 0.3);
+      ctx.strokeStyle = "rgba(20,8,45,0.4)";
+      ctx.lineWidth = lw * 0.5;
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * r * 0.1, r * 1.9); ctx.quadraticCurveTo(k * r * 0.15 - sw * r * 2, r * 2.4, -sw * r * 3.4, r * 2.85); ctx.stroke(); }
+      for (const s of [-1, 1]) {
+        const ax = s * r * 0.66 - sw * r * 2.5 - (s < 0 ? r * 0.3 : 0), ay = r * 2.25 + Math.sin(t * 2 + s) * r * 0.06;
+        limb([[s * r * 0.4, r * 1.0], [s * r * 0.62, r * 1.6], [ax, ay]], r * 0.15, "#ffd6e8", lw * 0.5);
+        glove(ax, ay + r * 0.1, r * 0.13, Math.PI, "#ffffff", lw * 0.6);
       }
       const torso = new Path2D();
       torso.moveTo(-r * 0.36, r * 0.35);
-      torso.quadraticCurveTo(-r * 0.55, r * 0.9, -r * 0.42, r * 1.2);
-      torso.lineTo(r * 0.42, r * 1.2);
-      torso.quadraticCurveTo(r * 0.55, r * 0.9, r * 0.36, r * 0.35);
+      torso.bezierCurveTo(-r * 0.3, r * 0.7, -r * 0.6, r * 0.95, -r * 0.44, r * 1.2);
+      torso.lineTo(r * 0.44, r * 1.2);
+      torso.bezierCurveTo(r * 0.6, r * 0.95, r * 0.3, r * 0.7, r * 0.36, r * 0.35);
       torso.closePath();
       ctx.fillStyle = "#5b2a86";
       ctx.fill(torso);
-      ctx.save();
-      ctx.clip(torso);
-      ctx.fillStyle = "#ff5fa8";
-      for (let i = -2; i <= 2; i++) for (let k = 0; k < 4; k++) {
-        if ((i + k) % 2) continue;
-        const dx = i * r * 0.2, dy = r * (0.45 + k * 0.22);
-        ctx.beginPath(); ctx.moveTo(dx, dy - r * 0.11); ctx.lineTo(dx + r * 0.1, dy); ctx.lineTo(dx, dy + r * 0.11); ctx.lineTo(dx - r * 0.1, dy); ctx.fill();
-      }
-      ctx.restore();
+      diamonds(torso, "#ff5fa8", "rgba(0,0,0,0)", r * 0.24, 0, r * 0.5);
       fShade(torso, r * 0.6, -r * 0.2, r * 0.6);
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw;
       ctx.stroke(torso);
+      ruffle(0, r * 1.16, r * 1.0, 5, r * 0.12, "#ffd23f", "#fbf8f2", lw);
       // head, upside down
       ctx.save();
-      ctx.translate(0, r * 1.55);
+      ctx.translate(0, r * 1.6);
       ctx.rotate(Math.PI);
       const head = new Path2D();
-      head.arc(0, 0, r * 0.4, 0, Math.PI * 2);
-      fBody(head, "#ffe4ef", r * 0.42, lw, r * 0.1, r * 0.15);
-      fEyes("tear", r * 0.16, -r * 0.05, r * 0.48, -t, "#5b2a86");
-      fMouth(true, -r * 0.08, r * 0.4, "#d62839", lw);
-      fCrown(0, -r * 0.36, r * 0.5, "#ff5fa8", lw * 0.8);
+      head.ellipse(0, 0, r * 0.4, r * 0.42, 0, 0, Math.PI * 2);
+      fBody(head, "#ffe9f1", r * 0.44, lw, r * 0.1, r * 0.15);
+      for (const s of [-1, 1]) {
+        ctx.fillStyle = "#5b2a86";
+        ctx.beginPath(); ctx.moveTo(s * r * 0.16, -r * 0.28); ctx.lineTo(s * r * 0.22, -r * 0.06); ctx.lineTo(s * r * 0.16, r * 0.18); ctx.lineTo(s * r * 0.1, -r * 0.06); ctx.fill();
+        eye(s * r * 0.16, -r * 0.06, r * 0.09, r * 0.08, { iris: "#5b2a86", look: [0.6, -0.3], lid: 0.2, slant: s * 0.6, lidColor: "#ffe9f1" });
+        ctx.fillStyle = "rgba(255,95,140,0.5)";
+        ctx.beginPath(); ctx.arc(s * r * 0.26, r * 0.12, r * 0.055, 0, Math.PI * 2); ctx.fill();
+      }
+      mouth(0, r * 0.2, r * 0.1, { curve: -0.8, open: 0.3, fill: "#d62839" }, lw * 0.5);
+      fCrown(0, -r * 0.38, r * 0.5, "#ff5fa8", lw * 0.8);
       ctx.restore();
+      tear(r * 0.16, r * 1.72, r * 0.035, t, 0);
       ctx.restore();
     },
 
     mother(f, r, t, lw, ft) {
-      // cables
-      for (let i = 0; i < 6; i++) {
-        const sx = (i - 2.5) * r * 0.32, pts = [[sx, r * 0.55]];
+      for (let i = 0; i < 7; i++) {
+        const sx = (i - 3) * r * 0.28, pts = [[sx, r * 0.55]];
         for (let k = 1; k <= 10; k++) {
           const kk = k / 10;
-          pts.push([sx + Math.sin(t * 2 + i + kk * 5) * r * 0.3 * kk + (i - 2.5) * r * 0.24 * kk, r * 0.55 + kk * (ft - r * 0.6)]);
+          pts.push([sx + Math.sin(t * 2 + i + kk * 5) * r * 0.32 * kk + (i - 3) * r * 0.24 * kk, r * 0.55 + kk * (ft - r * 0.6)]);
         }
-        limb(pts, r * 0.13, i % 2 ? "#2b2140" : "#3a2f52", lw * 0.4);
+        limb(pts, r * 0.13, i % 2 ? "#2b2140" : "#3f3358", lw * 0.4);
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth = r * 0.03;
+        ctx.beginPath(); pts.forEach((q, k) => (k ? ctx.lineTo(q[0] - r * 0.03, q[1]) : ctx.moveTo(q[0] - r * 0.03, q[1]))); ctx.stroke();
         const e = pts[pts.length - 1];
         const plug = new Path2D();
-        plug.roundRect(e[0] - r * 0.11, e[1] - r * 0.07, r * 0.22, r * 0.16, r * 0.04);
+        plug.roundRect(e[0] - r * 0.12, e[1] - r * 0.08, r * 0.24, r * 0.18, r * 0.04);
         fPaint(plug, "#cfc6d8", lw * 0.6);
+        ctx.fillStyle = "#e8b923";
+        ctx.fillRect(e[0] - r * 0.07, e[1] + r * 0.1, r * 0.04, r * 0.09);
+        ctx.fillRect(e[0] + r * 0.03, e[1] + r * 0.1, r * 0.04, r * 0.09);
       }
-      // two little TVs on stalks
       for (const s of [-1, 1]) {
-        const tx = s * r * 1.55, ty = -r * 0.3 + Math.sin(t * 1.8 + s) * r * 0.15;
-        limb([[s * r * 0.9, r * 0.1], [s * r * 1.3, r * 0.25], [tx, ty + r * 0.2]], r * 0.08, "#2b2140", lw * 0.4);
+        const tx = s * r * 1.6, ty = -r * 0.3 + Math.sin(t * 1.8 + s) * r * 0.15;
+        limb([[s * r * 0.9, r * 0.1], [s * r * 1.3, r * 0.3], [tx, ty + r * 0.22]], r * 0.08, "#2b2140", lw * 0.4);
         const tv2 = new Path2D();
-        tv2.roundRect(tx - r * 0.3, ty - r * 0.22, r * 0.6, r * 0.44, r * 0.07);
-        fPaint(tv2, "#3a2f52", lw * 0.8);
+        tv2.roundRect(tx - r * 0.32, ty - r * 0.24, r * 0.64, r * 0.48, r * 0.08);
+        fBody(tv2, "#4a3a6a", r * 0.4, lw * 0.8, tx - r * 0.1, ty - r * 0.2, 0.3);
         ctx.fillStyle = "#0c1410";
-        ctx.fillRect(tx - r * 0.23, ty - r * 0.16, r * 0.46, r * 0.32);
-        noiseRect(tx - r * 0.23, ty - r * 0.16, r * 0.46, r * 0.32, 8, true);
-        ctx.fillStyle = "#b6ff5c";
-        ctx.beginPath(); ctx.arc(tx, ty, r * 0.09, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#0c1410";
-        ctx.beginPath(); ctx.arc(tx - s * r * 0.03, ty, r * 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(tx - r * 0.25, ty - r * 0.17, r * 0.5, r * 0.34);
+        noiseRect(tx - r * 0.25, ty - r * 0.17, r * 0.5, r * 0.34, 8, true);
+        eye(tx, ty, r * 0.11, r * 0.11, { white: "#d4ff7a", iris: "#0c1410", look: [-s * 0.7, 0.3], glow: "#a6d94a" });
+        ctx.strokeStyle = "#cfc6d8";
+        ctx.lineWidth = lw * 0.5;
+        ctx.beginPath(); ctx.moveTo(tx, ty - r * 0.24); ctx.lineTo(tx - r * 0.12, ty - r * 0.42); ctx.moveTo(tx, ty - r * 0.24); ctx.lineTo(tx + r * 0.12, ty - r * 0.42); ctx.stroke();
       }
-      // rabbit ears
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw * 1.4;
+      ctx.lineWidth = lw * 1.5;
       ctx.beginPath();
-      ctx.moveTo(0, -r * 0.75); ctx.lineTo(-r * 0.75, -r * 1.55);
-      ctx.moveTo(0, -r * 0.75); ctx.lineTo(r * 0.65, -r * 1.6);
+      ctx.moveTo(0, -r * 0.75); ctx.lineTo(-r * 0.8, -r * 1.6);
+      ctx.moveTo(0, -r * 0.75); ctx.lineTo(r * 0.7, -r * 1.65);
       ctx.stroke();
       ctx.strokeStyle = "#cfc6d8";
       ctx.lineWidth = lw * 0.6;
       ctx.stroke();
-      ctx.fillStyle = "#cfc6d8";
-      ctx.beginPath(); ctx.arc(-r * 0.75, -r * 1.55, r * 0.07, 0, Math.PI * 2); ctx.arc(r * 0.65, -r * 1.6, r * 0.07, 0, Math.PI * 2); ctx.fill();
+      for (const [ax, ay] of [[-0.8, -1.6], [0.7, -1.65]]) { const bl = new Path2D(); bl.arc(ax * r, ay * r, r * 0.08, 0, Math.PI * 2); fPaint(bl, "#cfc6d8", lw * 0.5); if (Math.sin(t * 9 + ax) > 0.5) glow(ax * r, ay * r, r * 0.4, "#a6d94a", 0.8); }
       const box = new Path2D();
-      box.roundRect(-r * 1.05, -r * 0.78, r * 2.1, r * 1.5, r * 0.2);
-      fBody(box, vgrad("#4a3a6a", "#241a3a", -r * 0.8, r * 0.75), r * 1.4, lw);
-      // the screen bulges a little
+      box.roundRect(-r * 1.08, -r * 0.8, r * 2.16, r * 1.54, r * 0.22);
+      fBody(box, vgrad("#54427a", "#221838", -r * 0.8, r * 0.75), r * 1.4, lw);
+      // wood-grain trim
+      ctx.save();
+      ctx.clip(box);
+      ctx.strokeStyle = "rgba(20,8,45,0.3)";
+      ctx.lineWidth = lw * 0.4;
+      for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.moveTo(-r * 1.1, -r * 0.75 + k * r * 0.05); ctx.bezierCurveTo(-r * 0.3, -r * 0.8 + k * r * 0.05, r * 0.3, -r * 0.7 + k * r * 0.05, r * 1.1, -r * 0.76 + k * r * 0.05); ctx.stroke(); }
+      ctx.restore();
       const scr = new Path2D();
-      scr.moveTo(-r * 0.88, -r * 0.55);
-      scr.quadraticCurveTo(-r * 0.15, -r * 0.7, r * 0.55, -r * 0.55);
-      scr.quadraticCurveTo(r * 0.64, 0, r * 0.55, r * 0.52);
-      scr.quadraticCurveTo(-r * 0.15, r * 0.64, -r * 0.88, r * 0.52);
-      scr.quadraticCurveTo(-r * 0.96, 0, -r * 0.88, -r * 0.55);
+      scr.moveTo(-r * 0.9, -r * 0.56);
+      scr.quadraticCurveTo(-r * 0.15, -r * 0.72, r * 0.56, -r * 0.56);
+      scr.quadraticCurveTo(r * 0.66, 0, r * 0.56, r * 0.53);
+      scr.quadraticCurveTo(-r * 0.15, r * 0.66, -r * 0.9, r * 0.53);
+      scr.quadraticCurveTo(-r * 0.98, 0, -r * 0.9, -r * 0.56);
       ctx.fillStyle = "#0c1410";
       ctx.fill(scr);
       ctx.save();
       ctx.clip(scr);
-      noiseRect(-r * 0.95, -r * 0.7, r * 1.6, r * 1.35, 70, true);
-      glow(-r * 0.15, 0, r, "#a6d94a", 0.25);
+      noiseRect(-r * 0.97, -r * 0.7, r * 1.65, r * 1.35, 80, true);
+      glow(-r * 0.15, 0, r * 1.1, "#a6d94a", 0.28);
       ctx.save();
-      ctx.translate(-r * 0.16, 0);
-      fEyes("many", 0, -r * 0.1, r * 0.95, t, "#d4ff7a", "#0c1410");
-      ctx.fillStyle = "#d4ff7a";
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.5, r * 0.2);
-      ctx.quadraticCurveTo(0, r * 0.58, r * 0.5, r * 0.2);
-      ctx.quadraticCurveTo(0, r * 0.38, -r * 0.5, r * 0.2);
-      ctx.fill();
-      ctx.fillStyle = "#0c1410";
-      for (let k = -3; k <= 3; k++) ctx.fillRect(k * r * 0.12 - r * 0.01, r * 0.24, r * 0.025, r * 0.2);
+      ctx.translate(-r * 0.17, 0);
+      const pos = [[-0.42, -0.08, 0.13], [0.42, -0.08, 0.13], [0, -0.3, 0.1], [-0.2, 0.1, 0.08], [0.22, 0.12, 0.09]];
+      pos.forEach((p, i) => {
+        const open = Math.sin(t * 1.7 + i * 1.9) > -0.85;
+        eye(p[0] * r, p[1] * r - r * 0.05, r * p[2], r * p[2] * (open ? 1 : 0.12), { white: "#d4ff7a", iris: "#0c1410", look: [-0.6 + Math.sin(t * 0.8 + i) * 0.3, 0.2] });
+      });
+      mouth(0, r * 0.28, r * 0.5, { curve: 0.7, open: 0.5, teeth: "sharp", n: 10, fill: "#0c1410" }, lw * 0.6);
       ctx.restore();
       ctx.fillStyle = "rgba(212,255,122,0.22)";
       ctx.fillRect(-r, -r * 0.7 + ((t * 0.5) % 1) * r * 1.4, r * 2, r * 0.1);
-      ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.beginPath(); ctx.ellipse(-r * 0.5, -r * 0.3, r * 0.3, r * 0.14, -0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 16; i++) { ctx.beginPath(); ctx.moveTo(-r, -r * 0.6 + i * r * 0.08); ctx.lineTo(r, -r * 0.6 + i * r * 0.08); ctx.stroke(); }
+      ctx.fillStyle = "rgba(255,255,255,0.14)";
+      ctx.beginPath(); ctx.ellipse(-r * 0.52, -r * 0.3, r * 0.3, r * 0.13, -0.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       ctx.strokeStyle = FINK;
-      ctx.lineWidth = lw;
+      ctx.lineWidth = lw * 1.3;
       ctx.stroke(scr);
       for (let k = 0; k < 2; k++) {
         const dl = new Path2D();
-        dl.arc(r * 0.82, -r * 0.4 + k * r * 0.34, r * 0.11, 0, Math.PI * 2);
-        fPaint(dl, "#cfc6d8", lw * 0.7);
+        dl.arc(r * 0.84, -r * 0.4 + k * r * 0.34, r * 0.12, 0, Math.PI * 2);
+        fBody(dl, "#cfc6d8", r * 0.14, lw * 0.7, r * 0.8, -r * 0.45 + k * r * 0.34, 0.3);
         ctx.strokeStyle = FINK;
-        ctx.beginPath(); ctx.moveTo(r * 0.82, -r * 0.4 + k * r * 0.34); ctx.lineTo(r * 0.82 + Math.cos(t + k * 2) * r * 0.09, -r * 0.4 + k * r * 0.34 + Math.sin(t + k * 2) * r * 0.09); ctx.stroke();
+        ctx.lineWidth = lw * 0.7;
+        ctx.beginPath(); ctx.moveTo(r * 0.84, -r * 0.4 + k * r * 0.34); ctx.lineTo(r * 0.84 + Math.cos(t + k * 2) * r * 0.1, -r * 0.4 + k * r * 0.34 + Math.sin(t + k * 2) * r * 0.1); ctx.stroke();
       }
-      ctx.strokeStyle = "rgba(20,10,30,0.8)";
+      ctx.strokeStyle = "rgba(20,10,30,0.85)";
       ctx.lineWidth = lw * 0.5;
-      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(r * 0.7, r * 0.3 + k * r * 0.08); ctx.lineTo(r * 0.94, r * 0.3 + k * r * 0.08); ctx.stroke(); }
-      fCrown(0, -r * 0.82, r * 0.6, "#a6d94a", lw);
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(r * 0.72, r * 0.26 + k * r * 0.07); ctx.lineTo(r * 0.96, r * 0.26 + k * r * 0.07); ctx.stroke(); }
+      ctx.fillStyle = Math.sin(t * 4) > 0 ? "#ff3b4a" : "#5a0f1f";
+      ctx.beginPath(); ctx.arc(r * 0.84, r * 0.14, r * 0.035, 0, Math.PI * 2); ctx.fill();
+      fCrown(0, -r * 0.84, r * 0.62, "#a6d94a", lw);
     }
   };
 
@@ -2468,7 +2881,6 @@
     if (o.hurt) ctx.filter = "brightness(2.2) saturate(0.3)";
     if (f.charge) glow(x, y, r * 2.5, "#ffd23f", 0.25 + 0.2 * Math.sin(t * 12));
     ctx.translate(x, y);
-    // a slow breath
     const br = 1 + Math.sin(t * 2.2) * 0.012;
     ctx.scale(1 / br, br);
     ctx.lineJoin = "round";

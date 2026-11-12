@@ -14,7 +14,7 @@
   let shots = [], throws = [], words = [], bursts = [], puffs = [];
   let shake = 0, stopUntil = 0, flashT = 0, stageT = 0, show = null, lastB = null;
   let cache = {};
-  const SCALE = 1.95, FOE_SCALE = 1.25;   // fighters are drawn bigger on stage than in the garden
+  const SCALE = 2.25, FOE_SCALE = 1.45;   // fighters are drawn bigger on stage than in the garden
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => (cache = {}));
 
   function reset() {
