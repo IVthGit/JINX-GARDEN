@@ -19,12 +19,14 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
   - The best stat shows too: juggled planets, spring feet, a glowing antenna, or a spiked hat.
 - **The last show:** after 12 shows a Jinx rises into the sky as a constellation. If its Love is 50 or more, it leaves an egg that keeps a little of its stats and lean.
 - **Concession stand:** buy snacks, or an egg for 80 Tix. The garden holds 6.
+- **On their own**, Jinxes wander, nap, watch the old TV, splash in the sludge pond and play with each other, which lifts their Mood. Their eyes follow your pointer, and they bob in time with the music.
 - **Eggs** hatch on their own. Tap one to keep it warm and it hatches sooner.
 
 ## A run
 
 - **The acts:** three acts, The Midway, The Hall of Warped Mirrors and The Big Top Below. Each one ends with a Ringmaster.
 - **The map:** pick a path through Hecklers (fights), Headliners (hard fights that drop a charm), Sideshows (events), Snack stands (shops) and Fortune tents (rest, or train a stat for good).
+- **Each act has its own stage:** a midway with booths and a ferris wheel, a hall of mirrors that reflects the fight, and an upside-down big top over a floating platform.
 - **Fights** are turn based with a deck of tricks. You get 3 energy and draw 5 cards each turn, and the foe shows what it will do next.
   - **Stats boost cards:** Juggle adds to attacks, Tumble to Block (and gives a small chance to dodge), Glow to heals and Gunk, and Grit to health.
   - **Statuses:** Hype adds damage. Dazed deals 25% less. Pied takes 50% more. Gunk loses health every turn.

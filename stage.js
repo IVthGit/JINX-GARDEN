@@ -577,7 +577,7 @@
     const a = B.anim;
     let pr = null, fr = null;
     if (B.jinx) {
-      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, hop: pos.pHop, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
+      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, hop: pos.pHop, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
     }
     if (B.foe && !(B.over === "win" && rt - a.fDie > 0.8)) {
       c.save();

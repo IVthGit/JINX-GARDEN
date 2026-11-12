@@ -172,7 +172,10 @@
       if (!s) return null;
       const o = JSON.parse(s);
       if (!(o && o.v === 1 && Array.isArray(o.jinxes))) return null;
-      for (const j of o.jinxes) if (j.stage !== "egg" && !JG.TRAITS[j.trait]) j.trait = pick(Object.keys(JG.TRAITS));
+      for (const j of o.jinxes) {
+        if (j.stage !== "egg" && !JG.TRAITS[j.trait]) j.trait = pick(Object.keys(JG.TRAITS));
+        j.act = null; j.after = null; j.waitFor = null; j.moving = false;
+      }
       return o;
     } catch (e) { return null; }
   }
@@ -432,11 +435,16 @@
       j.belly = clamp(j.belly - dt / 25, 0, 100);
       if (j.belly < 25) j.mood = clamp(j.mood - dt / 20, 0, 100);
       else if (j.mood < 55) j.mood = clamp(j.mood + dt / 40, 0, 100);
-      if (G.selected === j.id) { j.moving = false; continue; }
+      if (G.selected === j.id) { j.moving = false; j.act = null; j.after = null; continue; }
+      if (j.act) { activity(j, dt); continue; }
       if (j.moving) {
         const dx = j.tx - j.u, dy = j.ty - j.v, d = Math.hypot(dx, dy);
         const sp = 0.1 * (j.stage === "adult" ? 1.15 : 0.9) * (j.mood < 30 ? 0.5 : 1);
-        if (d < 0.02) { j.moving = false; j.idle = 1.5 + rand() * 5; }
+        if (d < 0.02) {
+          j.moving = false;
+          j.idle = 1.5 + rand() * 5;
+          if (j.after) { startActivity(j); }
+        }
         else {
           j.u += (dx / d) * sp * dt;
           j.v += (dy / d) * sp * dt * 1.2;
@@ -447,9 +455,13 @@
         if (j.idle <= 0) {
           const r = rand();
           j.sleep = false;
+          j.waitFor = null;
           if (r < 0.14) { j.hopT = 1; j.idle = 1.2; sfx("bell"); }
           else if (r < 0.22 && j.mood > 40) { j.spinT = 1; j.idle = 1.4; }
           else if (r < 0.3 && (j.mood < 40 || j.belly < 30)) { j.sleep = true; j.idle = 6; }
+          else if (r < 0.42) goDo(j, "tv", -0.6 + rand() * 0.14, 0.4 + rand() * 0.12);
+          else if (r < 0.54) goDo(j, "pond", 0.42 + rand() * 0.06, 0.44 + rand() * 0.12);
+          else if (r < 0.7 && findBuddy(j)) { /* off to play */ }
           else { const [u, v] = spot(); j.tx = u; j.ty = v; j.moving = true; }
         }
       }
@@ -462,6 +474,64 @@
     if (G.panelT > 2 && G.selected && !renaming) { G.panelT = 0; renderPanel(); }
     G.saveT = (G.saveT || 0) + dt;
     if (G.saveT > 10) { G.saveT = 0; persist(); }
+  }
+
+  // ---- things Jinxes do on their own: watch the TV, splash in the pond, play together ----
+  function goDo(j, kind, u, v) { j.tx = u; j.ty = v; j.moving = true; j.after = kind; }
+  function findBuddy(j) {
+    const b = G.save.jinxes.find((o) => o !== j && o.stage !== "egg" && o.id !== G.selected && !o.act && !o.after && !o.sleep && !o.waitFor && !o.moving);
+    if (!b) return false;
+    b.moving = false;
+    b.idle = 12;
+    b.after = null;
+    b.waitFor = j.id;
+    j.buddy = b.id;
+    goDo(j, "play", clamp(b.u - 0.22, -0.8, 0.8), b.v);
+    return true;
+  }
+  function startActivity(j) {
+    const kind = j.after;
+    j.after = null;
+    if (kind === "play") {
+      const b = jinxById(j.buddy);
+      if (!b || b.stage === "egg" || b.id === G.selected || b.waitFor !== j.id) return;
+      b.act = { kind: "play", t: 6, buddy: j.id, beat: 0.35 };
+      b.dir = -1;
+      b.waitFor = null;
+      j.act = { kind: "play", t: 6, buddy: b.id, beat: 0 };
+      j.dir = 1;
+    } else j.act = { kind, t: 6 + rand() * 5, beat: 0 };
+  }
+  function activity(j, dt) {
+    const a = j.act;
+    a.t -= dt;
+    a.beat -= dt;
+    j.mood = clamp(j.mood + dt / 6, 0, 100);
+    const [x, y] = jinxScreen(j);
+    if (a.kind === "tv") {
+      j.dir = -1;
+      if (a.beat <= 0) { a.beat = 1.6 + rand() * 2; j.happyT = 0.9; D.burst(x, y - 30, "note", 1, "#c9b8ff"); }
+    } else if (a.kind === "pond") {
+      j.dir = 1;
+      if (a.beat <= 0) {
+        a.beat = 0.9 + rand() * 0.6;
+        j.hopT = 1;
+        j.happyT = 0.6;
+        const [px, py] = D.toScreen(0.66, 0.47);
+        D.burst(px, py, "drop", 7, "#b6ff5c");
+      }
+    } else if (a.kind === "play") {
+      const b = jinxById(a.buddy);
+      if (!b || !b.act || b.id === G.selected) a.t = 0;
+      else if (a.beat <= 0) {
+        a.beat = 0.7;
+        j.hopT = 1;
+        j.happyT = 0.5;
+        if (rand() < 0.35) D.burst(x, y - 34, "heart", 1, "#ff5fa8");
+        j.love = clamp(j.love + 0.2, 0, 100);
+      }
+    }
+    if (a.t <= 0) { j.act = null; j.idle = 1 + rand() * 3; }
   }
 
   function hatchEgg(e) {
@@ -482,6 +552,11 @@
     renderPanel();
   }
 
+  $("#scene").addEventListener("pointermove", (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    G.pointer = [e.clientX - r.left, e.clientY - r.top];
+  });
+  $("#scene").addEventListener("pointerleave", () => { G.pointer = null; });
   $("#scene").addEventListener("pointerdown", (e) => {
     if (G.mode !== "garden") return;
     A.init();
@@ -815,7 +890,7 @@
     const hp = def.hp[0] + ((rand() * (def.hp[1] - def.hp[0] + 1)) | 0);
     const B = (G.B = {
       act: r.act, kind, jinx: j, form: leanForm(j),
-      foe: { id: foeId, def, hp, maxHp: hp, block: 0, st: {}, mi: 0, charge: false },
+      foe: { id: foeId, def, hp, maxHp: hp, block: 0, st: {}, mi: 0, charge: false, mimic: j },
       p: { block: 0, st: {}, energy: 3 },
       draw: shuffle(r.deck.map((id) => ({ id, u: uid++ }))), hand: [], disc: [], exh: [],
       turn: 0, busy: false, over: null, anim: {},
