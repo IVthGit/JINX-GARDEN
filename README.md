@@ -46,7 +46,8 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 
 - `index.html`: the page and its styles.
 - `data.js`: items, cards, charms, foes, acts, names and sideshow text.
-- `draw.js`: everything drawn on the canvas (garden, Jinxes, eggs, foes, stage).
+- `draw.js`: the garden, Jinxes, eggs and foes, drawn on the canvas.
+- `stage.js`: the battle stage: a backdrop for each act, the crowd, attack animations, impacts and Showstoppers.
 - `game.js`: garden sim, runs, battles, events, shops, music and sound effects, saving.
 
 The look and the creatures are original. The genre (a pet-raising garden plus a roguelike deckbuilder) is borrowed from games we love.

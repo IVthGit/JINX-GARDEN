@@ -854,6 +854,7 @@
       const { W, H } = D.size();
       D.float(W / 2, H * 0.32, "Showstopper ready!", "#ffd23f", true);
       D.burst(W / 2, H * 0.3, "confetti", 36, "multi");
+      D.fx.cheer(B, 5);
       sfx("buff");
     }
   }
@@ -959,6 +960,7 @@
     $("#pileDisc").textContent = `Used ${B.disc.length}`;
     $("#hand").innerHTML = B.hand.map((c, i) => cardHtml(c.id, { i, act: "play", B, wild: c.u === B.wild, dim: JG.CARDS[c.id].cost > B.p.energy, disabled: B.busy || !!B.over })).join("");
     $("#hand").style.setProperty("--n", B.hand.length);
+    B.crowdY = $("#hand").getBoundingClientRect().top + 30;
     const full = B.applause >= 100;
     $("#applause").classList.toggle("full", full);
     $("#applause i").style.width = B.applause + "%";
@@ -987,6 +989,9 @@
   });
 
   function gainRunXp(stat, n) { if (stat) G.run.xp[stat] += n; }
+  // which attack animation each card uses (stage.js draws them)
+  const CARD_STYLE = { pie: "pie", honk: "wave", juggle: "stars", seltzer: "spray", mallet: "smash", chicken: "chicken", chord: "wave", mosh: "dive", dive: "dive",
+    feedback: "wave", cannon: "cannon", moonbeam: "beam", haloburst: "beam", mirror: "pie", blackhole: "goo" };
   async function playCard(i) {
     const B = G.B;
     if (!B || B.busy || B.over) return;
@@ -1026,23 +1031,24 @@
     if (B.form === "stardust" && c.type === "eth") gainRes(1);
     const fx = half ? scaleFx(c.fx, 0.5) : c.fx;
     for (let rep = 0; rep < (wild ? 2 : 1); rep++) {
-      if (!(await applyFx(fx))) return;
+      if (!(await applyFx(fx, CARD_STYLE[card.id]))) return;
       if (rep === 0 && wild) await sleep(200);
     }
     B.busy = false;
     renderBattle();
   }
   // Runs one card's effects. Returns false once the fight is over.
-  async function applyFx(fx) {
+  async function applyFx(fx, style) {
     const B = G.B, r = G.run, bo = bonuses(B.jinx), pp = scr("p"), fp = scr("f");
     if (fx.selfdmg) { hurtPlayer(fx.selfdmg, true); if (B.over) return false; }
     if (fx.hype) { B.p.st.hype = (B.p.st.hype || 0) + fx.hype; D.float(pp.x, pp.y - 50, `+${fx.hype} Hype`, "#ff8a3d"); sfx("buff"); }
-    if (fx.block) { B.p.block += fx.block + bo.blk; D.float(pp.x, pp.y - 30, `◆ ${fx.block + bo.blk}`, "#ffd23f"); sfx("block"); }
+    if (fx.block) { B.p.block += fx.block + bo.blk; D.float(pp.x, pp.y - 30, `◆ ${fx.block + bo.blk}`, "#ffd23f"); sfx("block"); D.fx.guard("p"); }
     if (fx.heal) {
       const h = Math.min(r.maxHp - r.hp, fx.heal + bo.heal);
       r.hp += h;
-      D.float(pp.x, pp.y - 70, `+${h}`, "#8fe9ff");
+      D.float(pp.x, pp.y - 70, h ? `+${h}` : "Already full", "#8fe9ff");
       D.burst(pp.x, pp.y, "star", 8, "#8fe9ff");
+      D.fx.heal("p");
       sfx("heal");
     }
     renderBattle();
@@ -1050,22 +1056,21 @@
       const hits = fx.hits || 1;
       const hit = () => (fx.dmg ? dmgValue(fx.dmg, B) : Math.floor(B.p.block * (fx.blockScale || 1)));
       for (let h = 0; h < hits; h++) {
-        B.anim.pLunge = G.t;
-        await sleep(140);
+        await D.fx.attack(style || "punch", "p", B);
         hurtFoe(hit());
         if (B.over) return false;
         sludgeTouch();
-        await sleep(hits > 1 ? 160 : 120);
+        await sleep(hits > 1 ? 90 : 120);
       }
       if (fx.piedHit && B.foe.st.pied) {
-        B.anim.pLunge = G.t;
-        await sleep(140);
+        await D.fx.attack(style || "punch", "p", B);
         hurtFoe(hit());
         if (B.over) return false;
         sludgeTouch();
       }
     }
-    if (fx.gunk) applyGunk(fx.gunk + bo.gunk);
+    if (fx.gunk) { await D.fx.attack("goo", "p", B); applyGunk(fx.gunk + bo.gunk); }
+    if (fx.pied && !fx.dmg) await D.fx.attack("pie", "p", B);
     if (fx.doubleGunk) {
       if (B.foe.st.gunk) {
         const add = B.foe.st.gunk;
@@ -1109,7 +1114,8 @@
     D.float(fp.x, fp.y - 40, dmg ? `-${dmg}` : "Blocked", isGunk ? "#a6d94a" : "#ffffff", dmg >= 15);
     D.burst(fp.x, fp.y, isGunk ? "drop" : "star", dmg >= 15 ? 14 : 6, isGunk ? "#a6d94a" : "#ffd23f");
     sfx(dmg ? "hit" : "block");
-    if (!isGunk && dmg >= 15) addApplause(8, "Ooooh!");
+    if (dmg && !isGunk) D.fx.impact("f", dmg, B);
+    if (!isGunk && dmg >= 15) { addApplause(8, "Ooooh!"); D.fx.cheer(B, 3); }
     renderBattle();
     if (f.hp <= 0) winBattle();
   }
@@ -1127,6 +1133,7 @@
       B.tookDmg += dmg;
       B.anim.pHurt = G.t;
       D.float(pp.x, pp.y - 40, `-${dmg}`, "#ff5fa8", dmg >= 12);
+      if (!unblockable) D.fx.impact("p", dmg, B);
       sfx("hit");
       addApplause(-Math.floor(dmg / 2));
       if (!unblockable && dmg >= 8 && B.jinx.trait === "hothead" && r.hp > 0) {
@@ -1183,31 +1190,26 @@
     B.applause = 0;
     B.anim.show = G.t;
     const j = B.jinx, bo = bonuses(j), r = G.run, F = JG.FORMS[B.form];
-    const { W, H } = D.size();
     const pp = scr("p");
     sfx("win");
-    D.float(W / 2, H * 0.3, `${F.show}!`, F.color, true);
-    D.burst(pp.x, pp.y - 30, "confetti", 50, "multi");
     for (const s of JG.STATS) gainRunXp(s, 2);
     renderBattle();
-    await sleep(650);
+    D.fx.cheer(B, 10);
+    await D.fx.showstopper(B.form, B);
+    D.burst(pp.x, pp.y - 30, "confetti", 50, "multi");
     if (B.form === "sludge") {
       const c = B.res;
-      B.anim.pLunge = G.t;
-      await sleep(140);
       hurtFoe(8 + Math.floor(c * 1.5) + bo.atk * 2);
       if (B.over) return;
       applyGunk(6 + bo.gunk);
       B.res = 0;
     } else if (B.form === "stardust") {
       const s = B.res;
-      B.anim.pLunge = G.t;
-      await sleep(140);
       hurtFoe(6 + s * 4 + bo.atk * 2);
       if (B.over) return;
       const h = Math.min(r.maxHp - r.hp, 4 + s * 3 + bo.heal);
       r.hp += h;
-      D.float(pp.x, pp.y - 70, `+${h}`, "#8fe9ff", true);
+      if (h) D.float(pp.x, pp.y - 70, `+${h}`, "#8fe9ff", true);
       D.burst(pp.x, pp.y, "star", 20, "#8fe9ff");
       delete B.p.st.dazed; delete B.p.st.pied; delete B.p.st.gunk;
       sfx("heal");
@@ -1251,16 +1253,15 @@
     }
     const m = f.intent;
     if (m.charge) { f.charge = true; D.float(fp.x, fp.y - 60, "Charging…", "#ffd23f"); sfx("buff"); }
-    if (m.blk) { f.block += m.blk; D.float(fp.x, fp.y - 30, `◆ ${m.blk}`, "#ffd23f"); sfx("block"); }
-    if (m.heal) { const h = Math.min(f.maxHp - f.hp, m.heal); f.hp += h; D.float(fp.x, fp.y - 60, `+${h}`, "#8fe9ff"); sfx("heal"); }
+    if (m.blk) { f.block += m.blk; D.float(fp.x, fp.y - 30, `◆ ${m.blk}`, "#ffd23f"); sfx("block"); D.fx.guard("f"); }
+    if (m.heal) { const h = Math.min(f.maxHp - f.hp, m.heal); f.hp += h; D.float(fp.x, fp.y - 60, `+${h}`, "#8fe9ff"); sfx("heal"); D.fx.heal("f"); }
     if (m.hype) { f.st.hype = (f.st.hype || 0) + m.hype; D.float(fp.x, fp.y - 80, `+${m.hype} Hype`, "#ff8a3d"); sfx("buff"); }
-    if (m.heckle) { B.anim.heckle = G.t; addApplause(-m.heckle, `Boo! -${m.heckle} Applause`); sfx("debuff"); }
+    if (m.heckle) { D.fx.heckle(B); addApplause(-m.heckle, `Boo! -${m.heckle} Applause`); sfx("debuff"); }
     renderBattle();
     if (m.atk) {
       for (let h = 0; h < (m.n || 1); h++) {
-        await sleep(220);
-        B.anim.fLunge = G.t;
-        await sleep(140);
+        await sleep(200);
+        await D.fx.attack(f.def.atk || "punch", "f", B);
         hurtPlayer(foeHitValue(m.atk));
         if (B.over) return;
       }
@@ -1269,7 +1270,7 @@
     const pp = scr("p");
     if (m.dazed) { B.p.st.dazed = (B.p.st.dazed || 0) + m.dazed; D.float(pp.x, pp.y - 60, `Dazed +${m.dazed}`, "#c9b8ff"); sfx("debuff"); }
     if (m.pied) { B.p.st.pied = (B.p.st.pied || 0) + m.pied; D.float(pp.x, pp.y - 75, `Pied +${m.pied}`, "#efe6d2"); sfx("debuff"); }
-    if (m.gunk) { B.p.st.gunk = (B.p.st.gunk || 0) + m.gunk; D.float(pp.x, pp.y - 90, `Gunk +${m.gunk}`, "#a6d94a"); sfx("gunk"); }
+    if (m.gunk) { await D.fx.attack("goo", "f", B); B.p.st.gunk = (B.p.st.gunk || 0) + m.gunk; D.float(pp.x, pp.y - 90, `Gunk +${m.gunk}`, "#a6d94a"); sfx("gunk"); }
     for (const k of ["dazed", "pied"]) if (f.st[k]) f.st[k]--;
     f.mi = (f.mi + 1) % f.def.moves.length;
     f.intent = f.def.moves[f.mi];
@@ -1287,6 +1288,7 @@
     const fp = scr("f");
     D.burst(fp.x, fp.y, "star", 30, "#ffd23f");
     D.burst(fp.x, fp.y - 40, "confetti", 30, "multi");
+    D.fx.cheer(B, 7);
     renderBattle();
     setTimeout(() => showRewards(B.kind), 1100);
   }

@@ -925,8 +925,8 @@
   };
 
   // ---------- foes ----------
-  D.foeCenter = function (look, feetY) {
-    const r = 42 * U * look.size;
+  D.foeCenter = function (look, feetY, scale) {
+    const r = 42 * U * look.size * (scale || 1);
     const off = { tall: 1.15, round: 1.0, balloon: 2.0, wide: 1.0, blob: 0.85, wisp: 1.6, tv: 1.25 }[look.body] || 1;
     return { r, cy: feetY - r * off };
   };
@@ -934,7 +934,7 @@
   D.drawFoe = function (f, x, feetY, t, o) {
     o = o || {};
     const L = f.def.look;
-    const { r, cy } = D.foeCenter(L, feetY);
+    const { r, cy } = D.foeCenter(L, feetY, o.scale);
     const floaty = ["balloon", "wisp", "tv"].includes(L.body);
     const y = cy + Math.sin(t * (floaty ? 1.6 : 2.4)) * r * (floaty ? 0.08 : 0.03);
     const skin = L.skin, paint = L.paint;
@@ -1499,120 +1499,8 @@
     return { px: W * (portrait ? 0.27 : 0.3), fx: W * (portrait ? 0.72 : 0.68), feet: H * (portrait ? 0.56 : 0.64), portrait };
   };
 
-  D.stage = function (t, dt, B) {
-    drawBg(t);
-    const act = B.act;
-    const tint = JG.ACTS[act - 1].tint;
-    const P = D.stagePos();
-    // floor: checker in perspective
-    const hz = P.feet - 50 * U;
-    ctx.fillStyle = "#120818";
-    ctx.fillRect(0, hz, W, H - hz);
-    const rows = 9;
-    for (let rIdx = 0; rIdx < rows; rIdx++) {
-      const y0 = hz + Math.pow(rIdx / rows, 1.8) * (H - hz), y1 = hz + Math.pow((rIdx + 1) / rows, 1.8) * (H - hz);
-      const w0 = 0.6 + (rIdx / rows) * 0.9, w1 = 0.6 + ((rIdx + 1) / rows) * 0.9;
-      const cols = 14;
-      for (let c = 0; c < cols; c++) {
-        if ((c + rIdx) % 2) continue;
-        const xa0 = W / 2 + ((c / cols) - 0.5) * W * w0 * 1.6, xb0 = W / 2 + (((c + 1) / cols) - 0.5) * W * w0 * 1.6;
-        const xa1 = W / 2 + ((c / cols) - 0.5) * W * w1 * 1.6, xb1 = W / 2 + (((c + 1) / cols) - 0.5) * W * w1 * 1.6;
-        ctx.fillStyle = `rgba(217,205,180,${0.07 + (rIdx / rows) * 0.12})`;
-        ctx.beginPath();
-        ctx.moveTo(xa0, y0);
-        ctx.lineTo(xb0, y0);
-        ctx.lineTo(xb1, y1);
-        ctx.lineTo(xa1, y1);
-        ctx.fill();
-      }
-    }
-    const fade = ctx.createLinearGradient(0, hz - 30 * U, 0, hz + 60 * U);
-    fade.addColorStop(0, "rgba(18,8,24,0)");
-    fade.addColorStop(1, "rgba(18,8,24,0.0)");
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, hz - 30 * U, W, 90 * U);
-    // spotlights
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const ap = (B.applause || 0) / 100;
-    const pCol = rgb(mix("#ffe9b0", "#ffd23f", ap));
-    for (const [sx, c] of [[P.px, pCol], [P.fx, tint]]) {
-      const lg = ctx.createLinearGradient(0, 0, 0, P.feet);
-      lg.addColorStop(0, rgb(c, 0.02));
-      lg.addColorStop(1, rgb(c, 0.2));
-      ctx.fillStyle = lg;
-      ctx.beginPath();
-      ctx.moveTo(sx - 20 * U, -10);
-      ctx.lineTo(sx + 20 * U, -10);
-      ctx.lineTo(sx + 95 * U, P.feet);
-      ctx.lineTo(sx - 95 * U, P.feet);
-      ctx.fill();
-      ctx.fillStyle = rgb(c, 0.18);
-      ctx.beginPath();
-      ctx.ellipse(sx, P.feet, 95 * U, 22 * U, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-    // curtains
-    const cw = W * (P.portrait ? 0.08 : 0.12);
-    for (const side of [0, 1]) {
-      const x0 = side ? W - cw : 0;
-      for (let i = 0; i < 6; i++) {
-        const k = i / 6;
-        const g = ctx.createLinearGradient(x0 + k * cw, 0, x0 + (k + 1 / 6) * cw, 0);
-        g.addColorStop(0, "#3a0714");
-        g.addColorStop(0.5, "#8c1a2e");
-        g.addColorStop(1, "#3a0714");
-        ctx.fillStyle = g;
-        ctx.fillRect(x0 + k * cw, 0, cw / 6 + 1, H);
-      }
-    }
-    // valance
-    ctx.fillStyle = "#6a0f22";
-    ctx.fillRect(0, 0, W, 26 * U);
-    for (let i = 0; i < Math.ceil(W / (40 * U)); i++) {
-      ctx.fillStyle = "#6a0f22";
-      ctx.beginPath();
-      ctx.arc(i * 40 * U + 20 * U, 26 * U, 20 * U, 0, Math.PI);
-      ctx.fill();
-      ctx.fillStyle = "#c9a227";
-      ctx.beginPath();
-      ctx.arc(i * 40 * U + 20 * U, 46 * U, 3 * U, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // fighters
-    const lungeK = (t0, dur) => {
-      if (!t0) return 0;
-      const k = (t - t0) / dur;
-      return k > 0 && k < 1 ? Math.sin(k * Math.PI) : 0;
-    };
-    const shake = (t0) => (t0 && t - t0 < 0.3 ? Math.sin((t - t0) * 80) * 6 * U * (1 - (t - t0) / 0.3) : 0);
-    const pl = lungeK(B.anim.pLunge, 0.35) * W * 0.12;
-    const fl = lungeK(B.anim.fLunge, 0.35) * W * 0.12;
-    const pr = B.jinx ? D.drawJinx(B.jinx, P.px + pl + shake(B.anim.pHurt), P.feet, { t, dir: 1, scale: 1.55, happy: B.over === "win", walk: pl > 0, sleep: B.over === "lose" }) : null;
-    let fr = null;
-    if (B.foe && !(B.over === "win" && t - B.anim.fDie > 0.8)) {
-      ctx.save();
-      if (B.over === "win") ctx.globalAlpha = Math.max(0, 1 - (t - B.anim.fDie) / 0.8);
-      fr = D.drawFoe(B.foe, P.fx - fl + shake(B.anim.fHurt), P.feet, t, { hurt: B.anim.fHurt && t - B.anim.fHurt < 0.12 });
-      ctx.restore();
-    }
-    B.screen = { p: pr, f: fr };
-    if (ap >= 0.6 && Math.random() < dt * (ap - 0.5) * 30) {
-      D.particles.push({ x: Math.random() * W, y: -10, vx: 0, vy: 20 * U, life: 1, kind: "confetti", color: ["#ff4fa3", "#ffd23f", "#8fe9ff", "#a6d94a"][(Math.random() * 4) | 0], s: (3 + Math.random() * 3) * U, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 10 });
-    }
-    particlesStep(dt);
-    if (B.anim.show && t - B.anim.show < 0.7) {
-      const k = 1 - (t - B.anim.show) / 0.7;
-      ctx.fillStyle = `rgba(255,230,140,${0.45 * k})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-    if (B.anim.heckle && t - B.anim.heckle < 0.5) {
-      const k = 1 - (t - B.anim.heckle) / 0.5;
-      ctx.fillStyle = `rgba(60,30,90,${0.35 * k})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-  };
+  // helpers for stage.js, which draws the battle stage
+  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb };
 
   D.clear = function () {
     D.particles.length = 0;
