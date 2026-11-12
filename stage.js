@@ -72,7 +72,7 @@
   FX.showstopper = function (form, B) {
     show = { form, t0: now(), B };
     B.anim.show = show.t0;
-    B.lastStyle = form === "sludge" ? "goo" : form === "stardust" ? "beam" : "stars";
+    B.lastStyle = form === "sludge" ? "goo" : form === "stardust" ? "beam" : form === "pierrot" ? "wave" : "stars";
     return JG.fast ? Promise.resolve() : new Promise((res) => setTimeout(res, reduced ? 500 : 1300));
   };
 
@@ -564,12 +564,19 @@
     const k = (t0, dur) => { if (!t0) return 0; const q = (rt - t0) / dur; return q > 0 && q < 1 ? Math.sin(q * Math.PI) : 0; };
     const sh = (t0) => (t0 && rt - t0 < 0.3 ? Math.sin((rt - t0) * 80) * 7 * U * (1 - (rt - t0) / 0.3) : 0);
     const a = B.anim, span = P.fx - P.px;
+    const sm = (q) => q * q * (3 - 2 * q);
+    const lun = (t0) => {
+      if (!t0) return 0;
+      const q = (rt - t0) / 0.4;
+      if (q <= 0 || q >= 1) return 0;
+      return q < 0.15 ? -0.2 * Math.sin((q / 0.15) * Math.PI * 0.5) : q < 0.4 ? -0.2 + 1.2 * ease((q - 0.15) / 0.25) : 1 - sm((q - 0.4) / 0.6);
+    };
     const pd = k(a.pDive, 0.5), fd = k(a.fDive, 0.5);
     return {
-      px: P.px + k(a.pLunge, 0.35) * span * 0.32 + pd * span * 0.8 + sh(a.pHurt) - k(a.pHurt, 0.3) * 12 * U - k(a.pCast, 0.25) * 8 * U,
+      px: P.px + lun(a.pLunge) * span * 0.32 + pd * span * 0.8 + sh(a.pHurt) - k(a.pHurt, 0.3) * 12 * U - k(a.pCast, 0.25) * 8 * U,
       py: P.feet,
       pHop: pd * H * 0.2 + k(a.pCast, 0.25) * 16 * U,
-      fx: P.fx - k(a.fLunge, 0.35) * span * 0.32 - fd * span * 0.8 + sh(a.fHurt) + k(a.fHurt, 0.3) * 12 * U + k(a.fCast, 0.25) * 8 * U,
+      fx: P.fx - lun(a.fLunge) * span * 0.32 - fd * span * 0.8 + sh(a.fHurt) + k(a.fHurt, 0.3) * 12 * U + k(a.fCast, 0.25) * 8 * U,
       fy: P.feet - fd * H * 0.16 - k(a.fCast, 0.25) * 12 * U
     };
   }
@@ -577,7 +584,7 @@
     const a = B.anim;
     let pr = null, fr = null;
     if (B.jinx) {
-      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, hop: pos.pHop, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
+      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, hop: pos.pHop, twirl: show && show.form === "pierrot" && rt - show.t0 > 0.3 && rt - show.t0 < 1.5 ? (rt - show.t0 - 0.3) * 15 : 0, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
     }
     if (B.foe && !(B.over === "win" && rt - a.fDie > 0.8)) {
       c.save();
@@ -590,7 +597,8 @@
         c.scale(1 - k * 0.6, 1 - k * 0.6);
         c.translate(-pos.fx, -(pos.fy - 60 * U));
       }
-      fr = D.drawFoe(B.foe, pos.fx, pos.fy, st, { scale: FOE_SCALE, hurt: main && a.fHurt && rt - a.fHurt < 0.12 });
+      const hk = a.fHurt && rt - a.fHurt < 0.4 ? Math.pow(1 - (rt - a.fHurt) / 0.4, 2) : 0;
+      fr = D.drawFoe(B.foe, pos.fx, pos.fy, st, { scale: FOE_SCALE, tint: main ? JG.ACTS[B.act - 1].tint : null, hurtK: hk, hurt: main && a.fHurt && rt - a.fHurt < 0.12 });
       c.restore();
     }
     if (main) B.screen = { p: pr, f: B.over === "win" ? null : fr };
@@ -1066,6 +1074,17 @@
     const dim = Math.min(1, rel / 0.2) * (rel > 1.6 ? Math.max(0, 1 - (rel - 1.6) / 0.6) : 1);
     c.fillStyle = `rgba(8,2,18,${0.6 * dim})`;
     c.fillRect(0, 0, W, H);
+    if (show.form === "pierrot") {
+      const k = ease((rel - 0.2) / 0.8), mx = W * 0.5, my = lerp(H * 0.75, H * 0.26, k), mr = Math.min(W, H) * 0.2;
+      c.save();
+      c.globalAlpha = dim;
+      X.glow(mx, my, mr * 2.6, "#cfe3ff", 0.35);
+      c.fillStyle = "#f4f8ff";
+      c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "rgba(160,180,220,0.35)";
+      for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(mx + (hash(i) - 0.5) * mr * 1.3, my + (hash(i + 9) - 0.5) * mr * 1.3, mr * (0.08 + hash(i + 4) * 0.12), 0, Math.PI * 2); c.fill(); }
+      c.restore();
+    }
     if (show.form === "harlequin") {
       // a sweep of diamonds
       const off = rel * W * 0.9, s = 54 * U;
@@ -1153,6 +1172,22 @@
         c.restore();
         if (after < 0.9 && Math.random() < 0.7) D.particles.push({ x: Math.random() * W, y: -6, vx: 0, vy: 160 * U, life: 1, kind: "star", color: Math.random() < 0.5 ? "#8fe9ff" : "#ffffff", s: (3 + Math.random() * 4) * U, rot: 0 });
       }
+    }
+    if (show.form === "pierrot" && rel > 0.3 && rel < 1.8) {
+      // ribbons of moonlight spin off the pirouette
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        const q = clamp((rel - 0.3 - i * 0.12) / 0.9, 0, 1), a0 = rel * 9 + i * 2.1;
+        c.strokeStyle = `rgba(207,227,255,${0.7 * (1 - q)})`;
+        c.lineWidth = (10 - i * 2) * U;
+        c.beginPath();
+        c.ellipse(lerp(A.x, T.x, q * q), A.y - A.r * 0.2, A.r * (1.2 + q * 1.6), A.r * (0.35 + q * 0.3), 0, a0, a0 + 3.6);
+        c.stroke();
+      }
+      c.restore();
+      if (Math.random() < 0.5) D.particles.push({ x: A.x + (Math.random() - 0.5) * A.r * 3, y: A.y - A.r * 2.5, vx: 0, vy: 60 * U, life: 1, kind: "drop", color: "#9fc4ff", s: (3 + Math.random() * 3) * U, rot: 0 });
     }
     if (show.form === "harlequin" && rel > 0.35 && rel < 1.5) {
       const q = clamp((rel - 0.35) / 0.75, 0, 1), fly = clamp((rel - 1.1) / 0.2, 0, 1);

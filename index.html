@@ -383,6 +383,37 @@ body[data-mode="map"] #btnQuit, body[data-mode="battle"] #btnQuit { display: inl
   .plate .pn { font-size: 0.95rem; }
 }
 
+/* ---------- polish: curtains between scenes, things that ease in ---------- */
+#curtain { position: absolute; inset: 0; z-index: 45; pointer-events: none; display: flex; overflow: hidden; }
+#curtain i { flex: 1; transform: translateX(-135%);
+  background: repeating-linear-gradient(90deg, #3a0714 0 18px, #8c1a2e 18px 36px, #5a0f1f 36px 54px); box-shadow: inset 0 0 60px rgba(0,0,0,0.6); }
+#curtain i:last-child { transform: translateX(135%); }
+#curtain.open i:first-child { animation: curL 0.7s cubic-bezier(.7, 0, .3, 1) both; }
+#curtain.open i:last-child { animation: curR 0.7s cubic-bezier(.7, 0, .3, 1) both; }
+@keyframes curL { 0%, 12% { transform: translateX(0); } 100% { transform: translateX(-135%) skewX(4deg); } }
+@keyframes curR { 0%, 12% { transform: translateX(0); } 100% { transform: translateX(135%) skewX(-4deg); } }
+#modal:not([hidden]) #modalBody { animation: pop 0.24s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes pop { from { opacity: 0; transform: scale(0.9) rotate(-3deg); } to { opacity: 1; transform: rotate(-0.5deg); } }
+#panel:not([hidden]) { animation: slidein 0.22s cubic-bezier(.3, 1.3, .5, 1) both; }
+@keyframes slidein { from { opacity: 0; translate: 24px 0; } to { opacity: 1; translate: 0 0; } }
+#hand.deal .slot { animation: deal 0.34s cubic-bezier(.3, 1.3, .5, 1) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes deal { from { opacity: 0; translate: 0 60px; rotate: 8deg; } to { opacity: 1; translate: 0 0; rotate: 0deg; } }
+.bar i { transition: width 0.45s cubic-bezier(.3, 1.2, .5, 1); }
+@media (prefers-reduced-motion: reduce) {
+  #curtain.open i, #modal:not([hidden]) #modalBody, #panel:not([hidden]), #hand.deal .slot { animation: none; }
+}
+
+/* ---------- grades, moon lean ---------- */
+.stat { grid-template-columns: 62px 28px 1fr 20px; }
+.stat .gr { font-family: var(--chunk); font-size: 0.7rem; text-align: center; color: var(--ink); background: var(--bone-dim); border: 1.5px solid var(--ink); cursor: help; }
+.stat .gr.g0 { background: #7a7088; } .stat .gr.g1 { background: #b9ad97; } .stat .gr.g2 { background: #efe6d2; } .stat .gr.g3 { background: #8fe9ff; } .stat .gr.g4 { background: #ffd23f; }
+.stat .gr.g5 { background: linear-gradient(135deg, #ff5fa8, #ffd23f, #8fe9ff); }
+.align.moon span:first-child { color: var(--pink); }
+.align.moon span:last-child { color: #cfe3ff; }
+.align.moon .track { background: linear-gradient(90deg, #d62839, #6a4a7a 50%, #f4f8ff); }
+.card .cost.cheap { background: var(--ether); }
+.st-res.pierrot { color: #cfe3ff; border-style: dashed; }
+
 /* ---------- order, answers and weak spots ---------- */
 #hand .slot { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 calc(-1 * clamp(0px, (var(--n, 5) - 5) * 7px, 26px)); transition: transform 0.12s; }
 #hand .slot .card { margin: 0; }
@@ -485,6 +516,8 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
     <nav class="hud-btns" aria-label="Garden">
       <button class="btn big" data-act="bigtop">Big Top</button>
       <button class="btn" data-act="shop">Concession</button>
+      <button class="btn" data-act="college">College</button>
+      <button class="btn ghost" data-act="whistle">Whistle</button>
       <button class="btn ghost" data-act="sky">Sky</button>
       <button class="btn ghost" id="btnSound" data-act="sound" aria-pressed="true">Sound on</button>
     </nav>
@@ -536,6 +569,7 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
     </div>
   </section>
 
+  <div id="curtain" aria-hidden="true"><i></i><i></i></div>
   <div id="modal" hidden><div id="modalBody" class="flyer" role="dialog" aria-modal="true"></div></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div id="grain"></div>

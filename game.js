@@ -174,9 +174,15 @@
       if (!(o && o.v === 1 && Array.isArray(o.jinxes))) return null;
       for (const j of o.jinxes) {
         if (j.stage !== "egg" && !JG.TRAITS[j.trait]) j.trait = pick(Object.keys(JG.TRAITS));
+        if (j.stage !== "egg") {
+          if (j.moon === undefined) j.moon = 0;
+          if (!j.grades) j.grades = rollGrades();
+          if (!Array.isArray(j.learned)) j.learned = [];
+        }
+        j.held = false;
         j.act = null; j.after = null; j.waitFor = null; j.moving = false;
       }
-      return o;
+      return gardenDefaults(o);
     } catch (e) { return null; }
   }
 
@@ -196,8 +202,20 @@
       id: uid++ + "-" + Date.now().toString(36), name: o.name || pick(JG.NAMES), stage: "child",
       hue: o.hue !== undefined ? o.hue : (rand() * 360) | 0, seed: rand() * 10, align: o.align || 0,
       stats: o.stats || blankStats(1, 3), belly: 70, mood: 70, love: 10, age: 0, gen: o.gen || 1, u, v,
-      trait: o.trait || pick(Object.keys(JG.TRAITS))
+      trait: o.trait || pick(Object.keys(JG.TRAITS)), moon: o.moon || 0, grades: o.grades || rollGrades(), learned: [], hat: null
     };
+  }
+  // Aptitude for each stat, E to S. Better grades learn faster. Set at birth; a loved Jinx passes on better ones.
+  const GRADE = ["E", "D", "C", "B", "A", "S"], GRADE_MULT = [0.7, 0.85, 1, 1.15, 1.3, 1.5];
+  function rollGrades(from) {
+    const g = {};
+    for (const s of JG.STATS) {
+      const r = rand();
+      let v = r < 0.12 ? 0 : r < 0.42 ? 1 : r < 0.78 ? 2 : r < 0.94 ? 3 : 4;
+      if (from) v = Math.min(5, Math.max(v, from[s]) + (rand() < 0.45 ? 1 : 0));
+      g[s] = v;
+    }
+    return g;
   }
   function makeEgg(o) {
     o = o || {};
@@ -208,7 +226,14 @@
   function newSave() {
     const first = makeJinx({ name: "Pickles", hue: 320 });
     const egg = makeEgg({ hatch: 30 });
-    return { v: 1, tix: 40, inv: { moonpie: 2, plum: 1, comet: 1 }, jinxes: [first, egg], sky: [], records: { runs: 0, wins: 0, bestAct: 0, hatched: 1 } };
+    return gardenDefaults({ v: 1, tix: 40, inv: { moonpie: 2, plum: 1, comet: 1 }, jinxes: [first, egg], sky: [], records: { runs: 0, wins: 0, bestAct: 0, hatched: 1 } });
+  }
+  function gardenDefaults(s) {
+    if (!Array.isArray(s.ground)) s.ground = [];
+    if (!s.tree || !Array.isArray(s.tree.fruits)) s.tree = { t: 0, fruits: [{ item: "plum", grow: 1, slot: 0 }, { item: "moonpie", grow: 0.5, slot: 2 }] };
+    if (!s.toys) s.toys = {};
+    for (const it of s.ground) it.held = false;
+    return s;
   }
   function demoSave() {
     const s = newSave();
@@ -218,7 +243,11 @@
     const c = makeJinx({ name: "Halley", hue: 260, align: 0.7 });
     c.stage = "adult";
     c.stats.juggle.lv = 14;
-    s.jinxes.push(b, c);
+    const d = makeJinx({ name: "Tinsel", hue: 210, moon: 0.8 });
+    d.stage = "adult";
+    d.stats.tumble.lv = 12;
+    s.jinxes.push(b, c, d);
+    s.toys = { tramp: true, crystal: true };
     s.sky = [{ name: "Bobo", pts: [[0.12, 0.1], [0.17, 0.16], [0.22, 0.12], [0.26, 0.2], [0.2, 0.25]] }];
     return s;
   }
@@ -227,7 +256,7 @@
   function addXp(j, s, n) {
     const st = j.stats[s];
     let ups = 0;
-    st.xp += Math.max(0, Math.round(n));
+    st.xp += Math.max(0, Math.round(n * GRADE_MULT[(j.grades && j.grades[s]) === undefined ? 2 : j.grades[s]]));
     while (st.xp >= need(st.lv) && st.lv < 99) { st.xp -= need(st.lv); st.lv++; ups++; }
     if (st.lv >= 99) st.xp = 0;
     return ups;
@@ -236,8 +265,8 @@
   function formName(j) {
     if (j.stage === "egg") return "Egg";
     const L = D.jinxLook(j);
-    const lean = j.align > 0.33 ? "Stardust" : j.align < -0.33 ? "Sludge" : "Harlequin";
-    if (!L.adult) return `Child, leaning ${j.align > 0.15 ? "Stardust" : j.align < -0.15 ? "Sludge" : "nowhere yet"}`;
+    const lean = j.align > 0.33 ? "Stardust" : j.align < -0.33 ? "Sludge" : (j.moon || 0) >= 0.33 ? "Pierrot" : "Harlequin";
+    if (!L.adult) return `Child, leaning ${j.align > 0.15 ? "Stardust" : j.align < -0.15 ? "Sludge" : (j.moon || 0) > 0.15 ? "Moonlit" : (j.moon || 0) < -0.15 ? "Motley" : "nowhere yet"}`;
     const role = { juggle: "Juggler", tumble: "Tumbler", glow: "Seer", grit: "Strongheart" }[L.best];
     return `${lean} ${role}`;
   }
@@ -280,6 +309,7 @@
     show("#battle", m === "battle");
     show("#runbar", m === "map" || m === "battle");
     document.body.dataset.mode = m;
+    if (!JG.fast) { const cu = $("#curtain"); cu.classList.remove("open"); void cu.offsetWidth; cu.classList.add("open"); }
     D.clear();
     if (m === "garden") { renderHud(); renderPanel(); }
   }
@@ -314,7 +344,7 @@
     }
     const st = JG.STATS.map((s) => {
       const S = j.stats[s], I = JG.STAT_INFO[s];
-      return `<div class="stat"><span class="sl" style="color:${I.color}">${I.label}</span><span class="lv">${S.lv}</span>${bar(S.xp, need(S.lv), I.color)}<span class="sh">${I.hint}</span></div>`;
+      return `<div class="stat"><span class="sl" style="color:${I.color}">${I.label}</span><span class="lv">${S.lv}</span>${bar(S.xp, need(S.lv), I.color)}<span class="gr g${j.grades[s]}" title="Aptitude ${GRADE[j.grades[s]]}: learns ${Math.round(GRADE_MULT[j.grades[s]] * 100)}% as fast as average">${GRADE[j.grades[s]]}</span><span class="sh">${I.hint}</span></div>`;
     }).join("");
     const al = ((j.align + 1) / 2) * 100;
     const inv = Object.keys(G.save.inv).filter((k) => G.save.inv[k] > 0);
@@ -324,9 +354,15 @@
     const nameHtml = renaming
       ? `<input id="renameBox" maxlength="14" value="${esc(j.name)}" aria-label="New name">`
       : `<h2>${esc(j.name)}</h2>`;
-    p.innerHTML = `<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">×</button></div>
-      <p class="tag">${formName(j)} · show ${j.age} of 12${j.gen > 1 ? " · generation " + j.gen : ""}</p>
-      ${ringHtml(j)}
+    p.innerHTML = `<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">\u00D7</button></div>
+      <p class="tag">${formName(j)} \u00B7 show ${j.age} of 12${j.gen > 1 ? " \u00B7 generation " + j.gen : ""}</p>
+      <div class="row">
+        <button class="btn small" data-act="pet">Pet</button>
+        <button class="btn small${feedOpen ? " on" : ""}" data-act="feed" aria-expanded="${feedOpen}">Feed</button>
+        <button class="btn small ghost" data-act="rename">${renaming ? "Save name" : "Rename"}</button>
+      </div>
+      ${feed}
+      <button class="btn big" data-act="run">Take ${esc(j.name)} to the Big Top</button>
       <div class="needs">
         <div><span>Belly</span>${bar(j.belly, 100, "#ffb36b")}</div>
         <div><span>Mood</span>${bar(j.mood, 100, "#ff5fa8")}</div>
@@ -334,13 +370,8 @@
       </div>
       <div class="stats">${st}</div>
       <div class="align"><span>Sludge</span><span class="track"><i style="left:${al}%"></i></span><span>Stardust</span></div>
-      <div class="row">
-        <button class="btn small" data-act="pet">Pet</button>
-        <button class="btn small${feedOpen ? " on" : ""}" data-act="feed" aria-expanded="${feedOpen}">Feed</button>
-        <button class="btn small ghost" data-act="rename">${renaming ? "Save name" : "Rename"}</button>
-      </div>
-      ${feed}
-      <button class="btn big" data-act="run">Take ${esc(j.name)} to the Big Top</button>`;
+      <div class="align moon" title="Only matters for a Jinx that stays between Sludge and Stardust: Motley grows into a Harlequin, Moonlit into a Pierrot"><span>Motley</span><span class="track"><i style="left:${(((j.moon || 0) + 1) / 2) * 100}%"></i></span><span>Moonlit</span></div>
+      ${ringHtml(j)}`;
     if (renaming) {
       const box = $("#renameBox");
       box.focus();
@@ -354,7 +385,7 @@
     const mood = j.mood < 35 ? " Mood is low, so they might phone it in." : "";
     return `<div class="ring"><p><b>${T ? esc(T.name) : ""}.</b> ${T ? esc(T.desc) : ""}</p>
       <p><b style="color:${F.color}">${F.name} in the ring.</b> ${esc(F.desc)} Showstopper: ${esc(F.show)}.</p>
-      <p class="note">With this much Love they improvise ${imp}.${mood}</p></div>`;
+      <p class="note">With this much Love they improvise ${imp}.${mood}${(j.learned || []).length ? " Learned at college: " + j.learned.map((id) => esc(JG.CARDS[id].name)).join(", ") + "." : ""}</p></div>`;
   }
   function finishRename() {
     const j = jinxById(G.selected), box = $("#renameBox");
@@ -399,15 +430,18 @@
     persist();
     renderPanel();
   }
-  function feedJinx(j, id) {
+  function feedJinx(j, id, ground) {
     const it = JG.ITEMS[id];
-    if (!it || !(G.save.inv[id] > 0)) return;
+    if (!it) return;
+    if (ground ? !G.save.ground.includes(ground) : !(G.save.inv[id] > 0)) return;
     if (it.belly > 0 && j.belly >= 97) { toast(`${j.name} is too full to eat.`); return; }
-    G.save.inv[id]--;
+    if (ground) G.save.ground.splice(G.save.ground.indexOf(ground), 1);
+    else G.save.inv[id]--;
     j.belly = clamp(j.belly + (it.belly || 0), 0, 100);
     j.mood = clamp(j.mood + (it.mood || 4), 0, 100);
     j.love = clamp(j.love + (it.love || 2), 0, 100);
     if (it.align) j.align = clamp(j.align + it.align, -1, 1);
+    if (it.moon) j.moon = clamp((j.moon || 0) + it.moon, -1, 1);
     const ups = [];
     for (const s in it.xp || {}) if (addXp(j, s, it.xp[s])) ups.push(JG.STAT_INFO[s].label);
     j.happyT = 1.4;
@@ -421,6 +455,7 @@
 
   function gardenStep(dt) {
     petCool -= dt;
+    treeStep(dt);
     for (const j of G.save.jinxes.slice()) {
       if (j.stage === "egg") {
         if (G.demo) continue;
@@ -435,11 +470,17 @@
       j.belly = clamp(j.belly - dt / 25, 0, 100);
       if (j.belly < 25) j.mood = clamp(j.mood - dt / 20, 0, 100);
       else if (j.mood < 55) j.mood = clamp(j.mood + dt / 40, 0, 100);
+      // turn like a paper cut-out, and ease in and out of a walk
+      const face0 = j.face === undefined ? j.dir || 1 : j.face;
+      j.face = face0 + ((j.dir || 1) - face0) * Math.min(1, dt * 9);
+      j.pace = (j.pace || 0) + ((j.moving ? 1 : 0) - (j.pace || 0)) * Math.min(1, dt * 5);
+      j.hurry = Math.max(0, (j.hurry || 0) - dt);
+      if (j.held) continue;
       if (G.selected === j.id) { j.moving = false; j.act = null; j.after = null; continue; }
       if (j.act) { activity(j, dt); continue; }
       if (j.moving) {
         const dx = j.tx - j.u, dy = j.ty - j.v, d = Math.hypot(dx, dy);
-        const sp = 0.1 * (j.stage === "adult" ? 1.15 : 0.9) * (j.mood < 30 ? 0.5 : 1);
+        const sp = 0.1 * (j.stage === "adult" ? 1.15 : 0.9) * (j.mood < 30 ? 0.5 : 1) * (j.hurry > 0 ? 2.4 : 1) * (0.25 + 0.75 * j.pace) * Math.min(1, 0.35 + d / 0.1);
         if (d < 0.02) {
           j.moving = false;
           j.idle = 1.5 + rand() * 5;
@@ -456,12 +497,20 @@
           const r = rand();
           j.sleep = false;
           j.waitFor = null;
-          if (r < 0.14) { j.hopT = 1; j.idle = 1.2; sfx("bell"); }
-          else if (r < 0.22 && j.mood > 40) { j.spinT = 1; j.idle = 1.4; }
-          else if (r < 0.3 && (j.mood < 40 || j.belly < 30)) { j.sleep = true; j.idle = 6; }
-          else if (r < 0.42) goDo(j, "tv", -0.6 + rand() * 0.14, 0.4 + rand() * 0.12);
-          else if (r < 0.54) goDo(j, "pond", 0.42 + rand() * 0.06, 0.44 + rand() * 0.12);
-          else if (r < 0.7 && findBuddy(j)) { /* off to play */ }
+          const sv = G.save, toys = Object.keys(sv.toys || {}).filter((id) => sv.toys[id]);
+          if (j.belly < 60 && sv.ground && sv.ground.length && rand() < 0.75) {
+            // hungry: go and eat something off the grass
+            const it = pick(sv.ground);
+            j.eatId = it.id;
+            goDo(j, "eat", clamp(it.u - 0.07, -0.85, 0.85), it.v);
+          }
+          else if (r < 0.1) { j.hopT = 1; j.idle = 1.2; sfx("bell"); }
+          else if (r < 0.16 && j.mood > 40) { j.spinT = 1; j.idle = 1.4; }
+          else if (r < 0.23 && (j.mood < 40 || j.belly < 30)) { j.sleep = true; j.idle = 6; }
+          else if (r < 0.33) goDo(j, "tv", -0.6 + rand() * 0.14, 0.4 + rand() * 0.12);
+          else if (r < 0.43) goDo(j, "pond", 0.42 + rand() * 0.06, 0.44 + rand() * 0.12);
+          else if (r < 0.62 && toys.length) { const id = pick(toys); j.toy = id; goDo(j, "toy", clamp(JG.TOYS[id].u + 0.11, -0.85, 0.85), JG.TOYS[id].v + 0.03); }
+          else if (r < 0.76 && findBuddy(j)) { /* off to play */ }
           else { const [u, v] = spot(); j.tx = u; j.ty = v; j.moving = true; }
         }
       }
@@ -500,7 +549,11 @@
       b.waitFor = null;
       j.act = { kind: "play", t: 6, buddy: b.id, beat: 0 };
       j.dir = 1;
-    } else j.act = { kind, t: 6 + rand() * 5, beat: 0 };
+    } else if (kind === "eat") {
+      const it = G.save.ground.find((g) => g.id === j.eatId);
+      if (it) feedJinx(j, it.item, it);
+    } else if (kind === "toy") j.act = { kind, toy: j.toy, t: 7 + rand() * 4, beat: 0.4 };
+    else j.act = { kind, t: 6 + rand() * 5, beat: 0 };
   }
   function activity(j, dt) {
     const a = j.act;
@@ -520,6 +573,19 @@
         const [px, py] = D.toScreen(0.66, 0.47);
         D.burst(px, py, "drop", 7, "#b6ff5c");
       }
+    } else if (a.kind === "toy") {
+      const T = JG.TOYS[a.toy];
+      j.dir = T.u > j.u ? 1 : -1;
+      G.toyUse = G.toyUse || {};
+      G.toyUse[a.toy] = G.t;
+      if (a.beat <= 0) {
+        // a little practice at a time adds up
+        a.beat = 1.4;
+        if (a.toy === "tramp") j.hopT = 1;
+        j.happyT = 0.6;
+        if (addXp(j, T.stat, 1)) { toast(`${j.name}'s ${JG.STAT_INFO[T.stat].label} went up from practice!`); sfx("buff"); }
+        D.burst(x, y - 34, "star", 2, JG.STAT_INFO[T.stat].color);
+      }
     } else if (a.kind === "play") {
       const b = jinxById(a.buddy);
       if (!b || !b.act || b.id === G.selected) a.t = 0;
@@ -536,7 +602,7 @@
 
   function hatchEgg(e) {
     const inh = e.inherit;
-    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined });
+    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, moon: inh ? inh.moon : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined, grades: inh && inh.grades ? rollGrades(inh.grades) : undefined });
     if (inh) for (const s of JG.STATS) j.stats[s].lv = Math.max(j.stats[s].lv, inh.stats[s]);
     j.u = e.u; j.v = e.v; j.love = inh ? 30 : 10;
     const i = G.save.jinxes.indexOf(e);
@@ -552,34 +618,155 @@
     renderPanel();
   }
 
+  // ---- pointer: tap to pet or pick, drag to carry ----
+  let drag = null;
+  const scenePos = (e) => { const r = $("#scene").getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  function hitAt(x, y, kind) {
+    let best = null, bd = 1e9;
+    for (const h of G.hits) {
+      if (kind && h.kind !== kind) continue;
+      const d = Math.hypot(h.x - x, h.y - y) - (h.kind === "jinx" ? 8 : h.kind === "item" ? 4 : 0);
+      if (d < h.r * (h.kind === "jinx" ? 1.5 : 1.15) && d < bd) { bd = d; best = h; }
+    }
+    return best;
+  }
+  function deselect() { if (G.selected) { G.selected = null; feedOpen = false; renaming = false; renderPanel(); } }
   $("#scene").addEventListener("pointermove", (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    G.pointer = [e.clientX - r.left, e.clientY - r.top];
+    const [x, y] = scenePos(e);
+    G.pointer = [x, y];
+    if (!drag || G.mode !== "garden") return;
+    if (!drag.moved && Math.hypot(x - drag.sx, y - drag.sy) > 10) {
+      if (drag.j && drag.j.stage === "egg") return;
+      drag.moved = true;
+      if (drag.j) {
+        const j = drag.j;
+        Object.assign(j, { held: true, act: null, after: null, moving: false, sleep: false });
+        if (G.selected === j.id) deselect();
+        sfx("honk");
+      } else drag.it.held = true;
+    }
+    if (drag.moved) {
+      const o = drag.j || drag.it, [u, v] = D.fromScreen(x, y + (drag.j ? 30 : 14));
+      o.u = u;
+      o.v = v;
+    }
   });
   $("#scene").addEventListener("pointerleave", () => { G.pointer = null; });
   $("#scene").addEventListener("pointerdown", (e) => {
     if (G.mode !== "garden") return;
     A.init();
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
-    let best = null, bd = 1e9;
-    for (const h of G.hits) {
-      const d = Math.hypot(h.x - x, h.y - y);
-      if (d < h.r * 1.6 && d < bd) { bd = d; best = h; }
+    const [x, y] = scenePos(e);
+    const h = hitAt(x, y);
+    if (!h) { deselect(); return; }
+    if (h.kind === "tree") { shakeTree(); return; }
+    if (h.kind === "toy") { const T = JG.TOYS[h.id]; toast(`${T.name}. ${T.desc}`); return; }
+    drag = { j: h.j, it: h.it, sx: x, sy: y, moved: false, h };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+  });
+  const endDrag = (e) => {
+    if (!drag) return;
+    const d = drag, [x, y] = scenePos(e);
+    drag = null;
+    if (!d.moved) tapThing(d);
+    else dropThing(d, x, y);
+  };
+  $("#scene").addEventListener("pointerup", endDrag);
+  $("#scene").addEventListener("pointercancel", endDrag);
+  function tapThing(d) {
+    if (d.it) {
+      // pick a snack up off the grass
+      const s = G.save, k = s.ground.indexOf(d.it);
+      if (k < 0) return;
+      s.ground.splice(k, 1);
+      s.inv[d.it.item] = (s.inv[d.it.item] || 0) + 1;
+      sfx("coin");
+      toast(`${JG.ITEMS[d.it.item].name} goes in the pantry. Drag snacks onto a Jinx to feed them straight away.`);
+      persist();
+      renderPanel();
+      return;
     }
-    if (!best) { if (G.selected) { G.selected = null; feedOpen = false; renaming = false; renderPanel(); } return; }
-    const j = best.j;
+    const j = d.j;
     if (j.stage === "egg") {
       j.hatch = Math.max(0.01, j.hatch - 3);
       j.wobble = 1;
       sfx("bell");
-      D.burst(best.x, best.y, "star", 4, "#ffd23f");
+      D.burst(d.h.x, d.h.y, "star", 4, "#ffd23f");
     } else if (G.selected === j.id) { petJinx(j); return; }
     else sfx("honk");
     if (G.selected !== j.id) { feedOpen = false; renaming = false; }
     G.selected = j.id;
     renderPanel();
-  });
+  }
+  function dropThing(d, x, y) {
+    const s = G.save;
+    if (d.it) {
+      d.it.held = false;
+      const h = hitAt(x, y - 20, "jinx");
+      if (h && h.j.stage !== "egg") feedJinx(h.j, d.it.item, d.it);
+      persist();
+      return;
+    }
+    const j = d.j;
+    j.held = false;
+    j.hopT = 1;
+    j.idle = 2;
+    sfx("bell");
+    const near = (u, v, rad) => Math.hypot(j.u - u, j.v - v) < rad;
+    const toy = Object.keys(s.toys || {}).find((id) => s.toys[id] && near(JG.TOYS[id].u, JG.TOYS[id].v, 0.22));
+    const pal = s.jinxes.find((o) => o !== j && o.stage !== "egg" && !o.held && near(o.u, o.v, 0.2));
+    const snack = s.ground.find((it) => near(it.u, it.v, 0.14));
+    if (near(0.66, 0.47, 0.26)) { j.u = 0.44; j.v = 0.48; j.act = { kind: "pond", t: 8, beat: 0.4 }; }
+    else if (near(-0.81, 0.36, 0.28)) { j.u = -0.6; j.v = 0.43; j.act = { kind: "tv", t: 9, beat: 0.6 }; }
+    else if (toy) { j.u = clamp(JG.TOYS[toy].u + 0.11, -0.85, 0.85); j.v = JG.TOYS[toy].v + 0.03; j.act = { kind: "toy", toy, t: 9, beat: 0.5 }; }
+    else if (snack) feedJinx(j, snack.item, snack);
+    else if (pal) {
+      Object.assign(pal, { moving: false, after: null, sleep: false, dir: j.u < pal.u ? -1 : 1, act: { kind: "play", t: 6, buddy: j.id, beat: 0.35 } });
+      j.dir = j.u < pal.u ? 1 : -1;
+      j.act = { kind: "play", t: 6, buddy: pal.id, beat: 0 };
+    }
+    persist();
+  }
+
+  // ---- the snack tree ----
+  function shakeTree() {
+    const s = G.save, tr = s.tree;
+    tr.shake = 0.7;
+    sfx("card");
+    const ripe = tr.fruits.filter((f) => f.grow >= 1);
+    if (!ripe.length) { toast(tr.fruits.length ? "Nothing's ripe yet. Give it a little while." : "The tree is bare. Snacks grow back in time."); return; }
+    const [tx, ty] = D.toScreen(JG.TREE.u, JG.TREE.v);
+    for (const f of ripe) {
+      if (s.ground.length >= 8) { toast("There's no room on the grass. Pick some snacks up first."); break; }
+      tr.fruits.splice(tr.fruits.indexOf(f), 1);
+      s.ground.push({ id: "g" + uid++, item: f.item, u: clamp(JG.TREE.u - 0.2 + rand() * 0.3, -0.85, 0.85), v: JG.TREE.v + 0.2 + rand() * 0.2 });
+      D.burst(tx, ty - 60, "star", 5, JG.ITEMS[f.item].color);
+    }
+    sfx("coin");
+    persist();
+  }
+  function treeStep(dt) {
+    const tr = G.save.tree;
+    if (!tr) return;
+    tr.shake = Math.max(0, (tr.shake || 0) - dt);
+    tr.t = (tr.t || 0) + dt;
+    for (const f of tr.fruits) f.grow = Math.min(1, f.grow + dt / 22);
+    if (tr.t > 32 && tr.fruits.length < 4) {
+      tr.t = 0;
+      const slot = [0, 1, 2, 3].find((k) => !tr.fruits.some((f) => f.slot === k));
+      tr.fruits.push({ item: pick(JG.TREE.items), grow: 0, slot });
+    }
+  }
+  function whistle() {
+    sfx("bell");
+    setTimeout(() => sfx("bell"), 140);
+    let i = 0;
+    for (const j of G.save.jinxes) {
+      if (j.stage === "egg" || j.held) continue;
+      Object.assign(j, { act: null, after: null, sleep: false, moving: true, happyT: 1.4, hurry: 4, tx: clamp(-0.3 + i * 0.2, -0.8, 0.8), ty: 0.34 + (i % 2) * 0.16 });
+      i++;
+    }
+    toast(i ? "Everyone, over here!" : "Nobody's hatched yet.");
+  }
 
   function openShop() {
     const s = G.save;
@@ -591,8 +778,22 @@
     modal(`<h2>Concession Stand</h2><p class="tag">You have <b class="tixnum">${s.tix}</b> Tix. Snacks go in the pantry.</p>
       <div class="shoplist">${rows}
       <div class="shoprow"><div><span class="glyph" style="color:#ffd23f">⬮</span>A mystery egg<small>${full ? "The garden is full (6 at most)." : "Something wriggles inside."}</small></div><span class="have"></span><button class="btn small" data-act="egg" ${s.tix < 80 || full ? "disabled" : ""}>80 Tix</button></div>
-      </div><button class="btn" data-act="close">Done</button>`, {
+      </div>
+      <h3>Toys for the garden</h3>
+      <div class="shoplist">${Object.keys(JG.TOYS).map((id) => { const T = JG.TOYS[id], own = s.toys[id]; return `<div class="shoprow"><div><span class="glyph" style="color:${JG.STAT_INFO[T.stat].color}">✦</span>${T.name}<small>${T.desc}</small></div><span class="have">${own ? "in the garden" : ""}</span><button class="btn small" data-act="toy" data-id="${id}" ${own || s.tix < T.price ? "disabled" : ""}>${own ? "Owned" : T.price + " Tix"}</button></div>`; }).join("")}</div>
+      <button class="btn" data-act="close">Done</button>`, {
       close: closeModal,
+      toy: (b) => {
+        const T = JG.TOYS[b.dataset.id];
+        if (s.toys[b.dataset.id] || s.tix < T.price) return;
+        s.tix -= T.price;
+        s.toys[b.dataset.id] = true;
+        sfx("coin");
+        persist();
+        renderHud();
+        closeModal();
+        toast(`The ${T.name.toLowerCase()} is set up. Jinxes will wander over, or you can carry one there.`);
+      },
       buy: (b) => {
         const id = b.dataset.item, it = JG.ITEMS[id];
         if (s.tix < it.price) return;
@@ -617,6 +818,42 @@
       }
     });
   }
+  // ---- Clown College: a Jinx keeps what it learns and brings it on every run ----
+  function openCollege() {
+    const j = jinxById(G.selected), s = G.save;
+    if (!j || j.stage === "egg") { toast("Tap a Jinx first to pick who goes to class."); return; }
+    const r = D.rng(1000 + s.records.runs * 7 + s.records.hatched);
+    const pool = Object.keys(JG.CARDS).filter((id) => [1, 2].includes(JG.CARDS[id].rarity) && !JG.CARDS[id].exhaust);
+    const offers = [];
+    while (offers.length < 3) { const id = pool[(r() * pool.length) | 0]; if (!offers.includes(id)) offers.push(id); }
+    const knows = (j.learned || []).map((id) => JG.CARDS[id].name);
+    const price = (id) => (JG.CARDS[id].rarity === 1 ? 45 : 75);
+    modal(`<p class="eyebrow">Clown College</p><h2>What should ${esc(j.name)} study?</h2>
+      <p>A Jinx brings every trick it has learned on every run, on top of its usual deck. It can keep 2 lessons${knows.length >= 2 ? `, so a new one replaces <b>${esc(knows[0])}</b>` : ""}. Today's classes change after each show.</p>
+      <p class="tag">${esc(j.name)} knows: ${knows.length ? esc(knows.join(", ")) : "nothing yet"} \u00B7 you have <b class="tixnum">${s.tix}</b> Tix</p>
+      <div class="cardgrid three">${offers.map((id) => cardHtml(id, { act: "learn", price: price(id), disabled: s.tix < price(id) || knows.includes(JG.CARDS[id].name) }).replace('data-act="learn"', `data-act="learn" data-id="${id}"`)).join("")}</div>
+      <button class="btn ghost" data-act="close">Not today</button>`, {
+      close: closeModal,
+      learn: (b) => {
+        const id = b.dataset.id;
+        if (s.tix < price(id)) return;
+        s.tix -= price(id);
+        j.learned = j.learned || [];
+        if (j.learned.length >= 2) j.learned.shift();
+        j.learned.push(id);
+        j.happyT = 2;
+        j.hopT = 1;
+        const [x, y] = jinxScreen(j);
+        D.burst(x, y - 30, "star", 16, "#ffd23f");
+        sfx("hatch");
+        persist();
+        renderHud();
+        renderPanel();
+        closeModal();
+        toast(`${j.name} learned ${JG.CARDS[id].name}!`);
+      }
+    }, { wide: true });
+  }
   function openSky() {
     const s = G.save, r = s.records;
     const list = s.sky.length
@@ -625,7 +862,9 @@
     modal(`<h2>The Sky</h2><p class="tag">Shows: ${r.runs} · full wins: ${r.wins} · furthest act: ${r.bestAct || "none yet"} · hatched: ${r.hatched}</p>${list}
       <h3>How it works</h3>
       <ul class="howto">
-        <li>Tap a Jinx to see it. Tap again to pet it.</li>
+        <li>Tap a Jinx to see it. Tap again to pet it. Drag one to carry it: drop it by the pond, the TV, a toy, a snack or a friend.</li>
+        <li>Tap the candy-floss tree to shake down ripe snacks. Tap a snack to put it in the pantry, or drag it onto a Jinx. A hungry Jinx will find snacks on its own.</li>
+        <li>Toys from the Concession stand train a stat a little at a time. Clown College teaches a Jinx a trick it brings on every run.</li>
         <li>Food raises stats. Cotton Comets and Angel Floss lean a Jinx toward Stardust; Sludge Pops and Black Hole Gum lean it toward Sludge.</li>
         <li>After 3 shows a child grows up. How it leans, and its best stat, decide what it becomes.</li>
         <li>On a run, the cards you play train the matching stat: attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.</li>
@@ -635,7 +874,9 @@
         <li>Foes can be weak to Attacks, Ether or Sludge, or shrug one of them off. Play 3 different kinds of card in a turn for a Hat Trick: 1 extra energy next turn.</li>
         <li>In a fight, the crowd's Applause fills as you play a mix of cards and avoid hits. When it's full, use your Showstopper.</li>
         <li>Each Jinx has a trait, and the more Love it has, the more often it improvises a free move. A sad Jinx sometimes phones it in.</li>
-        <li>How a Jinx leans changes how it fights: Sludge builds Corruption, Stardust builds Starlight, and Harlequins get a Wild card every turn.</li>
+        <li>How a Jinx leans changes how it fights: Sludge builds Corruption, Stardust builds Starlight, Harlequins get a Wild card every turn, and Pierrots can hold two cards and play held cards for 1 less.</li>
+        <li>A Jinx that stays between Sludge and Stardust grows into a Harlequin, or into a Pierrot if it leans Moonlit. Moon Pies and Paper Moons lean Moonlit; Motley Jawbreakers lean the other way.</li>
+        <li>The letter beside each stat is aptitude, E up to S. Better grades learn faster. An egg left by a loved Jinx often has better grades.</li>
         <li>If your Jinx faints, it comes home sad with less of what it learned and only one thing from its bag.</li>
       </ul>
       <button class="btn" data-act="close">Back</button>`, { close: closeModal });
@@ -658,7 +899,8 @@
   function maxHpFor(j, charms) { return JG.TUNE.baseHp + j.stats.grit.lv * 2 + (charms.includes("heart") ? 12 : 0); }
   function starterDeck(j) {
     const d = ["pie", "pie", "pie", "pie", "cart", "cart", "cart", "cart"];
-    d.push(j.align > 0.33 ? "halohum" : j.align < -0.33 ? "gunkspit" : "honk");
+    d.push({ stardust: "halohum", sludge: "gunkspit", pierrot: "tear", harlequin: "honk" }[leanForm(j)]);
+    for (const id of j.learned || []) if (JG.CARDS[id]) d.push(id);
     if (j.stage === "adult") {
       const best = D.jinxLook(j).best;
       d.push({ juggle: "juggle", tumble: "backflip", glow: "moonbeam", grit: "bath" }[best]);
@@ -684,6 +926,7 @@
     enterMap();
   }
   const runJinx = () => jinxById(G.run.jid);
+  const cardJinx = () => (G.run ? runJinx() : jinxById(G.selected) || G.save.jinxes.find((j) => j.stage !== "egg"));
 
   function genMap(act) {
     const floors = [];
@@ -832,7 +1075,7 @@
   }
   function dmgValue(base, B, type) {
     // shown and dealt damage per hit, from the player's point of view
-    const j = B ? B.jinx : runJinx();
+    const j = B ? B.jinx : cardJinx();
     let d = base + bonuses(j).atk + (B ? B.p.st.hype || 0 : 0);
     if (B && B.p.st.dazed) d *= 0.75;
     if (B && B.foe.st.pied) d *= 1.5;
@@ -867,7 +1110,7 @@
     return p.join(", ");
   }
   function cardText(id, B) {
-    const c = JG.CARDS[id], fx = effFx(c, B), j = B ? B.jinx : runJinx(), bo = bonuses(j);
+    const c = JG.CARDS[id], fx = effFx(c, B), j = B ? B.jinx : cardJinx(), bo = bonuses(j);
     const p = [];
     if (fx.selfdmg) p.push(`Lose ${fx.selfdmg} health.`);
     if (fx.dmg) p.push(`Deal ${dmgValue(fx.dmg, B, c.type)}${fx.hits > 1 ? ` ×${fx.hits}` : ""}.`);
@@ -893,7 +1136,7 @@
     const k = comboOf(c, o.B), live = k && k.on && !!o.B;
     const bonus = k ? `<span class="cbonus${live ? " on" : ""}">${live ? "\u2605 " : ""}${k.label}: ${bonusText(k.fx)}</span>` : "";
     return `<button class="card t-${c.type}${o.dim ? " dim" : ""}${o.wild ? " wild" : ""}${live ? " ready" : ""}" style="--tc:${T.color}" ${o.act ? `data-act="${o.act}"` : ""} ${o.i !== undefined ? `data-i="${o.i}"` : ""} ${o.disabled ? "disabled" : ""}>
-      ${o.wild ? `<span class="wildtag">Wild \u00D72</span>` : ""}<span class="cost">${c.cost}</span><span class="cname">${esc(c.name)}</span><span class="cart">${T.glyph}</span>
+      ${o.wild ? `<span class="wildtag">Wild \u00D72</span>` : ""}<span class="cost${o.cost !== undefined && o.cost < c.cost ? " cheap" : ""}">${o.cost !== undefined ? o.cost : c.cost}</span><span class="cname">${esc(c.name)}</span><span class="cart">${T.glyph}</span>
       <span class="ctext">${cardText(id, o.B)}</span>${bonus}<span class="ctype">${T.label} · ${rar}${o.price ? ` · <b>${o.price} Tix</b>` : ""}</span></button>`;
   }
   function rewardCards(kind) {
@@ -903,6 +1146,7 @@
       const c = JG.CARDS[id];
       let w = [0, 6, 3, 1][c.rarity] * (kind === "boss" && c.rarity === 3 ? 6 : 1) * (kind === "elite" && c.rarity >= 2 ? 2 : 1);
       if (c.type === "eth") w *= 1 + Math.max(0, j.align) * 2;
+      if ((c.type === "trick" || c.type === "blk") && leanForm(j) === "pierrot") w *= 1.7;
       if (c.type === "gunk") w *= 1 + Math.max(0, -j.align) * 2;
       return w;
     };
@@ -920,7 +1164,13 @@
   // ---------- battle ----------
   // Three layers sit on top of the card play:
   // Applause (the crowd), the Jinx's own will (love, mood and trait), and a mechanic per lean (form).
-  function leanForm(j) { return j.align <= -0.33 ? "sludge" : j.align >= 0.33 ? "stardust" : "harlequin"; }
+  function leanForm(j) { return j.align <= -0.33 ? "sludge" : j.align >= 0.33 ? "stardust" : (j.moon || 0) >= 0.33 ? "pierrot" : "harlequin"; }
+  // A Pierrot may hold two cards, and a card it held costs 1 less.
+  const maxHold = (B) => (B.form === "pierrot" ? 2 : 1);
+  function costOf(card, B) {
+    const c = JG.CARDS[card.id].cost;
+    return B && B.form === "pierrot" && (B.kept || []).includes(card.u) ? Math.max(0, c - 1) : c;
+  }
   JG.leanForm = leanForm;
   const scr = (k) => (G.B && G.B.screen && G.B.screen[k]) || { x: 0, y: 0 };
   const runLove = () => (G.run.loveStart === undefined ? runJinx().love : G.run.loveStart);
@@ -1029,6 +1279,11 @@
     B.wild = B.form === "harlequin" && B.hand.length ? pick(B.hand).u : null;
     B.busy = false;
     renderBattle();
+    const hd = $("#hand");
+    hd.classList.remove("deal");
+    void hd.offsetWidth;
+    hd.classList.add("deal");
+    setTimeout(() => hd.classList.remove("deal"), 700);
   }
   function statusHtml(st, block) {
     const out = [];
@@ -1043,6 +1298,7 @@
   function resHtml(B) {
     if (B.form === "sludge") return `<span class="st st-res sludge" title="${esc(JG.FORMS.sludge.desc)}">☣ Corruption ${B.res}${B.res >= 6 ? " · hits add Gunk" : ""}</span>`;
     if (B.form === "stardust") return `<span class="st st-res stardust" title="${esc(JG.FORMS.stardust.desc)}">☾ Starlight ${B.res}/5</span>`;
+    if (B.form === "pierrot") return `<span class="st st-res pierrot" title="${esc(JG.FORMS.pierrot.desc)}">☾ Holds 2 · held cards cost 1 less</span>`;
     return `<span class="st st-res harlequin" title="${esc(JG.FORMS.harlequin.desc)}">♠ One Wild card each turn</span>`;
   }
   function foeHitValue(base) {
@@ -1089,7 +1345,11 @@
     $("#energy").innerHTML = `<b>${B.p.energy}</b><small>energy</small>`;
     $("#pileDraw").textContent = `Draw ${B.draw.length}`;
     $("#pileDisc").textContent = `Used ${B.disc.length}`;
-    $("#hand").innerHTML = B.hand.map((c, i) => `<span class="slot${c.u === B.hold ? " held" : ""}">${cardHtml(c.id, { i, act: "play", B, wild: c.u === B.wild, dim: JG.CARDS[c.id].cost > B.p.energy, disabled: B.busy || !!B.over })}<button class="holdtab" data-hold="${i}" ${B.busy || B.over ? "disabled" : ""} aria-pressed="${c.u === B.hold}" title="Hold this card: it stays in your hand for next turn instead of a new draw">${c.u === B.hold ? "Held" : "Hold"}</button></span>`).join("");
+    const holds = B.holds || [];
+    $("#hand").innerHTML = B.hand.map((c, i) => {
+      const held = holds.includes(c.u), cost = costOf(c, B);
+      return `<span class="slot${held ? " held" : ""}" style="--i:${i}">${cardHtml(c.id, { i, act: "play", B, cost, wild: c.u === B.wild, dim: cost > B.p.energy, disabled: B.busy || !!B.over })}<button class="holdtab" data-hold="${i}" ${B.busy || B.over ? "disabled" : ""} aria-pressed="${held}" title="Hold this card: it stays in your hand for next turn instead of a new draw">${held ? "Held" : "Hold"}</button></span>`;
+    }).join("");
     $("#hand").style.setProperty("--n", B.hand.length);
     B.crowdY = $("#hand").getBoundingClientRect().top + 30;
     const full = B.applause >= 100;
@@ -1115,7 +1375,10 @@
   function toggleHold(i) {
     const B = G.B;
     if (!B || B.busy || B.over || !B.hand[i]) return;
-    B.hold = B.hold === B.hand[i].u ? null : B.hand[i].u;
+    const u = B.hand[i].u;
+    B.holds = B.holds || [];
+    if (B.holds.includes(u)) B.holds = B.holds.filter((x) => x !== u);
+    else { B.holds.push(u); while (B.holds.length > maxHold(B)) B.holds.shift(); }
     sfx("card");
     renderBattle();
   }
@@ -1141,13 +1404,15 @@
     const card = B.hand[i];
     if (!card) return;
     const c = JG.CARDS[card.id];
-    if (c.cost > B.p.energy) { toast("Not enough energy. End your turn to get more."); return; }
+    const cost = costOf(card, B);
+    if (cost > B.p.energy) { toast("Not enough energy. End your turn to get more."); return; }
     const j = B.jinx;
     const half = rand() < flubChance();
     const wild = card.u === B.wild;
     const combo = comboOf(c, B), fx0 = effFx(c, B);   // worked out before this card counts as played
     B.busy = true;
-    B.p.energy -= c.cost;
+    B.p.energy -= cost;
+    if (B.holds) B.holds = B.holds.filter((x) => x !== card.u);
     B.hand.splice(i, 1);
     (c.exhaust ? B.exh : B.disc).push(card);
     if (wild) B.wild = null;
@@ -1395,6 +1660,17 @@
       delete B.p.st.dazed; delete B.p.st.pied; delete B.p.st.gunk;
       sfx("heal");
       B.res = 0;
+    } else if (B.form === "pierrot") {
+      for (let h = 0; h < 3; h++) {
+        hurtFoe(dmgValue(5, B, null) + bo.atk, false, true);
+        if (B.over) return;
+        await sleep(160);
+      }
+      addFoeSt("dazed", 2);
+      B.p.block += 10 + bo.blk;
+      D.float(pp.x, pp.y - 30, `◆ ${10 + bo.blk}`, "#ffd23f");
+      D.fx.guard("p");
+      sfx("block");
     } else {
       B.disc.push(...B.hand);
       B.hand = [];
@@ -1414,10 +1690,12 @@
     if (!B || B.busy || B.over) return;
     B.busy = true;
     if (!B.played) addApplause(-10, "The crowd yawns…");
-    const kept = B.hand.filter((c) => c.u === B.hold);
-    B.disc.push(...B.hand.filter((c) => c.u !== B.hold));
+    const holds = B.holds || [];
+    const kept = B.hand.filter((c) => holds.includes(c.u));
+    B.disc.push(...B.hand.filter((c) => !holds.includes(c.u)));
     B.hand = kept;
-    B.hold = null;
+    B.kept = kept.map((c) => c.u);
+    B.holds = [];
     B.wild = null;
     for (const k of ["dazed", "pied"]) if (B.p.st[k]) B.p.st[k]--;
     renderBattle();
@@ -1609,7 +1887,7 @@
       const roll = rand();
       if (roll < 0.4) { r.hp = r.maxHp; out = "Your wish comes true: you feel brand new. Fully healed."; sfx("heal"); }
       else if (roll < 0.7) { const it = pick(JG.RARE_ITEMS); r.loot.push(it); out = `Something floats back up: a ${JG.ITEMS[it].name}.`; sfx("coin"); }
-      else { j.mood = clamp(j.mood + 15, 0, 100); out = "The song changes to one you haven't heard since middle school. Nothing else happens. You feel ok, though."; sfx("bell"); }
+      else { j.mood = clamp(j.mood + 15, 0, 100); j.moon = clamp((j.moon || 0) + 0.12, -1, 1); out = "The song changes to one you haven't heard since middle school. Nothing else happens. You feel ok, though."; sfx("bell"); }
     }
     else if (k === "tattoo.star") { r.deck.push("wish"); out = `A tiny star, right on the hat. ${j.name} learned Wish Upon a Star.`; sfx("buff"); }
     else if (k === "tattoo.skull") { r.deck.push("dive"); out = `A tiny skull. Very punk. ${j.name} learned Stage Dive.`; sfx("buff"); }
@@ -1743,7 +2021,7 @@
     s.sky.push({ name: j.name, pts, note: `${formName(j)}, 12 shows, generation ${j.gen}` });
     const i = s.jinxes.indexOf(j);
     if (loved) {
-      const inherit = { name: j.name, align: j.align * 0.5, gen: j.gen + 1, stats: {}, trait: j.trait };
+      const inherit = { name: j.name, align: j.align * 0.5, moon: (j.moon || 0) * 0.5, gen: j.gen + 1, stats: {}, trait: j.trait, grades: j.grades };
       for (const st of JG.STATS) inherit.stats[st] = Math.floor(j.stats[st].lv * 0.3);
       const e = makeEgg({ hue: j.hue, inherit, hatch: 30 });
       e.u = j.u; e.v = j.v;
@@ -1806,6 +2084,8 @@
     A.init();
     const a = b.dataset.act;
     if (a === "shop") openShop();
+    if (a === "college") openCollege();
+    if (a === "whistle") whistle();
     if (a === "sky") openSky();
     if (a === "sound") { A.setOn(!A.on); renderHud(); }
     if (a === "bigtop") {

@@ -7,15 +7,22 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 ## The garden
 
 - **Tap a Jinx** to see it. Tap it again to pet it. Petting raises Mood and Love.
+- **Carry a Jinx** by dragging it. Drop it by the pond, the TV, a toy, a snack on the grass or another Jinx and it joins in.
+- **The candy-floss tree** grows snacks. Tap it to shake down the ripe ones. Tap a snack to put it in the pantry, or drag it onto a Jinx. A hungry Jinx finds snacks on the grass by itself.
+- **Toys** from the Concession stand (juggling pins, a trampoline, a crystal ball, a punching bag) each train one stat a little at a time. Jinxes wander over on their own.
+- **Clown College** teaches the selected Jinx a trick. It keeps up to 2 and brings those cards on every run. The classes change after each show.
+- **Whistle** calls everyone over.
+- **Aptitude:** the letter beside each stat, E up to S, is how fast that Jinx learns it. It is set at birth. An egg left by a loved Jinx often has better grades.
 - **Feed** from the pantry. Food fills the Belly and raises stats:
   - Juggle Plum raises Juggle, Springberry raises Tumble, Cotton Comet raises Glow, Sludge Pop raises Grit.
   - The rare items (Red Rubber Nose, Mercury Shoe, Halo Shard, Rust Bolt) give a big boost.
   - Burned CDs cheer a Jinx up.
 - **Lean:** Cotton Comets and Angel Floss lean a Jinx toward Stardust. Sludge Pops and Black Hole Gum lean it toward Sludge. Some sideshows on runs change the lean too.
+- **Motley or Moonlit:** a second lean that only matters for a Jinx that stays between Stardust and Sludge. Moon Pies and Paper Moons lean Moonlit. Motley Jawbreakers lean Motley.
 - **Growing up:** after 3 shows a child becomes an adult:
   - **Stardust** Jinxes glow and wear a halo.
   - **Sludge** Jinxes drip and wear a safety pin.
-  - Jinxes in the middle become harlequins.
+  - Jinxes in the middle become **Harlequins**, or **Pierrots** if they lean Moonlit: a white face, a black skullcap, a wide ruff, long sleeves and a painted tear.
   - The best stat shows too: juggled planets, spring feet, a glowing antenna, or a spiked hat.
 - **The last show:** after 12 shows a Jinx rises into the sky as a constellation. If its Love is 50 or more, it leaves an egg that keeps a little of its stats and lean.
 - **Concession stand:** buy snacks, or an egg for 80 Tix. The garden holds 6.
@@ -45,6 +52,7 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
   - **Sludge** builds Corruption from Gunk. At 6 or more, every hit adds Gunk. Its Showstopper is Sludge Flood.
   - **Stardust** builds Starlight from Ether cards, up to 5, and starts each turn with 3 Block per Starlight. Its Showstopper is Supernova.
   - **Harlequins** get one Wild card in every hand that plays twice. Their Showstopper is Harlequin Shuffle.
+  - **Pierrots** can hold 2 cards instead of 1, and a card they held costs 1 less. Their Showstopper is Moonlit Pirouette.
 - **Training:** every card played trains its stat. Attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.
 - **Winning** all three acts brings home everything in the bag, the Tix and 1.5 times the training.
 - **Fainting** keeps half the Tix, one thing from the bag and 0.6 times the training, and the Jinx comes home sad.

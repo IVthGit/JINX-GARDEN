@@ -11,7 +11,9 @@ JG.STAT_INFO = {
 
 // Food and toys. xp goes to stats, align pushes toward Stardust (+) or Sludge (-).
 JG.ITEMS = {
-  moonpie:   { name: "Moon Pie", desc: "Fills the belly. A little of everything.", color: "#e9d3a4", glyph: "◐", price: 8, belly: 40, mood: 8, xp: { juggle: 2, tumble: 2, glow: 2, grit: 2 } },
+  moonpie:   { name: "Moon Pie", desc: "Fills the belly. A little of everything.", color: "#e9d3a4", glyph: "◐", price: 8, belly: 40, mood: 8, moon: 0.06, xp: { juggle: 2, tumble: 2, glow: 2, grit: 2 } },
+  papermoon: { name: "Paper Moon", desc: "Cut from an old theatre poster. Big Moonlit lean.", color: "#cfe3ff", glyph: "☽", price: 32, belly: 10, xp: { tumble: 4 }, moon: 0.22 },
+  jawbreaker:{ name: "Motley Jawbreaker", desc: "Every layer a different colour. Big Motley lean.", color: "#ff5fa8", glyph: "◕", price: 32, belly: 10, xp: { juggle: 4 }, moon: -0.22 },
   plum:      { name: "Juggle Plum", desc: "Round and bouncy. Builds Juggle.", color: "#ff5fa8", glyph: "●", price: 14, belly: 15, xp: { juggle: 9 } },
   spring:    { name: "Springberry", desc: "Fizzy little coil-berries. Builds Tumble.", color: "#ffd23f", glyph: "❀", price: 14, belly: 15, xp: { tumble: 9 } },
   comet:     { name: "Cotton Comet", desc: "Spun stardust. Builds Glow, leans Stardust.", color: "#c9b8ff", glyph: "✵", price: 14, belly: 15, xp: { glow: 9 }, align: 0.07 },
@@ -24,8 +26,8 @@ JG.ITEMS = {
   bolt:      { name: "Rust Bolt", desc: "Off the old ferris wheel. A huge boost to Grit.", color: "#c97a3d", glyph: "⚙", price: 48, belly: 0, xp: { grit: 28 } },
   cd:        { name: "Burned CD", desc: "Sharpie on the label: SAD SONGS 4 U. Cheers them right up.", color: "#d6e1ff", glyph: "◎", price: 20, belly: 0, mood: 40, love: 8 }
 };
-JG.SHOP_ITEMS = ["moonpie", "plum", "spring", "comet", "sludgepop", "cd", "floss", "gum"];
-JG.RARE_ITEMS = ["nose", "shoe", "shard", "bolt", "floss", "gum"];
+JG.SHOP_ITEMS = ["moonpie", "plum", "spring", "comet", "sludgepop", "cd", "floss", "gum", "papermoon", "jawbreaker"];
+JG.RARE_ITEMS = ["nose", "shoe", "shard", "bolt", "floss", "gum", "papermoon", "jawbreaker"];
 JG.COMMON_ITEMS = ["moonpie", "plum", "spring", "comet", "sludgepop", "cd"];
 
 // Cards. type sets the color and which stat boosts it and grows from it.
@@ -40,6 +42,7 @@ JG.CARDS = {
   halohum:   { name: "Halo Hum", cost: 1, type: "eth", rarity: 0, fx: { heal: 3, block: 3 }, after: ["eth", { heal: 3 }] },
   gunkspit:  { name: "Gunk Spit", cost: 1, type: "gunk", rarity: 0, fx: { gunk: 4 }, finisher: { gunk: 3 } },
   honk:      { name: "Honk!", cost: 0, type: "atk", rarity: 0, fx: { dmg: 3, dazed: 1 }, opener: { draw: 1 } },
+  tear:      { name: "Single Tear", cost: 1, type: "trick", rarity: 0, fx: { block: 4, dazed: 1 }, opener: { draw: 1 } },
 
   juggle:    { name: "Juggle Stars", cost: 1, type: "atk", rarity: 1, fx: { dmg: 3, hits: 3 }, finisher: { hits: 1 } },
   seltzer:   { name: "Seltzer Spray", cost: 1, type: "atk", rarity: 1, fx: { dmg: 4, pied: 2 }, opener: { dmg: 3 } },
@@ -107,7 +110,7 @@ JG.FOES = {
               moves: [{ charge: 1, flinch: 12, blk: 4 }, { atk: 13 }, { atk: 5 }] },
   tearer:   { name: "Ticket Tearer", atk: "tickets", hp: [30, 34], weak: "eth", body: "wide", size: 1,
               moves: [{ blk: 8, heckle: 10 }, { atk: 10 }, { atk: 6, pied: 1 }] },
-  strongman:{ name: "The Strongman Who Cries", atk: "smash", hp: [58, 62], elite: true, weak: "eth", body: "wide", size: 1.25,
+  strongman:{ name: "The Strongman Who Cries", atk: "smash", hp: [58, 62], elite: true, weak: "eth", body: "tall", size: 1.25,
               moves: [{ atk: 9 }, { charge: 1, flinch: 16, blk: 6 }, { atk: 15 }, { hype: 2, blk: 8 }, { atk: 6, n: 2 }] },
   calliope: { name: "Calliope Wraith", atk: "notes", hp: [105, 105], boss: true, weak: "gunk", resist: "eth", body: "wisp", size: 1.4,
               moves: [{ dazed: 2, blk: 10, heckle: 20 }, { atk: 11 }, { atk: 4, n: 3 }, { charge: 1, flinch: 20 }, { atk: 16 }, { heal: 10, hype: 2 }] },
@@ -186,6 +189,9 @@ JG.FORMS = {
   stardust: { name: "Stardust", res: "Starlight", show: "Supernova", color: "#8fe9ff",
     desc: "Every Ether card adds 1 Starlight, up to 5. Each turn starts with 3 Block for every Starlight.",
     showDesc: "Deal 6 plus 4 per Starlight, heal 4 plus 3 per Starlight, shake off Dazed, Pied and Gunk, and spend the Starlight." },
+  pierrot: { name: "Pierrot", res: null, show: "Moonlit Pirouette", color: "#cfe3ff",
+    desc: "Patient and wistful. It can hold 2 cards instead of 1, and a card it held costs 1 less.",
+    showDesc: "Spin under the moon: hit three times, Daze the foe for 2 turns and gain 10 Block." },
   harlequin: { name: "Harlequin", res: null, show: "Harlequin Shuffle", color: "#ff5fa8",
     desc: "One card in every hand is Wild and plays twice.",
     showDesc: "Swap your whole hand for 5 new cards, then gain 1 energy and 1 Hype." }
@@ -193,3 +199,13 @@ JG.FORMS = {
 
 // Difficulty dials, set by play-testing with automated players (a careless one should faint in Act I).
 JG.TUNE = { hp: [1.5, 1.7, 2.1], dmg: [1.9, 1.9, 2.3], bossHeal: 0.25, baseHp: 30 };   // hp and dmg are per act
+
+// The garden: where the snack tree and the toys stand (in island coordinates, -1 to 1).
+JG.TREE = { u: 0.62, v: -0.5, items: ["plum", "spring", "comet", "sludgepop", "moonpie", "moonpie"] };
+// Toys that Jinxes train on by themselves.
+JG.TOYS = {
+  pins:    { name: "Juggling pins", stat: "juggle", price: 60, u: -0.6, v: -0.2, desc: "Jinxes practise here and slowly build Juggle." },
+  tramp:   { name: "Trampoline", stat: "tumble", price: 60, u: -0.24, v: 0.7, desc: "Jinxes bounce here and slowly build Tumble." },
+  crystal: { name: "Crystal ball", stat: "glow", price: 60, u: 0.18, v: -0.68, desc: "Jinxes gaze into it and slowly build Glow." },
+  bag:     { name: "Punching bag", stat: "grit", price: 60, u: 0.3, v: 0.74, desc: "Jinxes spar with it and slowly build Grit." }
+};
