@@ -195,11 +195,13 @@
   // smoke) goes on a second sheet that is laid over the top, so it never gets an edge of its own.
   D.paper = { on: true, edge: "#fbf8f2", neon: false };
   const sheets = {};
-  let glowCtx = null, cutDepth = 0, lightUsed = false;
+  let glowCtx = null, cutDepth = 0, lightUsed = false, PS = null;
+  // Sheets come in size buckets: pasting from a canvas costs by the size of the whole canvas, so a small
+  // sprite must not share a sheet with a big one.
   function sheet(name, w, h) {
-    let L = sheets[name];
-    if (!L) { const cv = document.createElement("canvas"); L = sheets[name] = { cv, g: cv.getContext("2d") }; }
-    if (L.cv.width < w || L.cv.height < h) { L.cv.width = Math.max(L.cv.width, w); L.cv.height = Math.max(L.cv.height, h); }
+    const bw = Math.ceil(w / 96) * 96, bh = Math.ceil(h / 96) * 96, key = name + ":" + bw + "x" + bh;
+    let L = sheets[key];
+    if (!L) { const cv = document.createElement("canvas"); cv.width = bw; cv.height = bh; L = sheets[key] = { cv, g: cv.getContext("2d") }; }
     return L;
   }
   // draw(): draws in the usual coordinates. The box around (x, y) is hw to each side, up above and down below.
@@ -273,6 +275,10 @@
   D.cutout = cutout;
   // run fn so that what it draws lands on the light sheet (when a cut-out is being made)
   function lightLayer(fn) {
+    if (PS) {
+      if (PS.measure) return;
+      if (ctx === PS.g) { PS.lights.push({ m: PS.binv.multiply(ctx.getTransform()), fn }); return; }
+    }
     if (!glowCtx || ctx === glowCtx) { fn(); return; }
     const keep = ctx;
     lightUsed = true;
@@ -283,6 +289,10 @@
   }
 
   function glow(x, y, r, color, a) {
+    if (PS) {
+      if (PS.measure) return;
+      if (ctx === PS.g) { PS.lights.push({ m: PS.binv.multiply(ctx.getTransform()), fn: () => glow(x, y, r, color, a) }); return; }
+    }
     const c = glowCtx && ctx !== glowCtx ? glowCtx : ctx;
     if (c !== ctx) { lightUsed = true; c.save(); c.setTransform(ctx.getTransform()); }
     const g = c.createRadialGradient(x, y, 0, x, y, r);
@@ -1865,6 +1875,7 @@
         limb([[s * r * 0.22, r * 0.55], [s * r * 0.3, r * 0.85], [s * r * 0.28, ft - r * 0.1]], r * 0.19, "#1a1024", lw * 0.5);
         shoe(s * r * 0.26 - r * 0.1, ft, r * 0.2, -1, "#1a1024", lw * 0.8);
       }
+      P("torso", { pv: [0, 0.6], sw: 0.02, sp: 1.4, z: 0.7 });
       const torso = new Path2D();
       torso.moveTo(-r * 0.5, -r * 0.3);
       torso.quadraticCurveTo(-r * 0.68, r * 0.2, -r * 0.5, r * 0.66);
@@ -1892,6 +1903,7 @@
       ctx.moveTo(r * 0.28, -r * 0.32); ctx.lineTo(r * 0.22, r * 0.52);
       ctx.stroke();
       for (const s of [-1, 1]) { const bt = new Path2D(); bt.arc(s * r * 0.22, r * 0.5, r * 0.05, 0, Math.PI * 2); fPaint(bt, "#ffd23f", lw * 0.4); }
+      P("head", { pv: [0, -0.34], sw: 0.06, sp: 1.4, ph: 0.6, z: 1.2, brad: true });
       // head
       const head = new Path2D();
       head.ellipse(sway, -r * 0.74, r * 0.4, r * 0.44, 0, 0, Math.PI * 2);
@@ -1915,6 +1927,7 @@
       fBody(beret, "#1f1430", r * 0.5, lw, sway - r * 0.1, -r * 1.3, 0.3);
       ctx.fillStyle = FINK;
       ctx.fillRect(sway + r * 0.08, -r * 1.46, r * 0.05, r * 0.1);
+      P("arms", { pv: [0, -0.14], sw: 0.025, sp: 2.1, ph: 2, z: 1.7 });
       // hands pressed flat against a wall that isn't there
       for (const s of [-1, 1]) {
         const hx = -r * (s > 0 ? 0.78 : 1.0) + Math.sin(t * 1.4 + s) * r * 0.05, hy = (s > 0 ? r * 0.12 : -r * 0.6) + Math.cos(t * 1.4 + s) * r * 0.06;
@@ -1934,6 +1947,7 @@
         shoe(s * r * 0.36 - r * 0.12, ft, r * 0.17, -1, "#d62839", lw * 0.7);
       }
       const pk = Math.sin(t * 2) * r * 0.05;
+      P("head", { pv: [0, -0.1], sw: 0.05, sp: 2, z: 1.2 });
       for (const s of [-1, 1]) {
         const ear = new Path2D();
         ear.moveTo(s * r * 0.42, -r * 0.72 + pk);
@@ -1957,6 +1971,7 @@
       mouth(0, -r * 0.34 + pk, r * 0.36, { curve: 0.7, open: 0.55, teeth: "sharp", n: 8 }, lw * 0.7);
       fNose(0, -r * 0.5 + pk, r * 0.09, lw);
       fCone(r * 0.1, -r * 1.02 + pk, r * 0.5, "#d62839", lw, 0.25);
+      P("popcorn", { pv: [0, -0.1], sw: 0.015, sp: 3, ph: 1, z: 1.6 });
       // popcorn heaped on top, some of it popping
       for (let i = 0; i < 11; i++) {
         const pk3 = 0.5 + 0.5 * Math.sin(t * 3 + i * 1.7);
@@ -1967,6 +1982,7 @@
           fPaint(pc, q === 1 ? "#fff6d8" : "#ffe9a8", lw * 0.5);
         }
       }
+      P("box", { pv: [0, 0.86], sw: 0.025, sp: 1.7, ph: 1, z: 0.6 });
       const box = new Path2D();
       box.moveTo(-r * 0.95, -r * 0.1); box.lineTo(r * 0.95, -r * 0.1); box.lineTo(r * 0.7, r * 0.86); box.lineTo(-r * 0.7, r * 0.86); box.closePath();
       ctx.fillStyle = "#fbf8f2";
@@ -2000,6 +2016,7 @@
       ctx.fillText("POP", 0, r * 0.42);
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
+      P("hands", { pv: [0, -0.12], sw: 0.02, sp: 3, ph: 2, z: 1.9 });
       for (const s of [-1, 1]) glove(s * r * 0.8, -r * 0.12, r * 0.13, Math.PI + s * 0.2, "#9fd052", lw * 0.6);
     },
 
@@ -2013,6 +2030,7 @@
       const tag = new Path2D();
       tag.roundRect(-r * 0.16, ft - r * 0.2, r * 0.32, r * 0.2, r * 0.03);
       fPaint(tag, "#efe6d2", lw * 0.6);
+      P("balloon", { pv: [0, 1.12], sw: 0.07, sp: 1.3, z: 1, brad: true });
       const sq = 1 + Math.sin(t * 2.6) * 0.03 + (f.charge ? Math.sin(t * 18) * 0.03 : 0);
       ctx.save();
       ctx.scale(sq, 1 / sq);
@@ -2043,6 +2061,7 @@
       for (let k = 0; k <= 8; k++) { const px = (k - 4) * r * 0.1, py = r * 0.36 + (k % 2 ? -1 : 1) * r * (f.charge ? 0.11 : 0.06); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
       ctx.stroke();
       ctx.restore();
+      P("static", { box: [-2.0, -2.2, 2.0, 2.2], z: 2 });
       // crackling static
       const n = f.charge ? 12 : 5;
       ctx.lineJoin = "miter";
@@ -2065,6 +2084,7 @@
         limb([[s * r * 0.45, r * 0.7], [s * r * 0.48, ft - r * 0.12]], r * 0.24, "#1a1024", lw * 0.5);
         shoe(s * r * 0.48 - r * 0.14, ft, r * 0.22, -1, "#1a1024", lw * 0.8);
       }
+      P("body", { pv: [0, 0.98], sw: 0.02, sp: 1.1, z: 0.6 });
       const body = new Path2D();
       body.moveTo(0, -r * 0.95);
       body.bezierCurveTo(r * 1.5, -r * 0.95, r * 1.6, r * 0.9, 0, r * 0.98);
@@ -2079,6 +2099,7 @@
       ctx.fillRect(-r * 2, r * 0.72, r * 4, r * 0.08);
       ctx.restore();
       for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { const bt = new Path2D(); bt.arc(s * r * (0.3 + i * 0.07), -r * 0.6 + i * r * 0.3, r * 0.075, 0, Math.PI * 2); fPaint(bt, "#ffd23f", lw * 0.5); }
+      P("arms", { pv: [0, -0.5], sw: 0.03, sp: 2, ph: 1, z: 1.6 });
       for (const s of [-1, 1]) {
         const ep = new Path2D();
         ep.ellipse(s * r * 1.0, -r * 0.62, r * 0.36, r * 0.15, s * 0.5, 0, Math.PI * 2);
@@ -2089,6 +2110,7 @@
         limb([[s * r * 1.12, -r * 0.38], [s * r * 1.45, r * 0.0], [s * r * 1.38, r * 0.3 + Math.sin(t * 2 + s) * r * 0.05]], r * 0.26, "#8f2238", lw * 0.5);
         glove(s * r * 1.38, r * 0.42 + Math.sin(t * 2 + s) * r * 0.05, r * 0.16, Math.PI + s * 0.3, "#ffffff", lw * 0.7);
       }
+      P("slot", { pv: [0, 0.98], sw: 0.02, sp: 1.1, z: 0.6, edge: 0 });
       // a ticket slot for a mouth, feeding out a strip
       const slot = new Path2D();
       slot.roundRect(-r * 0.5, r * 0.02, r * 1.0, r * 0.4, r * 0.1);
@@ -2104,6 +2126,7 @@
         ctx.moveTo(-r * 0.47 + k * r * 0.12, r * 0.41); ctx.lineTo(-r * 0.41 + k * r * 0.12, r * 0.3); ctx.lineTo(-r * 0.35 + k * r * 0.12, r * 0.41);
         ctx.fill(); ctx.stroke();
       }
+      P("tickets", { pv: [-0.1, 0.25], sw: 0.05, sp: 2.6, z: 1.9 });
       for (let k = 0; k < 7; k++) {
         ctx.save();
         ctx.translate(-r * 0.1 - k * r * 0.27, r * 0.28 + k * r * 0.11 + Math.sin(t * 4 + k) * r * 0.05);
@@ -2115,6 +2138,7 @@
         ctx.fillRect(-r * 0.08, -r * 0.02, r * 0.16, r * 0.04);
         ctx.restore();
       }
+      P("head", { pv: [0, -0.7], sw: 0.05, sp: 1.6, ph: 2, z: 1.2, brad: true });
       const head = new Path2D();
       head.ellipse(0, -r * 0.96, r * 0.38, r * 0.36, 0, 0, Math.PI * 2);
       fBody(head, "#d5ccb4", r * 0.45, lw, -r * 0.1, -r * 1.05);
@@ -2142,6 +2166,7 @@
         ctx.lineWidth = lw * 0.5;
         for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(s * r * 0.42 - r * 0.1, ft - r * 0.25 + k * r * 0.07); ctx.lineTo(s * r * 0.42 + r * 0.1, ft - r * 0.25 + k * r * 0.07); ctx.stroke(); }
       }
+      P("barbell", { pv: [0, -0.5], sw: 0.03, sp: 1.6, z: 1.6 });
       // barbell, held up and shaking
       const by0 = -r * 1.66 + lift;
       ctx.strokeStyle = FINK;
@@ -2162,6 +2187,7 @@
         ctx.beginPath(); ctx.arc(s * r * 1.42, -r * 0.8, r * 0.16, s > 0 ? 3.4 : 5.2, s > 0 ? 5.0 : 6.8); ctx.stroke();
         glove(s * r * 1.3, by0 + r * 0.02, r * 0.17, 0, "#e8a17a", lw * 0.7);
       }
+      P("torso", { pv: [0, 0.78], sw: 0.018, sp: 1.6, ph: 1, z: 0.7 });
       const torso = new Path2D();
       torso.moveTo(-r * 1.3, -r * 0.55);
       torso.quadraticCurveTo(-r * 1.45, -r * 0.1, -r * 0.6, r * 0.78);
@@ -2203,6 +2229,7 @@
       bk.roundRect(-r * 0.17, r * 0.52, r * 0.34, r * 0.3, r * 0.05);
       fPaint(bk, "#ffd23f", lw * 0.7);
       sparkle(0, r * 0.67, r * 0.06, "#d62839");
+      P("head", { pv: [0, -0.68], sw: 0.045, sp: 3, ph: 1, z: 1.2, brad: true });
       const head = new Path2D();
       head.ellipse(0, -r * 1.0 + sob, r * 0.36, r * 0.38, 0, 0, Math.PI * 2);
       fBody(head, "#f0b08c", r * 0.42, lw, -r * 0.1, -r * 1.1);
@@ -2249,6 +2276,7 @@
           ctx.beginPath(); ctx.arc(px + Math.sin(puff * 5) * r * 0.1, -h - r * 0.2 - puff * r * 0.9, r * (0.1 + puff * 0.24), 0, Math.PI * 2); ctx.fill();
         });
       }
+      P("body", { pv: [0, 0], sw: 0.035, sp: 1.2, z: 1 });
       const body = new Path2D();
       body.moveTo(-r * 0.98, 0);
       body.bezierCurveTo(-r * 1.0, -r * 1.25, r * 1.0, -r * 1.25, r * 0.98, 0);
@@ -2284,6 +2312,7 @@
         if (k % 7 !== 2 && k % 7 !== 6 && k < 8) { ctx.fillStyle = "#12080f"; ctx.fillRect(kx + r * 0.09, ky, r * 0.08, r * 0.19); }
       }
       ctx.restore();
+      P("arms", { pv: [0, 0.2], sw: 0.03, sp: 2.5, ph: 1, z: 1.7 });
       for (const s of [-1, 1]) {
         const wv = Math.sin(t * 2.5 + s) * r * 0.22;
         limb([[s * r * 0.88, r * 0.2], [s * r * 1.4, -r * 0.05 + wv], [s * r * 1.55, -r * 0.5 + wv]], r * 0.17, "#d9d0f8", lw * 0.5);
@@ -2306,6 +2335,7 @@
         fl.ellipse(r * 1.34, r * 0.45 + s * r * 0.17, r * 0.36, r * 0.13, s * 0.6 - 0.5 + Math.sin(t * 3) * 0.2, 0, Math.PI * 2);
         fBody(fl, "#3d4a30", r * 0.4, lw, r * 1.2, r * 0.3, 0.3);
       }
+      P("body", { pv: [0.3, 0.86], sw: 0.02, sp: 2.2, z: 0.8 });
       const body = new Path2D();
       body.moveTo(-r * 0.92, -r * 0.3 + bob);
       body.quadraticCurveTo(-r * 0.98, r * 0.5, -r * 0.55, r * 0.86);
@@ -2339,6 +2369,7 @@
       const flip = new Path2D();
       flip.ellipse(-r * 0.12, r * 0.64, r * 0.52, r * 0.17, 0.5 + Math.sin(t * 4) * 0.15, 0, Math.PI * 2);
       fBody(flip, "#3d4a30", r * 0.5, lw, -r * 0.3, r * 0.5, 0.3);
+      P("face", { pv: [-0.4, -0.3], sw: 0.04, sp: 2.2, ph: 0.8, z: 1.2 });
       // a ruff, a face looking at the player
       ctx.save();
       ctx.translate(-r * 0.42, bob);
@@ -2356,6 +2387,7 @@
       for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(-r * 0.66, -r * 0.46 + bob); ctx.lineTo(-r * 0.22, -r * 0.42 + bob + k * r * 0.1); ctx.stroke(); }
       mouth(-r * 0.72, -r * 0.4 + bob, r * 0.14, { curve: 0.6, open: 0.3, teeth: "sharp", n: 5 }, lw * 0.5);
       fCone(-r * 0.28, -r * 1.1 + bob, r * 0.5, "#a6d94a", lw, 0.25);
+      P("ball", { pv: [-1.0, -0.6], sw: 0.06, sp: 2.2, ph: 1.5, z: 2 });
       // a ball balanced on its nose
       const bx = -r * 1.02, by2 = -r * 1.05 + bob - Math.abs(Math.sin(t * 2.2)) * r * 0.28;
       const ball = new Path2D();
@@ -2372,6 +2404,7 @@
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw * 0.8;
       ctx.stroke(ball);
+      P("drips", { pv: [0.3, 0.86], sw: 0.02, sp: 2.2, z: 0.8, edge: 0 });
       ctx.fillStyle = "rgba(166,217,74,0.92)";
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw * 0.5;
@@ -2389,6 +2422,7 @@
         limb([[s * r * 0.25, r * 0.95], [s * r * 0.3, ft - r * 0.08]], r * 0.1, "#bdf3ff", lw * 0.4);
         shoe(s * r * 0.3 - r * 0.1, ft, r * 0.16, -1, "#2a6f86", lw * 0.7);
       }
+      P("jar", { pv: [0, 1.06], sw: 0.03, sp: 1.5, z: 0.8 });
       const body = new Path2D();
       body.moveTo(-r * 0.25, -r * 1.15);
       body.lineTo(r * 0.25, -r * 1.15);
@@ -2444,10 +2478,12 @@
         eye(p[0] * r, p[1] * r, r * p[2], r * p[2] * (open ? 1.15 : 0.15), { iris: "#2fb7c9", look: [-0.6 + Math.sin(t + i) * 0.3, 0.2] });
       });
       mouth(0, r * 0.26, r * 0.3, { curve: 0.6, open: 0.5, teeth: "flat", n: 6, fill: "#17424e" }, lw * 0.7);
+      P("arms", { pv: [0, -0.2], sw: 0.03, sp: 3.2, ph: 1, z: 1.6 });
       for (const s of [-1, 1]) {
         limb([[s * r * 0.72, -r * 0.2], [s * r * 1.12, -r * 0.6], [s * r * 0.97, -r * 1.05 + Math.sin(t * 3.2 + s) * r * 0.1]], r * 0.1, "#bdf3ff", lw * 0.4);
         glove(s * r * 0.97, -r * 1.14 + Math.sin(t * 3.2 + s) * r * 0.1, r * 0.13, 0, "#eafcff", lw * 0.6);
       }
+      P("bubbles", { box: [-1.4, -3.15, 1.4, -1.45], pv: [0, -2], sw: 0.02, z: 2 });
       for (let k = 0; k < 4; k++) {
         const a = t * 3.2 + k * 1.57, px = Math.cos(a) * r * 0.97, py = -r * 1.85 - Math.abs(Math.sin(a)) * r * 0.9;
         const gb = new Path2D();
@@ -2501,10 +2537,12 @@
         }
         ctx.restore();
       }
+      P("legs", { pv: [0, 0], sw: 0.02, sp: 3, z: 0.6 });
       for (const s of [-1, 1]) {
         limb([[s * r * 0.15, r * 0.9], [s * r * 0.34, ft - r * 0.3], [s * r * 0.24, ft - r * 0.06]], r * 0.06, FINK, 0);
         limb([[s * r * 0.4, -r * 0.2], [s * r * 0.75, r * 0.1], [s * r * 0.6, r * 0.4 + Math.sin(t * 3 + s) * r * 0.05]], r * 0.07, FINK, 0);
       }
+      P("abdomen", { pv: [0, 0.1], sw: 0.07, sp: 3.5, z: 1 });
       const abd = new Path2D();
       abd.moveTo(-r * 0.32, r * 0.1);
       abd.bezierCurveTo(-r * 0.45, r * 0.7, -r * 0.2, r * 1.2, 0, r * 1.22);
@@ -2521,6 +2559,7 @@
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw;
       ctx.stroke(abd);
+      P("thorax", { pv: [0, -0.2], sw: 0.02, sp: 2, z: 0.8 });
       const thor = new Path2D();
       thor.ellipse(0, -r * 0.2, r * 0.46, r * 0.5, 0, 0, Math.PI * 2);
       fBody(thor, "#b02a6e", r * 0.5, lw, -r * 0.1, -r * 0.4);
@@ -2533,6 +2572,7 @@
         fz.arc(Math.cos(a) * r * 0.44, -r * 0.56 + Math.sin(a) * r * 0.1, r * (0.12 + (k % 2) * 0.03), 0, Math.PI * 2);
         fPaint(fz, "#f4e8cf", lw * 0.5);
       }
+      P("head", { pv: [0, -0.62], sw: 0.06, sp: 2, ph: 1, z: 1.3, brad: true });
       const head = new Path2D();
       head.ellipse(0, -r * 0.95, r * 0.38, r * 0.36, 0, 0, Math.PI * 2);
       fBody(head, "#e6d3ad", r * 0.42, lw, -r * 0.1, -r * 1.05);
@@ -2578,6 +2618,7 @@
       ctx.restore();
       ctx.strokeStyle = FINK; ctx.lineWidth = lw * 2.4; ctx.stroke(fr);
       ctx.strokeStyle = "#b98ad6"; ctx.lineWidth = lw * 1.4; ctx.stroke(fr);
+      P("copy", { pv: [0, ft / r], sw: 0.035, sp: 2.3, z: 1.4 });
       ctx.save();
       ctx.translate(0, ft);
       ctx.scale(wob, 1 / wob);
@@ -2620,6 +2661,7 @@
       ctx.fillStyle = "rgba(255,59,74,0.8)";
       for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, r * (0.3 + i * 0.22), r * 0.04, 0, Math.PI * 2); ctx.fill(); }
       ctx.beginPath(); ctx.moveTo(0, -r * 0.5); ctx.lineTo(-r * 0.22, -r * 0.62); ctx.lineTo(-r * 0.22, -r * 0.38); ctx.lineTo(0, -r * 0.5); ctx.lineTo(r * 0.22, -r * 0.62); ctx.lineTo(r * 0.22, -r * 0.38); ctx.fill();
+      P("whip", { pv: [-0.8, -0.4], sw: 0.04, sp: 2, z: 1.6 });
       // a whip of shadow
       ctx.lineCap = "round";
       const whip = () => {
@@ -2632,6 +2674,7 @@
       ctx.strokeStyle = "rgba(255,59,74,0.7)"; ctx.lineWidth = lw * 0.4; whip();
       limb([[-r * 0.8, -r * 0.4], [-r * 1.1, -r * 0.2], [-r * 1.05, -r * 0.05]], r * 0.16, "#2b1c48", lw * 0.3);
       limb([[r * 0.8, -r * 0.4], [r * 1.05, 0], [r * 0.7, r * 0.3]], r * 0.16, "#2b1c48", lw * 0.3);
+      P("head", { pv: [0, -0.6], sw: 0.05, sp: 1.3, ph: 1, z: 1.2 });
       const head = new Path2D();
       head.ellipse(0, -r * 0.98, r * 0.42, r * 0.44, 0, 0, Math.PI * 2);
       ctx.fillStyle = "#2a1b48";
@@ -2685,6 +2728,7 @@
         limb([[s * r * 0.2, r * 0.95], [s * r * 0.24, ft - r * 0.14]], r * 0.13, "#1a1024", lw * 0.4);
         shoe(s * r * 0.24 - r * 0.08, ft, r * 0.16, -1, "#1a1024", lw * 0.7);
       }
+      P("mirror", { pv: [0, 1.0], sw: 0.02, sp: 1, z: 0.8 });
       // the body is a standing mirror
       const fr = new Path2D();
       fr.moveTo(-r * 0.62, r * 1.0);
@@ -2741,6 +2785,7 @@
         st.arc(Math.cos(a) * r * 0.62, -r * 0.5 + Math.sin(a) * r * 0.62, r * 0.05, 0, Math.PI * 2);
         fPaint(st, "#d62839", lw * 0.4);
       }
+      P("arms", { pv: [0, -0.3], sw: 0.025, sp: 2, ph: 1, z: 1.6 });
       for (const s of [-1, 1]) {
         const hx = s * r * 1.02, hy = r * 0.15 + Math.sin(t * 2 + s) * r * 0.05;
         limb([[s * r * 0.62, -r * 0.35], [s * r * 0.98, -r * 0.1], [hx, hy]], r * 0.15, "#b02a42", lw * 0.4);
@@ -2755,6 +2800,7 @@
       const kn = new Path2D();
       kn.arc(-r * 1.02, r * 0.16, r * 0.11, 0, Math.PI * 2);
       fPaint(kn, "#e8b923", lw * 0.6);
+      P("hat", { pv: [0, -1.1], sw: 0.06, sp: 1.7, ph: 0.5, z: 2 });
       fTopHat(0, -r * 1.1, r * 0.85, "#d62839", lw, 0.08);
     },
 
@@ -2779,6 +2825,7 @@
         sparkle(r * (1 + k * 2.2), -r * 0.6 * k + (hashN(i) - 0.5) * r, r * 0.07 * (1 - k), `rgba(255,236,150,${1 - k})`);
       }
       glow(0, 0, r * 2.2, "#ff8a3d", 0.3);
+      P("head", { pv: [0, 0], sw: 0.045, sp: 1.5, z: 1 });
       ruffle(0, r * 0.82, r * 1.9, 7, r * 0.2, "#ff8a3d", "#fbf8f2", lw);
       const head = new Path2D();
       head.arc(0, 0, r, 0, Math.PI * 2);
@@ -2801,7 +2848,9 @@
       }
       mouth(0, r * 0.3, r * 0.5, { curve: 0.8, open: 0.6, teeth: "flat", n: 9, tongue: true, fill: "#7a1020" }, lw * 0.8);
       fNose(0, r * 0.02, r * 0.14, lw);
+      P("hat", { pv: [-0.15, -0.9], sw: 0.07, sp: 2, ph: 1, z: 1.9 });
       fCone(-r * 0.15, -r * 0.95, r * 0.72, "#ff8a3d", lw, -0.2);
+      P("tufts", { pv: [0, 0], sw: 0.045, sp: 1.5, z: 1 });
       for (const s of [-1, 1]) {
         const tf = new Path2D();
         tf.moveTo(s * r * 0.8, -r * 0.55);
@@ -2860,14 +2909,17 @@
         ctx.lineWidth = lw * 0.5;
         for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(s * r * (0.42 + k * 0.1), -r * 0.66); ctx.lineTo(s * r * (0.44 + k * 0.1), -r * 0.52); ctx.stroke(); }
       }
+      P("torch", { pv: [-0.58, -0.42], sw: 0.04, sp: 1.2, z: 1.5 });
       limb([[-r * 0.58, -r * 0.42], [-r * 1.0, -r * 0.05], [-r * 0.92, r * 0.1]], r * 0.15, "#100826", lw * 0.4);
       const tor = new Path2D();
       tor.moveTo(-r * 0.82, r * 0.0); tor.lineTo(-r * 1.15, -r * 0.02); tor.lineTo(-r * 1.28, -r * 0.1); tor.lineTo(-r * 1.28, r * 0.28); tor.lineTo(-r * 1.15, r * 0.2); tor.lineTo(-r * 0.82, r * 0.18); tor.closePath();
       fBody(tor, "#cfc6d8", r * 0.3, lw * 0.7, -r * 1.0, 0, 0.3);
       glow(-r * 1.3, r * 0.09, r * 0.3, "#8fe9ff", 0.9);
       glove(-r * 0.92, r * 0.1, r * 0.11, Math.PI / 2, "#ffffff", lw * 0.6);
+      P("arm", { pv: [0.58, -0.42], sw: 0.05, sp: 1.6, ph: 2, z: 1.5 });
       limb([[r * 0.58, -r * 0.42], [r * 0.9, 0.0], [r * 0.8, r * 0.35]], r * 0.15, "#100826", lw * 0.4);
       glove(r * 0.8, r * 0.42, r * 0.11, Math.PI, "#ffffff", lw * 0.6);
+      P("head", { pv: [0, -0.7], sw: 0.05, sp: 1.1, ph: 1, z: 1.2 });
       // no face: just eyes in the dark under the cap
       const hd = new Path2D();
       hd.ellipse(0, -r * 0.98, r * 0.38, r * 0.32, 0, 0, Math.PI * 2);
@@ -2906,6 +2958,7 @@
           ctx.restore();
         }
       }
+      P("body", { pv: [0, 0], sw: 0.035, sp: 1.4, z: 1 });
       const body = new Path2D();
       body.moveTo(-r * 0.92, 0);
       body.bezierCurveTo(-r * 0.95, -r * 1.2, r * 0.95, -r * 1.2, r * 0.92, 0);
@@ -2920,7 +2973,9 @@
       ctx.lineWidth = 1;
       for (let i = 0; i < 20; i++) { ctx.beginPath(); ctx.moveTo(-r, -r + i * r * 0.13 + ((t * 20) % (r * 0.13))); ctx.lineTo(r, -r + i * r * 0.13 + ((t * 20) % (r * 0.13))); ctx.stroke(); }
       ctx.restore();
+      P("halo", { pv: [0, -0.9], sw: 0.05, sp: 2, ph: 1, z: 2 });
       fHalo(-r * 0.9, r, "#8fe9ff", t);
+      P("face", { pv: [0, 0], sw: 0.035, sp: 1.4, z: 1, edge: 0 });
       for (const s of [-1, 1]) {
         eye(s * r * 0.33, -r * 0.2, r * 0.15, r * 0.15, { kind: "x", iris: "#2a6f86" });
         brow(s * r * 0.33, -r * 0.48, r * 0.16, s * 0.3, lw * 0.9);
@@ -2930,12 +2985,14 @@
       const mo = new Path2D();
       mo.ellipse(0, r * 0.22, r * 0.13, r * (0.14 + 0.07 * Math.sin(t * 6)), 0, 0, Math.PI * 2);
       fPaint(mo, "#2a6f86", lw * 0.7);
+      P("notes", { box: [-2.2, -1.2, 0, 0.6], z: 2 });
       for (let i = 0; i < 3; i++) {
         const k = (t * 0.6 + i / 3) % 1;
         ctx.fillStyle = `rgba(143,233,255,${1 - k})`;
         ctx.font = `${r * 0.3}px "Permanent Marker", serif`;
         ctx.fillText(i % 2 ? "♪" : "♫", -r * 0.5 - k * r * 1.2, r * 0.1 - k * r * 0.8 + Math.sin(k * 8) * r * 0.1);
       }
+      P("hands", { pv: [0, 0.68], sw: 0.04, sp: 2.5, ph: 2, z: 1.6 });
       for (const s of [-1, 1]) glove(s * r * 0.12, r * 0.68, r * 0.13, s * -0.5, "#ffffff", lw * 0.6);
       if (Math.sin(t * 9) > 0.8) lightLayer(() => { ctx.fillStyle = "rgba(143,233,255,0.45)"; ctx.fillRect(-r * 1.2, Math.sin(t * 40) * r, r * 2.4, r * 0.08); });
     },
@@ -2957,6 +3014,7 @@
         sl.ellipse(s * r * 0.2, -r * 0.68, r * 0.13, r * 0.2, s * 0.3, 0, Math.PI * 2);
         fPaint(sl, "#5b2a86", lw * 0.6);
       }
+      P("hair", { pv: [0, -0.25], sw: 0.03, sp: 1.5, ph: 1, z: 1.4 });
       // ponytail hangs past the head
       const pt = new Path2D();
       pt.moveTo(-r * 0.24, r * 1.85);
@@ -2971,6 +3029,7 @@
         limb([[s * r * 0.4, r * 1.0], [s * r * 0.62, r * 1.6], [ax, ay]], r * 0.15, "#ffd6e8", lw * 0.5);
         glove(ax, ay + r * 0.1, r * 0.13, Math.PI, "#ffffff", lw * 0.6);
       }
+      P("torso", { pv: [0, -1.25], sw: 0.02, sp: 1.5, z: 0.8 });
       const torso = new Path2D();
       torso.moveTo(-r * 0.36, r * 0.35);
       torso.bezierCurveTo(-r * 0.3, r * 0.7, -r * 0.6, r * 0.95, -r * 0.44, r * 1.2);
@@ -2985,6 +3044,7 @@
       ctx.lineWidth = lw;
       ctx.stroke(torso);
       ruffle(0, r * 1.16, r * 1.0, 5, r * 0.12, "#ffd23f", "#fbf8f2", lw);
+      P("head", { pv: [0, -0.05], sw: 0.05, sp: 1.8, ph: 2, z: 1.3, brad: true });
       // head, upside down
       ctx.save();
       ctx.translate(0, r * 1.6);
@@ -3025,6 +3085,7 @@
         ctx.fillRect(e[0] - r * 0.07, e[1] + r * 0.1, r * 0.04, r * 0.09);
         ctx.fillRect(e[0] + r * 0.03, e[1] + r * 0.1, r * 0.04, r * 0.09);
       }
+      P("tvs", { pv: [0, 0.1], sw: 0.03, sp: 1.8, z: 1.6 });
       for (const s of [-1, 1]) {
         const tx = s * r * 1.6, ty = -r * 0.3 + Math.sin(t * 1.8 + s) * r * 0.15;
         limb([[s * r * 0.9, r * 0.1], [s * r * 1.3, r * 0.3], [tx, ty + r * 0.22]], r * 0.08, "#2b2140", lw * 0.4);
@@ -3039,6 +3100,7 @@
         ctx.lineWidth = lw * 0.5;
         ctx.beginPath(); ctx.moveTo(tx, ty - r * 0.24); ctx.lineTo(tx - r * 0.12, ty - r * 0.42); ctx.moveTo(tx, ty - r * 0.24); ctx.lineTo(tx + r * 0.12, ty - r * 0.42); ctx.stroke();
       }
+      P("antenna", { pv: [0, -0.75], sw: 0.04, sp: 2.2, ph: 1, z: 1.8 });
       ctx.strokeStyle = FINK;
       ctx.lineWidth = lw * 1.5;
       ctx.beginPath();
@@ -3049,6 +3111,7 @@
       ctx.lineWidth = lw * 0.6;
       ctx.stroke();
       for (const [ax, ay] of [[-0.8, -1.6], [0.7, -1.65]]) { const bl = new Path2D(); bl.arc(ax * r, ay * r, r * 0.08, 0, Math.PI * 2); fPaint(bl, "#cfc6d8", lw * 0.5); if (Math.sin(t * 9 + ax) > 0.5) glow(ax * r, ay * r, r * 0.4, "#a6d94a", 0.8); }
+      P("box", { pv: [0, 0.7], sw: 0.015, sp: 1, z: 0.8 });
       const box = new Path2D();
       box.roundRect(-r * 1.08, -r * 0.8, r * 2.16, r * 1.54, r * 0.22);
       fBody(box, vgrad("#54427a", "#221838", -r * 0.8, r * 0.75), r * 1.4, lw);
@@ -3104,9 +3167,158 @@
       for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(r * 0.72, r * 0.26 + k * r * 0.07); ctx.lineTo(r * 0.96, r * 0.26 + k * r * 0.07); ctx.stroke(); }
       ctx.fillStyle = Math.sin(t * 4) > 0 ? "#ff3b4a" : "#5a0f1f";
       ctx.beginPath(); ctx.arc(r * 0.84, r * 0.14, r * 0.035, 0, Math.PI * 2); ctx.fill();
+      P("crown", { pv: [0, -0.84], sw: 0.07, sp: 1.6, ph: 1, z: 2 });
       fCrown(0, -r * 0.84, r * 0.62, "#a6d94a", lw);
     }
   };
+
+  // ---- foes are jointed paper puppets ----
+  // A foe's drawing is cut into parts by P() markers. Each part is its own piece of card with a cut edge and a
+  // shadow on the parts beneath, and swings a little on its own pin, so the pieces shift against each other.
+  // P(name, { pv: [x, y] pin in units of r, sw: swing in radians, sp: speed, ph: phase, z: how loose it is,
+  //           box: [x0, y0, x1, y1] fixed bounds in units of r, edge: 0 for a part glued flat to the one below })
+  function P(name, o) { if (PS) PS.mark(o || {}); }
+  const puppets = {};
+  let measG = null;
+  const MEAS = 220;
+  // Finds the bounds of every part by drawing the foe small at many moments of its animation.
+  function measurePuppet(r, hw, up, down, pad, drawAt) {
+    const sc = MEAS / Math.max(hw * 2, up + down);
+    if (!measG) { const cv = document.createElement("canvas"); cv.width = cv.height = MEAS; measG = cv.getContext("2d", { willReadFrequently: true }); }
+    const g = measG, acc = [], keep = ctx, fixed = [];
+    const flush = () => {
+      const i = PS.i;
+      if (i < 0) return;
+      if (!acc[i]) { const cv = document.createElement("canvas"); cv.width = cv.height = MEAS; acc[i] = cv.getContext("2d", { willReadFrequently: true }); }
+      acc[i].drawImage(g.canvas, 0, 0);
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, MEAS, MEAS); g.restore();
+    };
+    cutDepth++;
+    try {
+      for (let k = 0; k < 14; k++) {
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalAlpha = 1;
+        g.globalCompositeOperation = "source-over";
+        g.filter = "none";
+        g.clearRect(0, 0, MEAS, MEAS);
+        g.setTransform(sc, 0, 0, sc, hw * sc, up * sc);
+        g.lineJoin = "round";
+        g.lineCap = "round";
+        PS = { measure: true, i: -1, g, mark(op) { flush(); this.i++; if (op && op.box && !k) fixed.push(op.box.map((v) => v * r)); } };
+        ctx = g;
+        g.save();
+        PS.mark();
+        drawAt(k);
+        flush();
+        g.restore();
+      }
+    } finally { ctx = keep; PS = null; cutDepth--; }
+    const boxes = acc.map((a) => {
+      if (!a) return null;
+      const d = a.getImageData(0, 0, MEAS, MEAS).data;
+      let x0 = MEAS, y0 = MEAS, x1 = -1, y1 = -1;
+      for (let y = 0; y < MEAS; y++) for (let x = 0; x < MEAS; x++) {
+        if (d[(y * MEAS + x) * 4 + 3] > 6) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 < 0) return null;
+      const m = pad + 2 / sc;
+      return [Math.max(-hw, x0 / sc - hw - m), Math.max(-up, y0 / sc - up - m), Math.min(hw, (x1 + 1) / sc - hw + m), Math.min(down, (y1 + 1) / sc - up + m)];
+    });
+    // the sheet the parts are drawn on only has to cover them
+    const u = [0, 0, 0, 0];
+    for (const b of boxes.concat(fixed)) if (b) { u[0] = Math.min(u[0], b[0]); u[1] = Math.min(u[1], b[1]); u[2] = Math.max(u[2], b[2]); u[3] = Math.max(u[3], b[3]); }
+    return { boxes, hw: Math.min(hw, Math.max(-u[0], u[2]) + 2), up: Math.min(up, -u[1] + 2), down: Math.min(down, u[3] + 2) };
+  }
+  function puppet(f, r, t, lw, ft, hpK, art, o, hw, up, down) {
+    const main = ctx, e = 2.3 * U, lift = 2.6 * U, key = f.def.id + ":" + Math.round(r) + ":" + DPR;
+    let info = puppets[key];
+    if (!info) {
+      info = puppets[key] = measurePuppet(r, hw, up, down, r * 0.1 + e, (k) =>
+        art(k % 2 ? Object.assign({}, f, { charge: 1 }) : f, r, k * 0.61 + 0.2, lw, ft, k % 3 ? 1 : 0.2, -r * 4));
+    }
+    const boxes = info.boxes;
+    hw = info.hw; up = info.up; down = info.down;
+    const W = Math.ceil(hw * 2 * DPR), H = Math.ceil((up + down) * DPR), S = sheet("foe", W, H), g = S.g;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = "source-over";
+    g.filter = "none";
+    g.clearRect(0, 0, W, H);
+    g.setTransform(DPR, 0, 0, DPR, hw * DPR, up * DPR);
+    g.lineJoin = "round";
+    g.lineCap = "round";
+    const col = o.edgeColor || D.paper.edge, hk = o.hurtK || 0, ga = main.globalAlpha;
+    const finish = () => {
+      const i = PS.i, op = PS.opts;
+      if (i < 0) return;
+      let b = boxes[i];
+      if (op.box) b = [op.box[0] * r, op.box[1] * r, op.box[2] * r, op.box[3] * r];
+      // how this part hangs on its pin right now
+      const z = op.z === undefined ? 1 : op.z, pv = op.pv || [0, 0], side = i % 2 ? 1 : -1;
+      const ang = (op.sw || 0) * Math.sin(t * (op.sp || 1.5) + (op.ph || 0)) + hk * 0.2 * z * side + (f.charge ? Math.sin(t * 43 + i * 2) * 0.012 * z : 0);
+      const ox = Math.sin(t * 0.9 + i * 1.7) * r * 0.012 * z + hk * r * 0.07 * z * side, oy = -hk * r * 0.09 * z;
+      main.save();
+      main.translate(pv[0] * r + ox, pv[1] * r + oy);
+      main.rotate(ang);
+      main.translate(-pv[0] * r, -pv[1] * r);
+      if (b) {
+        const sx = Math.max(0, Math.floor((b[0] + hw) * DPR)), sy = Math.max(0, Math.floor((b[1] + up) * DPR));
+        const sw = Math.min(W, Math.ceil((b[2] + hw) * DPR)) - sx, sh = Math.min(H, Math.ceil((b[3] + up) * DPR)) - sy;
+        if (sw > 1 && sh > 1) {
+          const lx = sx / DPR - hw, ly = sy / DPR - up, lwd = sw / DPR, lh = sh / DPR;
+          const Pc = sheet("part", sw, sh);
+          Pc.g.globalCompositeOperation = "copy";
+          Pc.g.drawImage(S.cv, sx, sy, sw, sh, 0, 0, sw, sh);
+          if (op.edge !== 0) {
+            const ES = DPR >= 2 ? 0.5 : 0.75, ew = Math.ceil(sw * ES), eh = Math.ceil(sh * ES), M = sheet("edge", ew, eh), ee = e * DPR * ES;
+            M.g.setTransform(1, 0, 0, 1, 0, 0);
+            M.g.globalCompositeOperation = "source-over";
+            M.g.clearRect(0, 0, ew, eh);
+            for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; M.g.drawImage(Pc.cv, 0, 0, sw, sh, Math.cos(a) * ee, Math.sin(a) * ee, sw * ES, sh * ES); }
+            const tint = (c) => { M.g.globalCompositeOperation = "source-in"; M.g.fillStyle = c; M.g.fillRect(0, 0, ew, eh); M.g.globalCompositeOperation = "source-over"; };
+            if (!D.paper.neon) {
+              tint("#08030f");
+              main.globalAlpha = ga * 0.42;
+              main.drawImage(M.cv, 0, 0, ew, eh, lx + lift, ly + lift * 1.4, lwd, lh);
+              main.globalAlpha = ga;
+            }
+            tint(col);
+            main.drawImage(M.cv, 0, 0, ew, eh, lx, ly, lwd, lh);
+          }
+          main.drawImage(Pc.cv, 0, 0, sw, sh, lx, ly, lwd, lh);
+          g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(sx, sy, sw, sh); g.restore();
+        }
+      }
+      if (op.brad) {
+        // the split pin holding this part on
+        main.fillStyle = "#3a2a10";
+        main.beginPath(); main.arc(pv[0] * r, pv[1] * r, r * 0.06, 0, Math.PI * 2); main.fill();
+        main.fillStyle = "#e8b923";
+        main.beginPath(); main.arc(pv[0] * r, pv[1] * r, r * 0.042, 0, Math.PI * 2); main.fill();
+        main.fillStyle = "rgba(255,255,255,0.7)";
+        main.beginPath(); main.arc(pv[0] * r - r * 0.014, pv[1] * r - r * 0.014, r * 0.014, 0, Math.PI * 2); main.fill();
+      }
+      for (const L of PS.lights) {
+        main.save();
+        main.transform(L.m.a, L.m.b, L.m.c, L.m.d, L.m.e, L.m.f);
+        main.globalCompositeOperation = "lighter";
+        ctx = main;
+        try { L.fn(); } finally { ctx = g; }
+        main.restore();
+      }
+      PS.lights.length = 0;
+      main.restore();
+    };
+    PS = { g, i: -1, opts: {}, lights: [], binv: new DOMMatrix([DPR, 0, 0, DPR, hw * DPR, up * DPR]).inverse(), mark(op) { finish(); this.i++; this.opts = op; } };
+    ctx = g;
+    cutDepth++;
+    g.save();
+    try {
+      PS.mark({ z: 0.5 });
+      art(f, r, t, lw, ft, hpK, -r * 4);
+      finish();
+    } finally { g.restore(); ctx = main; cutDepth--; PS = null; }
+  }
 
   D.foeCenter = function (look, feetY, scale) {
     const r = 42 * U * look.size * (scale || 1);
@@ -3239,7 +3451,8 @@
     }
     ctx.restore();
     const hw = r * 3.7, up = r * 4.1, down = Math.max(feetY - y + r * 0.5, r * 3.0);
-    cutout(() => {
+    const paper = D.paper.on && !cutDepth && !o.flat;
+    if (paper && D.paper.neon) glow(x, y, r * 2.4, o.edgeColor || D.paper.edge, 0.3);
     ctx.save();
     if (o.hurt) ctx.filter = "brightness(2.2) saturate(0.3)";
     // paper on a stick: a slow sway from the base
@@ -3256,9 +3469,9 @@
     const lw = Math.max(1.6, r * 0.055);
     const hpK = f.maxHp ? Math.max(0, f.hp) / f.maxHp : 1;
     const art = ART[f.def.id] || ART.mime;
-    art(f, r, t, lw, feetY - y, hpK, -r * 4);
+    if (paper) puppet(f, r, t, lw, feetY - y, hpK, art, o, hw, up, down);
+    else art(f, r, t, lw, feetY - y, hpK, -r * 4);
     ctx.restore();
-    }, x, y, hw, up, down, { flat: o.flat, edgeColor: o.edgeColor, edge: 3.4 });
     return { x, y, r };
   };
 
