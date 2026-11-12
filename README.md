@@ -58,6 +58,14 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 - **Fainting** keeps half the Tix, one thing from the bag and 0.6 times the training, and the Jinx comes home sad.
 - **Keys:** 1 to 9 play cards, E ends the turn.
 
+## The look
+
+The whole game is a paper theatre made from a photocopied zine:
+
+- **Cut-outs:** Jinxes, foes, the tent, the tree and the toys are paper cut-outs with a white edge and a hard shadow. In a fight they stand on sticks behind a cardboard stage front, and each foe is pasted onto a torn scrap of printed paper. A beaten foe flips over like a card and flutters away.
+- **Zine print:** titles are cut-out letters from different magazines, buttons and map stops are stickers, and the cards and sky are printed in dots.
+- **Blacklight:** the third act is lit by blacklight, so the cut edges glow green and pink.
+
 ## Files
 
 - `index.html`: the page and its styles.

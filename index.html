@@ -42,9 +42,9 @@ body {
 #grain {
   position: absolute; inset: 0; pointer-events: none; z-index: 50;
   background:
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.13) 0 1px, transparent 1px 3px),
+    radial-gradient(circle, rgba(0,0,0,0.2) 0.7px, transparent 1.1px) 0 0 / 4px 4px,
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  opacity: 0.16;
+  opacity: 0.2;
   mix-blend-mode: overlay;
 }
 #app::after {
@@ -493,6 +493,99 @@ body[data-mode="battle"] #toast { bottom: auto; top: 40%; }
 @media (prefers-reduced-motion: reduce) {
   .node.can .ng, .in-charge, .btn.showstop, #applause.full .ap-bar i { animation: none; }
   .btn, .card, #toast { transition: none; }
+}
+
+/* ---------- zine: cut-and-paste lettering, sticker edges, print dots ---------- */
+:root { --paper: #fbf8f2; --dots: radial-gradient(circle, rgba(20,10,30,0.3) 1.1px, transparent 1.5px) 0 0 / 5px 5px; }
+.ransom { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 0.12em 0; }
+.ransom .w { display: inline-flex; gap: 0.06em; margin: 0 0.16em; }
+.rn {
+  display: inline-block; min-width: 0.72em; padding: 0.06em 0.12em 0.02em; line-height: 1; text-align: center; text-shadow: none;
+  transform: rotate(var(--r, 0deg)) translateY(var(--y, 0));
+  box-shadow: 0.03em 0.05em 0 rgba(8,3,16,0.6);
+  background: var(--bone); color: var(--ink);
+}
+.rn.k0 { font-family: var(--chunk); font-size: 0.86em; background: var(--dots), var(--bone); background-blend-mode: multiply; }
+.rn.k1 { font-family: var(--drip); background: var(--ink); color: var(--sludge); box-shadow: 0 0 0 0.04em var(--paper), 0.06em 0.08em 0 rgba(8,3,16,0.6); }
+.rn.k2 { font-family: var(--marker); background: var(--pink); color: #fff; }
+.rn.k3 { font-family: var(--type); font-size: 0.95em; background: var(--gold); color: var(--ink); }
+.rn.k4 { font-family: var(--chunk); font-size: 0.86em; background: var(--ether); color: var(--ink); clip-path: polygon(0 4%, 100% 0, 97% 100%, 3% 96%); }
+.rn.k5 { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700; background: #fff; color: var(--red); clip-path: polygon(3% 0, 100% 5%, 96% 97%, 0 100%); }
+.logo { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--ink);
+  filter: drop-shadow(5px 7px 0 rgba(8,3,16,0.75)); font-size: clamp(3rem, 9.4vw, 6.2rem); line-height: 1.02; }
+.tagline { background: rgba(13,6,24,0.78); color: var(--bone); padding: 8px 12px; box-shadow: 3px 4px 0 rgba(8,3,16,0.6); transform: rotate(0.6deg); }
+.credit { background: rgba(13,6,24,0.6); padding: 2px 8px; }
+.node:disabled { opacity: 0.62; filter: grayscale(0.45); }
+.node.done { opacity: 0.8; filter: none; }
+.hud-logo { color: var(--ink); text-shadow: none; font-size: 1.45rem; filter: drop-shadow(2px 3px 0 rgba(8,3,16,0.7)); }
+#mapTitle .ransom { font-size: 0.92em; padding-top: 4px; filter: drop-shadow(3px 4px 0 rgba(8,3,16,0.7)); }
+h2 { text-shadow: -2px -1px 0 rgba(143,233,255,0.75), 2.5px 2px 0 var(--pink), 5px 5px 0 var(--ink); }
+#mapTitle { text-shadow: none; }
+
+/* buttons are stickers: flat ink colour, print dots in the lower half, a white cut edge */
+.btn {
+  --b: var(--pink);
+  background: linear-gradient(180deg, var(--b) 42%, transparent 92%), var(--dots), var(--b);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--paper), 5px 6px 0 3px rgba(8,3,16,0.72);
+}
+.btn:hover:not(:disabled) { box-shadow: 0 0 0 3px var(--paper), 7px 8px 0 3px rgba(8,3,16,0.72); }
+.btn:active:not(:disabled) { box-shadow: 0 0 0 3px var(--paper), 1px 1px 0 3px rgba(8,3,16,0.72); }
+.btn.big { --b: var(--sludge); background: linear-gradient(180deg, var(--b) 42%, transparent 92%), var(--dots), var(--b); }
+.btn.small[style*="--bc"] { --b: var(--bc); background: linear-gradient(180deg, var(--b) 42%, transparent 92%), var(--dots), var(--b); }
+.btn.on, .btn.showstop { --b: var(--gold); background: linear-gradient(180deg, var(--b) 42%, transparent 92%), var(--dots), var(--b); }
+.btn.warn { --b: var(--red); background: linear-gradient(180deg, var(--b) 42%, transparent 92%), var(--dots), var(--b); }
+.btn.ghost { background: rgba(20,10,30,0.82); box-shadow: 0 0 0 1.5px var(--bone-dim), 4px 5px 0 2px rgba(8,3,16,0.72); border-color: transparent; }
+.btn.choice { --b: #6d3bd0; }
+
+/* flyers are photocopies: dots creeping in from a corner, a second strip of tape */
+.flyer {
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.085) 1px, transparent 1.5px) 0 0 / 6px 6px,
+    linear-gradient(200deg, rgba(255,79,163,0.14), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 40%),
+    var(--bruise);
+  box-shadow: 0 0 0 1px var(--ink), 8px 9px 0 rgba(8,3,16,0.8), 0 0 40px rgba(255,79,163,0.14);
+}
+.plate { background: radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1.5px) 0 0 / 5px 5px, linear-gradient(105deg, rgba(47,24,72,0.94), rgba(20,10,30,0.9)); }
+
+/* cards: the picture is printed in dots, slightly off register */
+.card {
+  background:
+    linear-gradient(180deg, var(--tc) 0 30px, transparent 30px),
+    radial-gradient(circle at 50% 42%, transparent 0 29%, var(--bone) 30%),
+    radial-gradient(circle, color-mix(in srgb, var(--tc) 62%, var(--bone)) 1.7px, transparent 2.1px) 2px 1px / 6px 6px,
+    radial-gradient(circle at 53% 44%, rgba(143,233,255,0.5) 0 29%, transparent 30%),
+    var(--bone);
+}
+.card .cart { text-shadow: 2px 1.5px 0 rgba(143,233,255,0.85); }
+
+/* the map is a flyer taped to the wall; stops are round stickers */
+#mapBoard::before {
+  content: ""; position: absolute; inset: -18px -14px -26px; z-index: -1;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1.5px) 0 0 / 6px 6px,
+    linear-gradient(160deg, rgba(34,17,52,0.9), rgba(13,6,24,0.82));
+  border: 2px dashed rgba(239,230,210,0.4);
+  box-shadow: 8px 9px 0 rgba(8,3,16,0.7);
+  transform: rotate(-0.4deg);
+}
+#mapBoard::after {
+  content: ""; position: absolute; top: -30px; left: 50%; width: 110px; height: 26px; margin-left: -55px; z-index: 0;
+  background: rgba(233,211,164,0.6); transform: rotate(2.5deg); box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+#mapBoard { isolation: isolate; }
+.node .ng {
+  background: linear-gradient(180deg, var(--nc) 40%, transparent 95%), var(--dots), var(--nc);
+  box-shadow: 0 0 0 3px var(--paper), 4px 5px 0 3px rgba(8,3,16,0.72);
+}
+.node.done .ng { background: var(--bruise-2); box-shadow: 0 0 0 2px var(--bone-dim), 3px 4px 0 2px rgba(8,3,16,0.72); }
+.node:nth-child(3n) .ng { transform: rotate(-5deg); } .node:nth-child(3n+1) .ng { transform: rotate(4deg); }
+.node .nl { background: var(--bone); color: var(--ink); padding: 1px 6px; transform: rotate(-1.5deg); box-shadow: 2px 2px 0 rgba(8,3,16,0.6); }
+.node.done .nl, .node:disabled .nl { background: rgba(13,6,24,0.85); color: var(--bone); box-shadow: none; }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px var(--paper), 4px 5px 0 3px rgba(8,3,16,0.72), 0 0 0 3px rgba(255,210,63,0.7); }
+  50% { transform: scale(1.1); box-shadow: 0 0 0 3px var(--paper), 4px 5px 0 3px rgba(8,3,16,0.72), 0 0 0 13px rgba(255,210,63,0); }
 }
 </style>
 

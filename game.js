@@ -8,6 +8,15 @@
   const pick = (a) => a[(rand() * a.length) | 0];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const sleep = (ms) => (JG.fast ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));   // JG.fast: automated play-tests skip the waits
+  // cut-out lettering: every letter is a scrap from a different magazine
+  function ransom(text) {
+    let i = 0, prev = 0;
+    return `<span class="ransom" aria-hidden="true">` + String(text).split(" ").map((w) => `<span class="w">` + [...w].map((ch) => {
+      const k = (prev + 1 + (ch.charCodeAt(0) + i) % 5) % 6, r = ((i * 37 + 3) % 11) - 5, y = ((i * 53) % 7) - 3;
+      prev = k; i++;
+      return `<span class="rn k${k}" style="--r:${r}deg;--y:${(y * 0.025).toFixed(3)}em">${esc(ch)}</span>`;
+    }).join("") + `</span>`).join("") + `</span>`;
+  }
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   let uid = 1;
 
@@ -1006,7 +1015,8 @@
     setMode("map");
     renderRunbar();
     const act = JG.ACTS[r.act - 1];
-    $("#mapTitle").innerHTML = `<small>Act ${["I", "II", "III"][r.act - 1]}</small>${esc(act.name)}`;
+    $("#mapTitle").innerHTML = `<small>Act ${["I", "II", "III"][r.act - 1]}</small>${ransom(act.name)}`;
+    $("#mapTitle").setAttribute("aria-label", `Act ${r.act}: ${act.name}`);
     const avail = available().map((p) => p.join(":"));
     const rowH = 92;
     const H = r.map.length * rowH + 40;
@@ -2054,6 +2064,7 @@
       : `<button class="btn big" data-act="new">Open the gates</button>`;
   }
   let confirmNew = false;
+  for (const el of document.querySelectorAll(".logo, .hud-logo")) { el.setAttribute("aria-label", el.textContent); el.innerHTML = ransom(el.textContent); }
   $("#titleBtns").addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b) return;

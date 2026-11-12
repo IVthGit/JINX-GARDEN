@@ -96,6 +96,145 @@
     cache[key] = { k: full, cv };
     return cv;
   }
+  // lay a finished piece of scenery onto a layer with a white cut edge and a paper shadow
+  function stampFlat(g, tmp, e) {
+    const dpr = c.canvas.width / W, sil = document.createElement("canvas");
+    sil.width = tmp.width;
+    sil.height = tmp.height;
+    const sg = sil.getContext("2d");
+    sg.drawImage(tmp, 0, 0);
+    sg.globalCompositeOperation = "source-in";
+    sg.fillStyle = "#fbf8f2";
+    sg.fillRect(0, 0, sil.width, sil.height);
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.shadowColor = "rgba(8,3,16,0.55)";
+    g.shadowOffsetX = 6 * U * dpr;
+    g.shadowOffsetY = -3 * U * dpr;
+    g.drawImage(sil, 0, 0);
+    g.shadowColor = "transparent";
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; g.drawImage(sil, Math.cos(a) * e * dpr, Math.sin(a) * e * dpr); }
+    g.drawImage(tmp, 0, 0);
+    g.restore();
+  }
+  // ---- the toy theatre itself: side wings and the front ledge the puppet sticks vanish behind ----
+  const SETS = [
+    { card: "#b98d5c", dark: "#8a623a", a: "#d62839", b: "#efe6d2", trim: "#ffd23f" },
+    { card: "#1f5560", dark: "#0e2f36", a: "#e8b923", b: "#0b2228", trim: "#8fe9ff" },
+    { card: "#191026", dark: "#0a0612", a: "#b6ff5c", b: "#ff4fa3", trim: "#8fe9ff" }
+  ];
+  function buildTheatre(g, act, y0) {
+    const S = SETS[act - 1], ww = clamp(W * 0.045, 22 * U, 58 * U), neon = act === 3, r = X.rng(50 + act);
+    const corrug = (x, y, w, h, vertical) => {
+      g.fillStyle = S.dark;
+      g.fillRect(x, y, w, h);
+      g.strokeStyle = "rgba(255,255,255,0.22)";
+      g.lineWidth = 1;
+      g.beginPath();
+      const n = Math.floor((vertical ? h : w) / (5 * U));
+      for (let i = 0; i < n; i++) {
+        if (vertical) { const yy = y + i * 5 * U; g.moveTo(x, yy); g.quadraticCurveTo(x + w / 2, yy + 3 * U, x + w, yy); }
+        else { const xx = x + i * 5 * U; g.moveTo(xx, y); g.quadraticCurveTo(xx + 3 * U, y + h / 2, xx, y + h); }
+      }
+      g.stroke();
+    };
+    const tape = (x, y, ang) => {
+      g.save();
+      g.translate(x, y);
+      g.rotate(ang);
+      g.fillStyle = neon ? "rgba(182,255,92,0.5)" : "rgba(233,211,164,0.72)";
+      g.fillRect(-22 * U, -7 * U, 44 * U, 14 * U);
+      g.restore();
+    };
+    for (const side of [0, 1]) {
+      g.save();
+      if (side) { g.translate(W, 0); g.scale(-1, 1); }
+      g.shadowColor = "rgba(8,3,16,0.6)";
+      g.shadowBlur = 10 * U;
+      g.shadowOffsetX = side ? -6 * U : 6 * U;
+      const wing = new Path2D();
+      wing.moveTo(0, 0);
+      wing.lineTo(ww, 0);
+      for (let y = 0; y <= H; y += 46 * U) wing.quadraticCurveTo(ww + 12 * U, y + 23 * U, ww, y + 46 * U);
+      wing.lineTo(0, H + 50);
+      wing.closePath();
+      g.fillStyle = "#fbf8f2";
+      g.fill(wing);
+      g.shadowColor = "transparent";
+      g.save();
+      g.clip(wing);
+      g.fillStyle = S.card;
+      g.fillRect(0, 0, ww * 1.5, H);
+      // hand-painted stripes that don't quite stay inside the lines
+      for (let y = -20 * U, i = 0; y < H; y += 34 * U, i++) {
+        g.fillStyle = i % 2 ? S.a : S.b;
+        g.globalAlpha = neon ? 0.9 : 0.82;
+        g.beginPath();
+        g.moveTo(0, y + r() * 4 * U);
+        g.lineTo(ww * 1.5, y - 12 * U + r() * 4 * U);
+        g.lineTo(ww * 1.5, y + 5 * U + r() * 4 * U);
+        g.lineTo(0, y + 17 * U + r() * 4 * U);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+      for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.1})`; g.fillRect(r() * ww * 1.3, r() * H, 1 + r() * 3, 1 + r() * 2); }
+      g.restore();
+      g.strokeStyle = "#fbf8f2";
+      g.lineWidth = 3 * U;
+      g.stroke(wing);
+      g.strokeStyle = INK;
+      g.lineWidth = 1.2;
+      g.stroke(wing);
+      g.restore();
+    }
+    // the ledge
+    g.save();
+    g.shadowColor = "rgba(8,3,16,0.65)";
+    g.shadowBlur = 12 * U;
+    g.shadowOffsetY = -5 * U;
+    g.fillStyle = "#fbf8f2";
+    g.fillRect(-10, y0 - 3 * U, W + 20, H - y0 + 20);
+    g.restore();
+    g.fillStyle = S.card;
+    g.fillRect(0, y0, W, H - y0);
+    corrug(0, y0, W, 7 * U, false);
+    for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(0,0,0,${0.04 + r() * 0.1})`; g.fillRect(r() * W, y0 + 8 * U + r() * (H - y0), 2 + r() * 8, 1 + r() * 2); }
+    const seg = 38 * U;
+    for (let x = -seg / 2, i = 0; x < W + seg; x += seg, i++) {
+      g.fillStyle = "#fbf8f2";
+      g.beginPath(); g.arc(x, y0 + 7 * U, seg / 2 + 2.5 * U, 0, Math.PI); g.fill();
+      g.fillStyle = i % 2 ? S.a : S.b;
+      g.beginPath(); g.arc(x, y0 + 7 * U, seg / 2, 0, Math.PI); g.fill();
+      g.fillStyle = S.trim;
+      g.beginPath(); g.arc(x, y0 + 7 * U + seg / 2 + 3 * U, 3.2 * U, 0, Math.PI * 2); g.fill();
+    }
+    tape(ww + 20 * U, y0 + 4 * U, -0.2);
+    tape(W - ww - 20 * U, y0 + 4 * U, 0.16);
+    tape(ww * 0.5, 30 * U, 1.2);
+    tape(W - ww * 0.5, 34 * U, -1.1);
+    // brads
+    for (const [bx, by] of [[ww * 0.5, H * 0.3], [W - ww * 0.5, H * 0.34]]) {
+      g.fillStyle = INK; g.beginPath(); g.arc(bx, by, 6 * U, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#e8b923"; g.beginPath(); g.arc(bx, by, 4.4 * U, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "rgba(255,255,255,0.6)"; g.beginPath(); g.arc(bx - 1.5 * U, by - 1.5 * U, 1.4 * U, 0, Math.PI * 2); g.fill();
+    }
+  }
+  function theatre(B) {
+    const y0 = Math.round((B.crowdY || H * 0.8) - 30 * U);
+    c.drawImage(layer("set" + B.act + ":" + y0, (g) => buildTheatre(g, B.act, y0)), 0, 0, W, H);
+  }
+  // a lollipop stick holding a puppet up from below
+  function stick(x, top) {
+    const w = 7 * U;
+    c.fillStyle = INK;
+    c.fillRect(x - w / 2 - 1.5 * U, top, w + 3 * U, H - top);
+    c.fillStyle = "#d9b77a";
+    c.fillRect(x - w / 2, top, w, H - top);
+    c.fillStyle = "rgba(255,255,255,0.35)";
+    c.fillRect(x - w / 2, top, w * 0.3, H - top);
+    c.fillStyle = "rgba(90,60,30,0.3)";
+    for (let y = top + 14 * U; y < H; y += 26 * U) c.fillRect(x - w / 2, y, w, 1.5 * U);
+  }
   function checker(g, hz, tone) {
     const rows = 9, cols = 14;
     for (let r = 0; r < rows; r++) {
@@ -133,6 +272,11 @@
     const cols = [["#b52a42", "#d9cdb4"], ["#2f8f9a", "#d9cdb4"], ["#7a3fc4", "#ffd23f"], ["#6f9a22", "#1b1726"]];
     const neon = ["#ff4fa3", "#8fe9ff", "#ffd23f", "#a6d94a"];
     let i = 0;
+    const base = g, tmp = document.createElement("canvas");
+    tmp.width = base.canvas.width;
+    tmp.height = base.canvas.height;
+    g = tmp.getContext("2d");
+    g.setTransform(base.getTransform());
     for (let x = -bw * 0.35; x < W; x += bw * 1.06, i++) {
       const top = hz - bh, cl = cols[i % cols.length];
       g.fillStyle = "#170c16";
@@ -187,9 +331,11 @@
       g.fillText(names[i % names.length], x + bw / 2, top - bh * 0.2);
       g.shadowBlur = 0;
     }
+    stampFlat(base, tmp, 3.5 * U);
+    g = base;
     const sh = g.createLinearGradient(0, hz - bh * 1.4, 0, hz);
-    sh.addColorStop(0, "rgba(13,6,24,0.5)");
-    sh.addColorStop(1, "rgba(13,6,24,0.15)");
+    sh.addColorStop(0, "rgba(13,6,24,0.32)");
+    sh.addColorStop(1, "rgba(13,6,24,0.05)");
     g.fillStyle = sh;
     g.fillRect(0, hz - bh * 1.4, W, bh * 1.4);
     g.textAlign = "left";
@@ -354,8 +500,8 @@
       c.translate(cx, bot - mh * 0.08);
       c.transform(w[0] * wob, 0, w[2] * Math.sin(st * 0.8 + i), w[1] / wob, 0, 0);
       c.scale(0.8, 0.8);
-      if (B.jinx) D.drawJinx(B.jinx, (pos.px - cx) * 0.7, 0, { t: st, dir: 1, scale: SCALE, hop: pos.pHop });
-      if (B.foe && !B.over) D.drawFoe(B.foe, (pos.fx - cx) * 0.7, pos.fy - P.feet, st, { scale: FOE_SCALE });
+      if (B.jinx) D.drawJinx(B.jinx, (pos.px - cx) * 0.7, 0, { t: st, dir: 1, scale: SCALE, hop: pos.pHop, flat: true });
+      if (B.foe && !B.over) D.drawFoe(B.foe, (pos.fx - cx) * 0.7, pos.fy - P.feet, st, { scale: FOE_SCALE, flat: true });
       c.restore();
       c.save();
       c.clip(path);
@@ -583,22 +729,27 @@
   function fighters(B, pos, st, rt, main) {
     const a = B.anim;
     let pr = null, fr = null;
+    const neon = B.act === 3;
     if (B.jinx) {
-      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, hop: pos.pHop, twirl: show && show.form === "pierrot" && rt - show.t0 > 0.3 && rt - show.t0 < 1.5 ? (rt - show.t0 - 0.3) * 15 : 0, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
+      if (main) stick(pos.px, pos.py - pos.pHop - 8 * U);
+      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, flat: !main, edgeColor: neon ? "#b6ff5c" : undefined, hop: pos.pHop, twirl: show && show.form === "pierrot" && rt - show.t0 > 0.3 && rt - show.t0 < 1.5 ? (rt - show.t0 - 0.3) * 15 : 0, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
     }
     if (B.foe && !(B.over === "win" && rt - a.fDie > 0.8)) {
       c.save();
       if (B.over === "win") {
-        // knocked spinning off the stage
-        const k = clamp((rt - a.fDie) / 0.8, 0, 1), px = pos.fx + k * 120 * U, py = pos.fy - 60 * U - Math.sin(k * Math.PI) * 120 * U;
+        // flips over like a card and flutters off the stage
+        const k = clamp((rt - a.fDie) / 0.8, 0, 1), px = pos.fx + k * 150 * U + Math.sin(k * 9) * 20 * U, py = pos.fy - 60 * U - Math.sin(k * Math.PI) * 140 * U;
         c.globalAlpha = 1 - k * k;
         c.translate(px, py);
-        c.rotate(k * 7);
-        c.scale(1 - k * 0.6, 1 - k * 0.6);
+        c.rotate(Math.sin(k * 7) * 0.5);
+        c.scale(Math.cos(k * 17) * (1 - k * 0.4), 1 - k * 0.4);
         c.translate(-pos.fx, -(pos.fy - 60 * U));
+      } else if (main) {
+        const fc = D.foeCenter(B.foe.def.look, pos.fy, FOE_SCALE), floaty = ["balloon", "wisp", "tv"].includes(B.foe.def.look.body) || B.foe.def.id === "comet" || B.foe.def.id === "trapeze";
+        if (B.foe.def.id !== "trapeze") stick(pos.fx, floaty ? fc.cy + fc.r * 0.5 : pos.fy - 8 * U);
       }
       const hk = a.fHurt && rt - a.fHurt < 0.4 ? Math.pow(1 - (rt - a.fHurt) / 0.4, 2) : 0;
-      fr = D.drawFoe(B.foe, pos.fx, pos.fy, st, { scale: FOE_SCALE, tint: main ? JG.ACTS[B.act - 1].tint : null, hurtK: hk, hurt: main && a.fHurt && rt - a.fHurt < 0.12 });
+      fr = D.drawFoe(B.foe, pos.fx, pos.fy, st, { scale: FOE_SCALE, flat: !main, edgeColor: neon ? "#ff4fa3" : undefined, tint: main ? JG.ACTS[B.act - 1].tint : null, hurtK: hk, hurt: main && a.fHurt && rt - a.fHurt < 0.12 });
       c.restore();
     }
     if (main) B.screen = { p: pr, f: B.over === "win" ? null : fr };
@@ -1269,6 +1420,8 @@
     ({ W, H, U } = D.size());
     const rt = now(), P = D.stagePos(), hz = P.feet - 50 * U;
     if (B !== lastB) { lastB = B; reset(); }
+    D.paper.neon = B.act === 3;      // Act III is lit by blacklight: cut edges glow
+    D.paper.edge = "#fbf8f2";
     const frozen = rt < stopUntil;
     if (!frozen) stageT += dt;
     const st = stageT, ap = (B.applause || 0) / 100;
@@ -1285,6 +1438,7 @@
     statusFx(B, st);
     drawShots(B, rt);
     drawImpacts(B, rt);
+    theatre(B);
     showFront(B, rt, st, P);
     crowd(B, st, rt, ap);
     drawThrows(B, rt);
