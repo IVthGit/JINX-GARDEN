@@ -12,6 +12,20 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 - **Toys** from the Concession stand (juggling pins, a trampoline, a crystal ball, a punching bag) each train one stat a little at a time. Jinxes wander over on their own.
 - **Clown College** teaches the selected Jinx a trick. It keeps up to 2 and brings those cards on every run. The classes change after each show.
 - **Whistle** calls everyone over.
+- **Talent show:** tap a Jinx, then Talent show, and pick Open Mic, the Midway Revue or the Big Top Gala.
+  - It is three rounds in the ring against three rivals. Each round tests one stat, and the judges hold up a score.
+  - On your Jinx's turn a marker sweeps a bar. Tap **Cheer** (or press Space) as it crosses the middle, three times. Good timing lifts the score.
+  - A good Mood helps, and the judges like a hat.
+  - First place wins Tix, a ribbon, and a hat the first time. Taking part trains the stats that were tested.
+  - A Jinx that has performed needs a rest until after the next Big Top show.
+- **Hats:** tap a Jinx, then Hat, to try on anything in the hat box. Hats are only for looks.
+  - The Concession stand sells the Big Bow, Traffic Cone, Tin Bucket, Flower Pot and Rabbit Ears.
+  - The Propeller Cap, Rainbow Wig and Paper Crown are talent show prizes. The Tiny Topper comes home from a full win at the Big Top.
+  - Your first hatchling keeps its Eggshell as a hat, and now and then a later one does too.
+- **Duets:** two grown Jinxes with 40 Love each can share a **Heart Balloon** from the Concession stand. Tap one, then Duet, and pick who sings with it.
+  - They sing in the ring and leave an egg. The garden holds 6.
+  - The egg takes its colour, its lean, a trait and its aptitude grades from both of them. Now and then a grade comes out a step better.
+  - Each singer needs 2 more shows before the next duet.
 - **Aptitude:** the letter beside each stat, E up to S, is how fast that Jinx learns it. It is set at birth. An egg left by a loved Jinx often has better grades.
 - **Feed** from the pantry. Food fills the Belly and raises stats:
   - Juggle Plum raises Juggle, Springberry raises Tumble, Cotton Comet raises Glow, Sludge Pop raises Grit.
@@ -63,15 +77,16 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 The whole game is a paper theatre made from a photocopied zine:
 
 - **Cut-outs:** Jinxes, foes, the tent, the tree and the toys are paper cut-outs with a white edge and a hard shadow. In a fight they stand on sticks behind a cardboard stage front, and each foe is pasted onto a torn scrap of printed paper. A beaten foe flips over like a card and flutters away.
+- **Puppet foes:** every foe is made of separate pieces of card (legs, body, head, arms, hat) pinned together. Each piece swings a little on its own pin, and they rattle loose when the foe is hit.
 - **Zine print:** titles are cut-out letters from different magazines, buttons and map stops are stickers, and the cards and sky are printed in dots.
 - **Blacklight:** the third act is lit by blacklight, so the cut edges glow green and pink.
 
 ## Files
 
 - `index.html`: the page and its styles.
-- `data.js`: items, cards, charms, foes, acts, names and sideshow text.
+- `data.js`: items, hats, cards, charms, foes, acts, talent show leagues, names and sideshow text.
 - `draw.js`: the garden, Jinxes, eggs and foes, drawn on the canvas.
 - `stage.js`: the battle stage: a backdrop for each act, the crowd, attack animations, impacts and Showstoppers.
-- `game.js`: garden sim, runs, battles, events, shops, music and sound effects, saving.
+- `game.js`: garden sim, talent shows, duets, runs, battles, events, shops, music and sound effects, saving.
 
 The look and the creatures are original. The genre (a pet-raising garden plus a roguelike deckbuilder) is borrowed from games we love.

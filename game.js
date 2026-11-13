@@ -190,6 +190,7 @@
         }
         j.held = false;
         j.act = null; j.after = null; j.waitFor = null; j.moving = false;
+        if (j.hat && !JG.HATS[j.hat]) j.hat = null;
       }
       return gardenDefaults(o);
     } catch (e) { return null; }
@@ -241,6 +242,8 @@
     if (!Array.isArray(s.ground)) s.ground = [];
     if (!s.tree || !Array.isArray(s.tree.fruits)) s.tree = { t: 0, fruits: [{ item: "plum", grow: 1, slot: 0 }, { item: "moonpie", grow: 0.5, slot: 2 }] };
     if (!s.toys) s.toys = {};
+    if (!s.hats) s.hats = {};
+    if (!s.records.ribbons) s.records.ribbons = {};
     for (const it of s.ground) it.held = false;
     return s;
   }
@@ -257,6 +260,7 @@
     d.stats.tumble.lv = 12;
     s.jinxes.push(b, c, d);
     s.toys = { tramp: true, crystal: true };
+    b.hat = "bucket"; c.hat = "crown"; d.hat = "bow";
     s.sky = [{ name: "Bobo", pts: [[0.12, 0.1], [0.17, 0.16], [0.22, 0.12], [0.26, 0.2], [0.2, 0.25]] }];
     return s;
   }
@@ -339,7 +343,7 @@
     $("#btnSound").textContent = A.on ? "Sound on" : "Sound off";
     $("#btnSound").setAttribute("aria-pressed", A.on ? "true" : "false");
   }
-  let feedOpen = false, renaming = false;
+  let feedOpen = false, renaming = false, hatOpen = false;
   function renderPanel() {
     const p = $("#panel");
     const j = jinxById(G.selected);
@@ -348,7 +352,7 @@
     if (j.stage === "egg") {
       p.innerHTML = `<div class="p-head"><h2>A warm egg</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
         <p class="tag">Hatches in about ${Math.ceil(j.hatch)} seconds.</p>
-        <p class="note">Tap it to keep it warm and it hatches sooner.${j.inherit ? " Something of " + esc(j.inherit.name) + " is in there." : ""}</p>`;
+        <p class="note">Tap it to keep it warm and it hatches sooner.${j.inherit ? (j.inherit.duet ? " A duet egg from " + esc(j.inherit.parents.join(" and ")) + "." : " Something of " + esc(j.inherit.name) + " is in there.") : ""}</p>`;
       return;
     }
     const st = JG.STATS.map((s) => {
@@ -356,7 +360,12 @@
       return `<div class="stat"><span class="sl" style="color:${I.color}">${I.label}</span><span class="lv">${S.lv}</span>${bar(S.xp, need(S.lv), I.color)}<span class="gr g${j.grades[s]}" title="Aptitude ${GRADE[j.grades[s]]}: learns ${Math.round(GRADE_MULT[j.grades[s]] * 100)}% as fast as average">${GRADE[j.grades[s]]}</span><span class="sh">${I.hint}</span></div>`;
     }).join("");
     const al = ((j.align + 1) / 2) * 100;
-    const inv = Object.keys(G.save.inv).filter((k) => G.save.inv[k] > 0);
+    const inv = Object.keys(G.save.inv).filter((k) => G.save.inv[k] > 0 && !JG.ITEMS[k].keep);
+    const owned = Object.keys(G.save.hats).filter((k) => G.save.hats[k] > 0 && JG.HATS[k]);
+    const hats = hatOpen
+      ? `<div class="feed">${owned.length ? owned.map((k) => { const free = hatsFree(k) + (j.hat === k ? 1 : 0); return `<button class="chip${j.hat === k ? " on" : ""}" data-act="wear" data-hat="${k}" ${free > 0 ? "" : "disabled"} title="${esc(JG.HATS[k].desc)}">${esc(JG.HATS[k].name)}${j.hat === k ? " (take off)" : free > 0 ? "" : " (worn)"}</button>`; }).join("") : `<p class="note">The hat box is empty. The Concession stand sells hats, and talent shows give them as prizes.</p>`}</div>`
+      : "";
+    const rib = j.ribbons ? ` \u00B7 ${j.ribbons} ribbon${j.ribbons > 1 ? "s" : ""}` : "";
     const feed = feedOpen
       ? `<div class="feed">${inv.length ? inv.map((k) => `<button class="chip" data-act="eat" data-item="${k}" title="${esc(JG.ITEMS[k].desc)}">${itemChip(k, G.save.inv[k])}</button>`).join("") : `<p class="note">The pantry is empty. Buy snacks at the Concession stand, or bring some home from a run.</p>`}</div>`
       : "";
@@ -364,13 +373,15 @@
       ? `<input id="renameBox" maxlength="14" value="${esc(j.name)}" aria-label="New name">`
       : `<h2>${esc(j.name)}</h2>`;
     p.innerHTML = `<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">\u00D7</button></div>
-      <p class="tag">${formName(j)} \u00B7 show ${j.age} of 12${j.gen > 1 ? " \u00B7 generation " + j.gen : ""}</p>
+      <p class="tag">${formName(j)} \u00B7 show ${j.age} of 12${j.gen > 1 ? " \u00B7 generation " + j.gen : ""}${rib}</p>
       <div class="row">
         <button class="btn small" data-act="pet">Pet</button>
         <button class="btn small${feedOpen ? " on" : ""}" data-act="feed" aria-expanded="${feedOpen}">Feed</button>
+        <button class="btn small${hatOpen ? " on" : ""}" style="--bc:#8fe9ff" data-act="hats" aria-expanded="${hatOpen}">Hat</button>
+        ${j.stage === "adult" ? `<button class="btn small" style="--bc:#ffb3d6" data-act="duet">Duet</button>` : ""}
         <button class="btn small ghost" data-act="rename">${renaming ? "Save name" : "Rename"}</button>
       </div>
-      ${feed}
+      ${feed}${hats}
       <button class="btn big" data-act="run">Take ${esc(j.name)} to the Big Top</button>
       <div class="needs">
         <div><span>Belly</span>${bar(j.belly, 100, "#ffb36b")}</div>
@@ -411,10 +422,13 @@
     if (!b) return;
     const j = jinxById(G.selected);
     const act = b.dataset.act;
-    if (act === "close") { G.selected = null; feedOpen = false; renaming = false; renderPanel(); return; }
+    if (act === "close") { G.selected = null; feedOpen = false; hatOpen = false; renaming = false; renderPanel(); return; }
     if (!j) return;
     if (act === "pet") petJinx(j);
-    if (act === "feed") { feedOpen = !feedOpen; renderPanel(); }
+    if (act === "feed") { feedOpen = !feedOpen; hatOpen = false; renderPanel(); }
+    if (act === "hats") { hatOpen = !hatOpen; feedOpen = false; renderPanel(); }
+    if (act === "wear") wearHat(j, b.dataset.hat);
+    if (act === "duet") openDuet(j);
     if (act === "eat") feedJinx(j, b.dataset.item);
     if (act === "rename") { if (renaming) finishRename(); else { renaming = true; renderPanel(); } }
     if (act === "run") confirmRun(j);
@@ -441,7 +455,7 @@
   }
   function feedJinx(j, id, ground) {
     const it = JG.ITEMS[id];
-    if (!it) return;
+    if (!it || it.keep) return;
     if (ground ? !G.save.ground.includes(ground) : !(G.save.inv[id] > 0)) return;
     if (it.belly > 0 && j.belly >= 97) { toast(`${j.name} is too full to eat.`); return; }
     if (ground) G.save.ground.splice(G.save.ground.indexOf(ground), 1);
@@ -465,6 +479,8 @@
   function gardenStep(dt) {
     petCool -= dt;
     treeStep(dt);
+    if (G.talent) talentStep(dt);
+    if (G.duet) duetStep(dt);
     for (const j of G.save.jinxes.slice()) {
       if (j.stage === "egg") {
         if (G.demo) continue;
@@ -485,6 +501,8 @@
       j.pace = (j.pace || 0) + ((j.moving ? 1 : 0) - (j.pace || 0)) * Math.min(1, dt * 5);
       j.hurry = Math.max(0, (j.hurry || 0) - dt);
       if (j.held) continue;
+      if (G.talent && (!j.moving || G.talent.cast.some((c) => c.j === j))) { j.moving = j.moving && !G.talent.cast.some((c) => c.j === j); if (!j.moving) { j.dir = j.u < 0 ? 1 : -1; continue; } }
+      if (G.duet && (G.duet.a === j.id || G.duet.b === j.id) && (G.duet.phase === "sing" || !j.moving)) continue;
       if (G.selected === j.id) { j.moving = false; j.act = null; j.after = null; continue; }
       if (j.act) { activity(j, dt); continue; }
       if (j.moving) {
@@ -611,7 +629,8 @@
 
   function hatchEgg(e) {
     const inh = e.inherit;
-    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, moon: inh ? inh.moon : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined, grades: inh && inh.grades ? rollGrades(inh.grades) : undefined });
+    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, moon: inh ? inh.moon : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined,
+      grades: inh && inh.grades ? (inh.exact ? inh.grades : rollGrades(inh.grades)) : undefined });
     if (inh) for (const s of JG.STATS) j.stats[s].lv = Math.max(j.stats[s].lv, inh.stats[s]);
     j.u = e.u; j.v = e.v; j.love = inh ? 30 : 10;
     const i = G.save.jinxes.indexOf(e);
@@ -622,7 +641,10 @@
     D.burst(x, y - 20, "star", 16, "#ffd23f");
     D.burst(x, y - 20, "heart", 4, "#ff5fa8");
     sfx("hatch");
-    toast(inh ? `${j.name} was born again!` : `An egg hatched! Say hi to ${j.name}.`);
+    // the first hatchling keeps its shell as a hat, and now and then so does a later one
+    const shell = !G.demo && (!G.save.hats.shell || rand() < 0.25);
+    if (shell) { grantHat("shell"); j.hat = "shell"; }
+    toast((inh && inh.duet ? `${j.name} hatched: the child of ${inh.parents.join(" and ")}.` : inh ? `${j.name} was born again!` : `An egg hatched! Say hi to ${j.name}.`) + (shell ? " It kept its shell as a hat." : ""));
     persist();
     renderPanel();
   }
@@ -639,7 +661,7 @@
     }
     return best;
   }
-  function deselect() { if (G.selected) { G.selected = null; feedOpen = false; renaming = false; renderPanel(); } }
+  function deselect() { if (G.selected) { G.selected = null; feedOpen = false; hatOpen = false; renaming = false; renderPanel(); } }
   $("#scene").addEventListener("pointermove", (e) => {
     const [x, y] = scenePos(e);
     G.pointer = [x, y];
@@ -662,10 +684,11 @@
   });
   $("#scene").addEventListener("pointerleave", () => { G.pointer = null; });
   $("#scene").addEventListener("pointerdown", (e) => {
-    if (G.mode !== "garden") return;
+    if (G.mode !== "garden" || G.talent) return;
     A.init();
     const [x, y] = scenePos(e);
     const h = hitAt(x, y);
+    if (h && h.j && G.duet && (G.duet.a === h.j.id || G.duet.b === h.j.id)) return;
     if (!h) { deselect(); return; }
     if (h.kind === "tree") { shakeTree(); return; }
     if (h.kind === "toy") { const T = JG.TOYS[h.id]; toast(`${T.name}. ${T.desc}`); return; }
@@ -702,7 +725,7 @@
       D.burst(d.h.x, d.h.y, "star", 4, "#ffd23f");
     } else if (G.selected === j.id) { petJinx(j); return; }
     else sfx("honk");
-    if (G.selected !== j.id) { feedOpen = false; renaming = false; }
+    if (G.selected !== j.id) { feedOpen = false; hatOpen = false; renaming = false; }
     G.selected = j.id;
     renderPanel();
   }
@@ -735,6 +758,276 @@
     }
     persist();
   }
+
+  // ---- hats ----
+  function grantHat(id) { const h = G.save.hats; h[id] = (h[id] || 0) + 1; }
+  // how many of a hat are in the box, not on a head
+  function hatsFree(id) { return (G.save.hats[id] || 0) - G.save.jinxes.filter((o) => o.hat === id).length; }
+  function wearHat(j, id) {
+    if (j.hat === id) j.hat = null;
+    else if (hatsFree(id) > 0) j.hat = id;
+    else return;
+    j.hopT = 1;
+    j.happyT = 1.2;
+    sfx("honk");
+    persist();
+    renderPanel();
+  }
+
+  // ---- duets: two grown Jinxes share a Heart Balloon, sing in the ring, and leave an egg ----
+  const canDuet = (j) => j.stage === "adult" && j.love >= 40 && j.age - (j.duetAge === undefined ? -9 : j.duetAge) >= 2;
+  function openDuet(j) {
+    const s = G.save, have = s.inv.balloon || 0, full = s.jinxes.length >= 6;
+    const why = (o) => (o.love < 40 ? "needs more Love (40)" : !canDuet(o) ? "still hoarse from the last duet (2 shows)" : "");
+    const others = s.jinxes.filter((o) => o !== j && o.stage === "adult");
+    const mine = why(j);
+    const rows = others.length
+      ? others.map((o) => { const w = mine || why(o); return `<div class="shoprow"><div>${esc(o.name)}<small>${formName(o)}${w && !mine ? " · " + w : ""}</small></div><span class="have"></span><button class="btn small" data-act="sing" data-id="${o.id}" ${w || !have || full ? "disabled" : ""}>Sing</button></div>`; }).join("")
+      : `<p class="note">There's no other grown Jinx in the garden yet. A child grows up after 3 shows.</p>`;
+    modal(`<p class="eyebrow">Duet</p><h2>Who sings with ${esc(j.name)}?</h2>
+      <p>Two grown Jinxes who share a <b>Heart Balloon</b> sing a duet in the ring, and an egg appears. The egg takes its colour, its lean, a trait and its aptitude grades from both of them, and now and then a grade comes out a step better.</p>
+      <p class="tag">Heart Balloons: <b>${have}</b>${have ? "" : " · the Concession stand sells them"}${full ? " · the garden is full (6 at most)" : ""}${mine ? " · " + esc(j.name) + " " + mine : ""}</p>
+      <div class="shoplist">${rows}</div>
+      <button class="btn ghost" data-act="close">Not now</button>`, {
+      close: closeModal,
+      sing: (b) => { const o = jinxById(b.dataset.id); if (o && canDuet(j) && canDuet(o) && s.inv.balloon > 0 && s.jinxes.length < 6) { closeModal(); startDuet(j, o); } }
+    });
+  }
+  function startDuet(a, b) {
+    const s = G.save;
+    s.inv.balloon--;
+    a.duetAge = a.age;
+    b.duetAge = b.age;
+    deselect();
+    for (const [j, u] of [[a, -0.14], [b, 0.08]]) Object.assign(j, { act: null, after: null, sleep: false, held: false, moving: true, hurry: 5, tx: u, ty: 0.08 });
+    G.duet = { a: a.id, b: b.id, phase: "walk", t: 0, u: -0.03, v: 0.08, beat: 0 };
+    toast(`${a.name} and ${b.name} head for the ring.`);
+    persist();
+  }
+  function duetStep(dt) {
+    const d = G.duet, a = jinxById(d.a), b = jinxById(d.b);
+    if (!a || !b) { G.duet = null; return; }
+    d.t += dt;
+    if (d.phase === "walk") {
+      if ((!a.moving && !b.moving) || d.t > 9) {
+        Object.assign(a, { moving: false, u: -0.14, v: 0.08, dir: 1 });
+        Object.assign(b, { moving: false, u: 0.08, v: 0.08, dir: -1 });
+        d.phase = "sing";
+        d.t = 0;
+      }
+      return;
+    }
+    d.beat -= dt;
+    if (d.beat <= 0) {
+      d.beat = 0.45;
+      const who = Math.floor(d.t / 0.45) % 2 ? a : b, [x, y] = jinxScreen(who);
+      who.hopT = 1;
+      who.happyT = 1;
+      D.burst(x, y - 40, "note", 2, who === a ? "#ff5fa8" : "#8fe9ff");
+      sfx("bell");
+    }
+    if (d.t > 3.6) {
+      const s = G.save, [x, y] = D.toScreen(d.u, d.v);
+      const e = makeEgg({ hue: blendHue(a.hue, b.hue), inherit: duetInherit(a, b), hatch: 45 });
+      e.u = d.u; e.v = d.v + 0.05;
+      s.jinxes.push(e);
+      for (const j of [a, b]) { j.mood = clamp(j.mood + 20, 0, 100); j.love = clamp(j.love + 5, 0, 100); j.happyT = 2.5; j.idle = 3; }
+      D.burst(x, y - 30, "heart", 14, "#ff5fa8");
+      D.burst(x, y - 30, "star", 12, "#ffd23f");
+      sfx("hatch");
+      toast(`${a.name} and ${b.name} left an egg in the ring!`);
+      G.duet = null;
+      persist();
+    }
+  }
+  function blendHue(h1, h2) {
+    let d = ((h2 - h1 + 540) % 360) - 180;
+    return Math.round((h1 + d * (0.3 + rand() * 0.4) + (rand() - 0.5) * 40 + 360) % 360);
+  }
+  function duetInherit(a, b) {
+    const grades = {}, stats = {};
+    for (const st of JG.STATS) {
+      const r = rand(), g = (rand() < 0.5 ? a : b).grades[st];
+      grades[st] = clamp(g + (r < 0.22 ? 1 : r > 0.92 ? -1 : 0), 0, 5);
+      stats[st] = Math.max(1, Math.floor((a.stats[st].lv + b.stats[st].lv) * 0.12));
+    }
+    const r = rand();
+    return { duet: true, exact: true, parents: [a.name, b.name], align: clamp((a.align + b.align) / 2 * 0.6 + (rand() - 0.5) * 0.2, -1, 1), moon: clamp(((a.moon || 0) + (b.moon || 0)) / 2 * 0.6 + (rand() - 0.5) * 0.2, -1, 1),
+      gen: Math.max(a.gen, b.gen) + 1, trait: r < 0.45 ? a.trait : r < 0.9 ? b.trait : pick(Object.keys(JG.TRAITS)), grades, stats };
+  }
+
+  // ---- the talent show: three rounds in the garden ring against three rivals ----
+  const rested = (j) => j.showDay !== G.save.records.runs;
+  function openTalent() {
+    const j = jinxById(G.selected), s = G.save;
+    if (!j || j.stage === "egg") { toast("Tap a Jinx first to pick who performs."); return; }
+    const top = Math.max(...JG.STATS.map((st) => j.stats[st].lv));
+    const no = !rested(j) ? `${j.name} has already performed and needs a rest. They can enter again after the next Big Top show.` : j.belly < 20 ? `${j.name} is too hungry to perform. Feed them first.` : "";
+    const rows = JG.LEAGUES.map((L) => {
+      const won = s.records.ribbons[L.id] || 0, hat = JG.HATS[L.hat];
+      return `<div class="shoprow"><div>${L.name}<small>${L.blurb} Rivals are around level ${L.lv}; ${esc(j.name)}'s best stat is ${top}.</small><small>First prize: ${L.prize} Tix${s.hats[L.hat] ? "" : " and the " + hat.name}${won ? ` · won ${won} time${won > 1 ? "s" : ""}` : ""}</small></div><span class="have"></span><button class="btn small" data-act="enter" data-id="${L.id}" ${no ? "disabled" : ""}>Enter</button></div>`;
+    }).join("");
+    modal(`<p class="eyebrow">Talent show</p><h2>Put ${esc(j.name)} on stage?</h2>
+      <p>Three rounds in the garden ring against three rivals. Each round tests one stat. When it's ${esc(j.name)}'s turn, tap <b>Cheer</b> as the marker crosses the middle of the bar: good timing lifts the judges' score.</p>
+      <p class="note">A good Mood helps, and the judges like a hat. Taking part trains the stats that were tested.</p>
+      ${no ? `<p class="tag">${esc(no)}</p>` : ""}
+      <div class="shoplist">${rows}</div>
+      <button class="btn ghost" data-act="close">Not today</button>`, {
+      close: closeModal,
+      enter: (b) => { const L = JG.LEAGUES.find((l) => l.id === b.dataset.id); if (L && rested(j) && j.belly >= 20) { closeModal(); talentShow(j, L); } }
+    });
+  }
+  function makeRival(L, name) {
+    const r = makeJinx({ name, align: pick([-0.8, 0, 0, 0.8]), moon: pick([-0.6, 0.8]) });
+    r.stage = L.lv >= 8 ? "adult" : "child";
+    for (const st of JG.STATS) r.stats[st].lv = Math.max(1, Math.round(L.lv + (rand() - 0.5) * 4));
+    r.stats[pick(JG.STATS)].lv += 3;
+    r.mood = 80;
+    r.hat = rand() < 0.55 ? pick(Object.keys(JG.HATS)) : null;
+    return r;
+  }
+  const round1 = (v) => Math.round(clamp(v, 1, 10) * 10) / 10;
+  async function talentShow(j, L) {
+    const s = G.save, names = shuffle(JG.RIVALS.slice());
+    deselect();
+    j.showDay = s.records.runs;
+    j.belly = clamp(j.belly - 20, 0, 100);
+    Object.assign(j, { act: null, after: null, sleep: false, moving: false, held: false });
+    const tall = innerHeight > innerWidth;   // on a phone the island is narrow: stand further apart, a little smaller
+    const cast = (tall ? [-0.5, -0.19, 0.12, 0.43] : [-0.38, -0.15, 0.08, 0.31]).map((u, i) => ({ j: i === 1 ? j : makeRival(L, names[i]), me: i === 1, u, v: 0.0, dir: u < 0 ? 1 : -1, cheer: 0, scale: tall ? 0.95 : 1.25, low: tall && i % 2 === 1 }));
+    j.u = cast[1].u; j.v = cast[1].v;
+    // everyone else comes to watch from the wings
+    const SEATS = [[-0.72, 0.22], [0.66, 0.3], [-0.62, 0.42], [0.56, 0.48], [-0.8, 0.02]];
+    let seat = 0;
+    for (const o of s.jinxes) {
+      if (o === j) continue;
+      if (o.stage === "egg") { if (Math.abs(o.v) < 0.3 && Math.abs(o.u) < 0.55) o.v = 0.55; continue; }
+      const st = SEATS[seat++ % SEATS.length];
+      Object.assign(o, { act: null, after: null, sleep: false, held: false, moving: true, hurry: 4, tx: st[0], ty: st[1] });
+    }
+    const T = (G.talent = {
+      L, cast, order: shuffle(JG.STATS.slice()).slice(0, 3), stat: null, acting: -1, t0: 0, cards: [], totals: [0, 0, 0, 0], meter: null, winner: -1,
+      view(i) { return { acting: this.acting === i, stat: this.stat, k: clamp((G.t - this.t0) / 3, 0, 1), card: this.cards[i], total: this.totals[i], cheer: cast[i].cheer, won: this.winner === i }; }
+    });
+    document.body.dataset.show = "1";
+    show("#talent", true);
+    const say = (a, b) => { $("#tlRound").textContent = a; $("#tlHint").textContent = b || ""; };
+    say(`${L.name}`, `Tonight: ${T.order.map((st) => JG.STAT_INFO[st].label).join(", ")}.`);
+    sfx("hatch");
+    await sleep(1600);
+    const ACTS = { juggle: "juggling", tumble: "tumbling", glow: "a light show", grit: "feats of strength" };
+    for (let r = 0; r < 3; r++) {
+      const st = T.order[r], I = JG.STAT_INFO[st];
+      T.stat = st;
+      T.cards = [];
+      say(`Round ${r + 1} of 3: ${I.label}`, `The rivals go first, with ${ACTS[st]}.`);
+      await sleep(900);
+      for (const i of [0, 2, 3]) {
+        T.acting = i; T.t0 = G.t;
+        sfx("card");
+        await sleep(1150);
+        const v = round1(5 + (cast[i].j.stats[st].lv - L.lv) * 0.35 + 0.7 + (rand() - 0.5) * 1.6);
+        T.acting = -1;
+        T.cards[i] = { v, t0: G.t };
+        T.totals[i] += v;
+        sfx("coin");
+        await sleep(380);
+      }
+      say(`Round ${r + 1} of 3: ${I.label}`, `${j.name}'s turn. Tap Cheer when the marker is in the middle.`);
+      T.acting = 1; T.t0 = G.t;
+      const bonus = await cheerPhase(T, cast[1]);
+      const v = round1(5 + (j.stats[st].lv - L.lv) * 0.35 + bonus + (j.mood >= 70 ? 0.4 : j.mood < 35 ? -0.6 : 0) + (j.hat ? 0.3 : 0) + (j.trait === "showoff" ? 0.4 : j.trait === "scaredy" ? -0.3 : 0) + (rand() - 0.5) * 0.6);
+      T.acting = -1;
+      T.cards[1] = { v, t0: G.t };
+      T.totals[1] += v;
+      const [x, y] = jinxScreen(j);
+      D.burst(x, y - 40, "star", v >= 8 ? 18 : 8, "#ffd23f");
+      sfx(v >= 8 ? "buff" : "coin");
+      say(`Round ${r + 1} of 3: ${I.label}`, `The judges give ${j.name} ${v.toFixed(1)}.`);
+      await sleep(1700);
+    }
+    // results
+    const rank = [0, 1, 2, 3].sort((a, b) => T.totals[b] - T.totals[a]), place = rank.indexOf(1);
+    T.cards = [];
+    T.winner = rank[0];
+    say(`${cast[rank[0]].j.name} takes the ribbon!`, "");
+    sfx(place === 0 ? "hatch" : "bell");
+    { const [x, y] = D.toScreen(cast[rank[0]].u, cast[rank[0]].v); D.burst(x, y - 50, "star", 26, "#ffd23f"); D.burst(x, y - 50, "heart", 8, "#ff5fa8"); }
+    await sleep(2200);
+    show("#talent", false);
+    let tix = place === 0 ? L.prize : place === 1 ? Math.floor(L.prize / 3) : 0, hat = null;
+    if (place === 0) {
+      s.records.ribbons[L.id] = (s.records.ribbons[L.id] || 0) + 1;
+      j.ribbons = (j.ribbons || 0) + 1;
+      if (!s.hats[L.hat]) { hat = L.hat; grantHat(hat); }
+    }
+    s.tix += tix;
+    const ups = [];
+    for (const st of T.order) if (addXp(j, st, 3 + Math.floor(L.lv / 3) + (place === 0 ? 3 : 0))) ups.push(JG.STAT_INFO[st].label);
+    j.mood = clamp(j.mood + [22, 8, 0, -8][place], 0, 100);
+    j.love = clamp(j.love + (place === 0 ? 6 : 2), 0, 100);
+    persist();
+    const table = rank.map((i, k) => `<li>${["1st", "2nd", "3rd", "4th"][k]} <b${i === 1 ? ' style="color:var(--pink)"' : ""}>${esc(cast[i].j.name)}</b> ${T.totals[i].toFixed(1)}</li>`).join("");
+    modal(`<p class="eyebrow">${L.name}</p><h2>${place === 0 ? `${esc(j.name)} wins the ribbon!` : `${esc(j.name)} came ${["first", "second", "third", "last"][place]}`}</h2>
+      <p>${place === 0 ? "The whole garden is cheering." : place === 1 ? "So close. A little more practice, or better-timed cheers, would do it." : "The rivals were sharper tonight. Train the stats that were tested and try again."}</p>
+      <div class="cols"><div><h3>The judges' totals</h3><ul class="loot">${table}</ul></div>
+      <div><h3>Brought home</h3><ul class="loot">${tix ? `<li><span class="glyph" style="color:#ffd23f">✂</span><b>${tix}</b> Tix</li>` : ""}${hat ? `<li><span class="glyph" style="color:#8fe9ff">♛</span>${JG.HATS[hat].name}, for the hat box</li>` : ""}<li>Practice in ${T.order.map((st) => JG.STAT_INFO[st].label).join(", ")}${ups.length ? ` <small>(${ups.join(" and ")} went up)</small>` : ""}</li></ul></div></div>
+      <p class="note">${esc(j.name)} needs a rest now, and can enter again after the next Big Top show.</p>
+      <button class="btn big" data-act="home">Back to the garden</button>`, {
+      home: () => {
+        closeModal();
+        G.talent = null;
+        delete document.body.dataset.show;
+        show("#talent", false);
+        j.happyT = 2;
+        G.selected = j.id;
+        renderHud();
+        renderPanel();
+      }
+    }, { wide: true });
+  }
+  // The cheering game: a marker sweeps the bar and the player taps as it crosses the middle, three times.
+  function cheerPhase(T, c) {
+    return new Promise((done) => {
+      const m = (T.meter = { pos: rand() * 0.3, dir: 1, v: T.L.speed, left: 3, bonus: 0, until: G.t + 10, done, c });
+      show("#tlMeter", true);
+      show("#cheerBtn", true);
+      $("#tlPips").textContent = "★★★";
+      if (JG.fast) { m.left = 0; m.bonus = 1.2; }
+    });
+  }
+  function cheer() {
+    const T = G.talent, m = T && T.meter;
+    if (!m || m.left <= 0 || G.t < (m.wait || 0)) return;
+    m.wait = G.t + 0.3;   // so a double tap doesn't spend two cheers
+    const d = Math.abs(m.pos - 0.5), [x, y] = jinxScreen(m.c.j);
+    m.left--;
+    m.c.cheer = 1;
+    if (d < 0.05) { m.bonus += 0.9; D.burst(x, y - 40, "heart", 8, "#ff5fa8"); D.float && D.float(x, y - 90, "Perfect!", "#ffd23f"); sfx("buff"); }
+    else if (d < 0.14) { m.bonus += 0.5; D.burst(x, y - 40, "heart", 4, "#ff5fa8"); D.float && D.float(x, y - 90, "Good!", "#8fe9ff"); sfx("bell"); }
+    else { D.float && D.float(x, y - 90, m.pos < 0.5 ? "Too early" : "Too late", "#efe6d2"); sfx("honk"); }
+    m.v *= 1.12;
+    $("#tlPips").textContent = "★".repeat(m.left) + "☆".repeat(3 - m.left);
+  }
+  function talentStep(dt) {
+    const T = G.talent;
+    for (const c of T.cast) c.cheer = Math.max(0, c.cheer - dt * 2);
+    const m = T.meter;
+    if (!m) return;
+    m.pos += m.dir * m.v * dt;
+    if (m.pos > 1) { m.pos = 2 - m.pos; m.dir = -1; }
+    if (m.pos < 0) { m.pos = -m.pos; m.dir = 1; }
+    $("#tlMark").style.left = (m.pos * 100).toFixed(1) + "%";
+    if (m.left <= 0 || G.t > m.until) {
+      T.meter = null;
+      show("#tlMeter", false);
+      show("#cheerBtn", false);
+      $("#tlPips").textContent = "";
+      setTimeout(() => m.done(m.bonus), JG.fast ? 0 : 500);
+    }
+  }
+  $("#cheerBtn").addEventListener("click", cheer);
+  addEventListener("keydown", (e) => { if (G.talent && G.talent.meter && (e.code === "Space" || e.key === "Enter") && $("#modal").hidden) { e.preventDefault(); cheer(); } });
 
   // ---- the snack tree ----
   function shakeTree() {
@@ -787,11 +1080,27 @@
     modal(`<h2>Concession Stand</h2><p class="tag">You have <b class="tixnum">${s.tix}</b> Tix. Snacks go in the pantry.</p>
       <div class="shoplist">${rows}
       <div class="shoprow"><div><span class="glyph" style="color:#ffd23f">⬮</span>A mystery egg<small>${full ? "The garden is full (6 at most)." : "Something wriggles inside."}</small></div><span class="have"></span><button class="btn small" data-act="egg" ${s.tix < 80 || full ? "disabled" : ""}>80 Tix</button></div>
+      <div class="shoprow"><div>${itemChip("balloon")}<small>${esc(JG.ITEMS.balloon.desc)}</small></div><span class="have">have ${s.inv.balloon || 0}</span><button class="btn small" data-act="buy" data-item="balloon" ${s.tix < JG.ITEMS.balloon.price ? "disabled" : ""}>${JG.ITEMS.balloon.price} Tix</button></div>
+      </div>
+      <h3>Hats</h3>
+      <div class="shoplist">${JG.SHOP_HATS.map((id) => { const Hh = JG.HATS[id]; return `<div class="shoprow"><div><span class="glyph" style="color:#8fe9ff">\u265B</span>${Hh.name}<small>${Hh.desc}</small></div><span class="have">${s.hats[id] ? "have " + s.hats[id] : ""}</span><button class="btn small" data-act="hat" data-id="${id}" ${s.tix < Hh.price ? "disabled" : ""}>${Hh.price} Tix</button></div>`; }).join("")}
+      <p class="note">Hats go in the hat box. Tap a Jinx, then Hat, to try one on. Other hats are prizes.</p>
       </div>
       <h3>Toys for the garden</h3>
       <div class="shoplist">${Object.keys(JG.TOYS).map((id) => { const T = JG.TOYS[id], own = s.toys[id]; return `<div class="shoprow"><div><span class="glyph" style="color:${JG.STAT_INFO[T.stat].color}">✦</span>${T.name}<small>${T.desc}</small></div><span class="have">${own ? "in the garden" : ""}</span><button class="btn small" data-act="toy" data-id="${id}" ${own || s.tix < T.price ? "disabled" : ""}>${own ? "Owned" : T.price + " Tix"}</button></div>`; }).join("")}</div>
       <button class="btn" data-act="close">Done</button>`, {
       close: closeModal,
+      hat: (b) => {
+        const Hh = JG.HATS[b.dataset.id];
+        if (!Hh || s.tix < Hh.price) return;
+        s.tix -= Hh.price;
+        grantHat(b.dataset.id);
+        sfx("coin");
+        persist();
+        renderHud();
+        renderPanel();
+        openShop();
+      },
       toy: (b) => {
         const T = JG.TOYS[b.dataset.id];
         if (s.toys[b.dataset.id] || s.tix < T.price) return;
@@ -886,6 +1195,9 @@
         <li>How a Jinx leans changes how it fights: Sludge builds Corruption, Stardust builds Starlight, Harlequins get a Wild card every turn, and Pierrots can hold two cards and play held cards for 1 less.</li>
         <li>A Jinx that stays between Sludge and Stardust grows into a Harlequin, or into a Pierrot if it leans Moonlit. Moon Pies and Paper Moons lean Moonlit; Motley Jawbreakers lean the other way.</li>
         <li>The letter beside each stat is aptitude, E up to S. Better grades learn faster. An egg left by a loved Jinx often has better grades.</li>
+        <li>The Talent show is three rounds in the ring against three rivals. Tap Cheer as the marker crosses the middle of the bar. Winning gives Tix, a ribbon, and a hat the first time.</li>
+        <li>Hats live in the hat box: tap a Jinx, then Hat. They are only for looks, though the talent show judges like one.</li>
+        <li>Two grown Jinxes with 40 Love each can share a Heart Balloon and sing a Duet. The egg takes after both of them.</li>
         <li>If your Jinx faints, it comes home sad with less of what it learned and only one thing from its bag.</li>
       </ul>
       <button class="btn" data-act="close">Back</button>`, { close: closeModal });
@@ -1986,6 +2298,8 @@
     j.love = clamp(j.love + (won ? 8 : 3), 0, 100);
     s.records.runs++;
     if (won) s.records.wins++;
+    const topper = won && !s.hats.topper;
+    if (topper) grantHat("topper");
     const reached = won ? 4 : r.act;
     s.records.bestAct = Math.max(s.records.bestAct, Math.min(3, reached));
     let evolved = false;
@@ -2000,7 +2314,7 @@
     const lootHtml = loot.length ? loot.map((id) => `<li>${itemChip(id)}</li>`).join("") : "<li>Nothing in the bag.</li>";
     modal(`<p class="eyebrow">${won ? "Standing ovation" : "Curtain falls"}</p>
       <h2>${won ? `${esc(j.name)} conquered the Big Top Below!` : `${esc(j.name)} fainted in Act ${["I", "II", "III"][r.act - 1]}`}</h2>
-      <p>${won ? "The whole cosmos is clapping. Every snack in the bag comes home, plus a 60 Tix bonus." : `They wobble home sad and a bit sticky.${lost ? ` ${lost} thing${lost > 1 ? "s" : ""} fell out of the bag on the way.` : ""}`}</p>
+      <p>${won ? "The whole cosmos is clapping. Every snack in the bag comes home, plus a 60 Tix bonus." + (topper ? " A Ringmaster dropped a Tiny Topper on the way out: it's in the hat box." : "") : `They wobble home sad and a bit sticky.${lost ? ` ${lost} thing${lost > 1 ? "s" : ""} fell out of the bag on the way.` : ""}`}</p>
       <div class="cols"><div><h3>What they learned</h3><ul class="loot">${gl}</ul></div>
       <div><h3>Brought home</h3><ul class="loot"><li><span class="glyph" style="color:#ffd23f">✂</span><b>${tix}</b> Tix</li>${lootHtml}</ul></div></div>
       <button class="btn big" data-act="home">Back to the garden</button>`, {
@@ -2097,6 +2411,7 @@
     if (a === "shop") openShop();
     if (a === "college") openCollege();
     if (a === "whistle") whistle();
+    if (a === "talent") openTalent();
     if (a === "sky") openSky();
     if (a === "sound") { A.setOn(!A.on); renderHud(); }
     if (a === "bigtop") {
@@ -2133,5 +2448,5 @@
   setMode("title");
   requestAnimationFrame(frame);
   // test hook for automated checks
-  JG.debug = { toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, effFx, dmgValue, foeHitValue, bonuses, typeMult, gunkValue };
+  JG.debug = { openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, effFx, dmgValue, foeHitValue, bonuses, typeMult, gunkValue };
 })();

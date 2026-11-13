@@ -691,6 +691,174 @@
   }
 
   // ---------- Jinx (the pet) ----------
+  // ---- hats: things a Jinx can wear on top of whatever grows from its head ----
+  // Drawn in the head's own space: (0, hCy) is the middle of the head, hRx and hRy its radii.
+  function wearHat(id, j, R, hRx, hRy, hCy, lw, t, ink, jig) {
+    const paint = (p, fill, w) => { ctx.fillStyle = fill; ctx.fill(p); ctx.strokeStyle = ink; ctx.lineWidth = w || lw; ctx.stroke(p); };
+    const line = (p, w) => { ctx.strokeStyle = ink; ctx.lineWidth = w || lw; ctx.stroke(p); };
+    ctx.save();
+    ctx.translate(0, hCy - hRy * 0.9);
+    ctx.rotate(-0.1 + (jig || 0) / (R * 3));
+    if (id === "cone") {
+      const base = new Path2D();
+      base.roundRect(-R * 0.66, -R * 0.05, R * 1.32, R * 0.22, R * 0.06);
+      paint(base, "#e8590c");
+      const c = new Path2D();
+      c.moveTo(-R * 0.46, R * 0.0); c.lineTo(-R * 0.13, -R * 1.2); c.quadraticCurveTo(0, -R * 1.3, R * 0.13, -R * 1.2); c.lineTo(R * 0.46, R * 0.0); c.closePath();
+      ctx.fillStyle = "#ff7a1a";
+      ctx.fill(c);
+      ctx.save();
+      ctx.clip(c);
+      ctx.fillStyle = "#fbf8f2";
+      ctx.fillRect(-R, -R * 0.82, R * 2, R * 0.24);
+      ctx.fillRect(-R, -R * 0.36, R * 2, R * 0.16);
+      ctx.fillStyle = "rgba(60,20,0,0.18)";
+      ctx.fillRect(R * 0.08, -R * 1.4, R, R * 1.5);
+      ctx.restore();
+      line(c);
+    } else if (id === "pot") {
+      ctx.strokeStyle = "#3f7a2a";
+      ctx.lineWidth = lw * 1.4;
+      ctx.beginPath(); ctx.moveTo(0, -R * 0.78); ctx.quadraticCurveTo(R * 0.14, -R * 1.1, R * 0.04 + Math.sin(t * 2) * R * 0.05, -R * 1.42); ctx.stroke();
+      const leaf = new Path2D();
+      leaf.ellipse(R * 0.2, -R * 1.02, R * 0.16, R * 0.07, -0.5, 0, Math.PI * 2);
+      paint(leaf, "#6fb63f", lw * 0.6);
+      const fx = R * 0.04 + Math.sin(t * 2) * R * 0.05, fy = -R * 1.48;
+      for (let k = 0; k < 6; k++) { const pt = new Path2D(); pt.ellipse(fx + Math.cos(k * 1.047) * R * 0.15, fy + Math.sin(k * 1.047) * R * 0.15, R * 0.11, R * 0.11, 0, 0, Math.PI * 2); paint(pt, "#fbf8f2", lw * 0.5); }
+      const mid = new Path2D(); mid.arc(fx, fy, R * 0.1, 0, Math.PI * 2); paint(mid, "#ffd23f", lw * 0.5);
+      const pot = new Path2D();
+      pot.moveTo(-R * 0.36, -R * 0.8); pot.lineTo(R * 0.36, -R * 0.8); pot.lineTo(R * 0.52, R * 0.0); pot.lineTo(-R * 0.52, R * 0.0); pot.closePath();
+      paint(pot, "#c8643c");
+      ctx.fillStyle = "rgba(60,15,0,0.2)";
+      ctx.beginPath(); ctx.moveTo(R * 0.1, -R * 0.8); ctx.lineTo(R * 0.36, -R * 0.8); ctx.lineTo(R * 0.52, 0); ctx.lineTo(R * 0.2, 0); ctx.fill();
+      const rim = new Path2D();
+      rim.roundRect(-R * 0.6, -R * 0.06, R * 1.2, R * 0.24, R * 0.05);
+      paint(rim, "#d97a4e");
+    } else if (id === "bucket") {
+      const b = new Path2D();
+      b.moveTo(-R * 0.4, -R * 0.85); b.lineTo(R * 0.4, -R * 0.85); b.lineTo(R * 0.6, R * 0.12); b.lineTo(-R * 0.6, R * 0.12); b.closePath();
+      ctx.fillStyle = "#b9c2cc";
+      ctx.fill(b);
+      ctx.save();
+      ctx.clip(b);
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillRect(-R * 0.36, -R, R * 0.14, R * 1.2);
+      ctx.fillStyle = "rgba(20,10,40,0.2)";
+      ctx.fillRect(R * 0.16, -R, R, R * 1.2);
+      ctx.strokeStyle = "rgba(20,10,40,0.45)";
+      ctx.lineWidth = lw * 0.6;
+      for (const yy of [-0.6, -0.1]) { ctx.beginPath(); ctx.moveTo(-R, yy * R); ctx.lineTo(R, yy * R); ctx.stroke(); }
+      ctx.restore();
+      line(b);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = lw * 0.8;
+      ctx.beginPath(); ctx.arc(R * 0.5, -R * 0.2, R * 0.42, -1.2, 1.3); ctx.stroke();
+    } else if (id === "bow") {
+      ctx.translate(R * 0.34, R * 0.02);
+      ctx.rotate(0.3);
+      for (const sd of [-1, 1]) {
+        const lp = new Path2D();
+        lp.moveTo(0, 0); lp.bezierCurveTo(sd * R * 0.3, -R * 0.6, sd * R * 0.95, -R * 0.5, sd * R * 0.8, 0); lp.bezierCurveTo(sd * R * 0.95, R * 0.4, sd * R * 0.3, R * 0.35, 0, 0);
+        paint(lp, "#ff5fa8");
+        ctx.strokeStyle = "rgba(120,10,60,0.5)";
+        ctx.lineWidth = lw * 0.6;
+        ctx.beginPath(); ctx.moveTo(sd * R * 0.12, 0); ctx.lineTo(sd * R * 0.55, -R * 0.08); ctx.stroke();
+        const tail = new Path2D();
+        tail.moveTo(0, R * 0.05); tail.lineTo(sd * R * 0.42, R * 0.62); tail.lineTo(sd * R * 0.2, R * 0.56); tail.lineTo(sd * R * 0.1, R * 0.7); tail.closePath();
+        paint(tail, "#e23f8c", lw * 0.7);
+      }
+      const kn = new Path2D();
+      kn.roundRect(-R * 0.14, -R * 0.16, R * 0.28, R * 0.32, R * 0.08);
+      paint(kn, "#ff8cc0");
+    } else if (id === "antenna") {
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = lw * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.05, -R * 0.1); ctx.lineTo(-R * 0.62, -R * 1.25);
+      ctx.moveTo(R * 0.05, -R * 0.1); ctx.lineTo(R * 0.58, -R * 1.32);
+      ctx.stroke();
+      ctx.strokeStyle = "#cfc6d8";
+      ctx.lineWidth = lw * 0.7;
+      ctx.stroke();
+      for (const [ax, ay] of [[-0.62, -1.25], [0.58, -1.32]]) { const bl = new Path2D(); bl.arc(ax * R, ay * R, R * 0.09, 0, Math.PI * 2); paint(bl, "#cfc6d8", lw * 0.6); }
+      if (Math.sin(t * 7) > 0.6) glow(R * 0.58, -R * 1.32, R * 0.45, "#a6d94a", 0.8);
+      const box = new Path2D();
+      box.roundRect(-R * 0.28, -R * 0.2, R * 0.56, R * 0.3, R * 0.07);
+      paint(box, "#4a3a6a");
+      ctx.fillStyle = Math.sin(t * 4) > 0 ? "#ff3b4a" : "#7a1020";
+      ctx.beginPath(); ctx.arc(R * 0.14, -R * 0.05, R * 0.045, 0, Math.PI * 2); ctx.fill();
+    } else if (id === "shell") {
+      const sh = new Path2D();
+      sh.moveTo(-R * 0.62, R * 0.12);
+      sh.bezierCurveTo(-R * 0.66, -R * 0.75, R * 0.66, -R * 0.75, R * 0.62, R * 0.12);
+      for (let k = 0; k <= 6; k++) sh.lineTo(R * 0.62 - k * R * 0.207, R * (k % 2 ? 0.3 : 0.1));
+      sh.closePath();
+      ctx.fillStyle = rgb(hsl(j.hue, 70, 88));
+      ctx.fill(sh);
+      ctx.save();
+      ctx.clip(sh);
+      ctx.fillStyle = rgb(hsl((j.hue + 40) % 360, 75, 68));
+      for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc((hashN(k + j.hue) - 0.5) * R, -R * 0.1 - hashN(k * 3 + 1) * R * 0.4, R * 0.09, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath(); ctx.ellipse(-R * 0.26, -R * 0.3, R * 0.16, R * 0.08, -0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      line(sh);
+    } else if (id === "propeller") {
+      const cols = ["#d62839", "#ffd23f", "#2fb7c9", "#a6d94a"];
+      const dome = new Path2D();
+      dome.moveTo(-R * 0.56, R * 0.08); dome.bezierCurveTo(-R * 0.58, -R * 0.62, R * 0.58, -R * 0.62, R * 0.56, R * 0.08); dome.closePath();
+      ctx.save();
+      ctx.clip(dome);
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = cols[k]; ctx.fillRect(-R * 0.56 + k * R * 0.28, -R, R * 0.29, R * 1.2); }
+      ctx.restore();
+      line(dome);
+      const brim = new Path2D();
+      brim.ellipse(R * 0.46, R * 0.1, R * 0.4, R * 0.1, 0.1, 0, Math.PI * 2);
+      paint(brim, "#d62839", lw * 0.8);
+      ctx.strokeStyle = ink; ctx.lineWidth = lw * 1.2;
+      ctx.beginPath(); ctx.moveTo(0, -R * 0.44); ctx.lineTo(0, -R * 0.7); ctx.stroke();
+      const wv = Math.cos(t * 9);
+      for (const sd of [-1, 1]) { const bl = new Path2D(); bl.ellipse(sd * R * 0.26 * wv, -R * 0.72, Math.max(R * 0.04, R * 0.26 * Math.abs(wv)), R * 0.07, 0, 0, Math.PI * 2); paint(bl, sd < 0 ? "#ffd23f" : "#2fb7c9", lw * 0.6); }
+      const nub = new Path2D(); nub.arc(0, -R * 0.72, R * 0.06, 0, Math.PI * 2); paint(nub, "#d62839", lw * 0.5);
+    } else if (id === "wig") {
+      const cols = ["#d62839", "#ff8a3d", "#ffd23f", "#a6d94a", "#2fb7c9", "#8a3dff", "#ff5fa8"];
+      for (let row = 0; row < 2; row++) for (let k = 0; k < 7; k++) {
+        const a = Math.PI * (1.02 + (k / 6) * 0.96), rr = row ? 0.92 : 1.2;
+        const c = new Path2D();
+        c.arc(Math.cos(a) * hRx * rr, hRy * 0.9 + Math.sin(a) * hRy * rr * 1.05, R * (row ? 0.3 : 0.34), 0, Math.PI * 2);
+        paint(c, cols[(k + row * 3) % 7], lw * 0.7);
+      }
+    } else if (id === "crown") {
+      const c = new Path2D();
+      c.moveTo(-R * 0.56, R * 0.1);
+      for (let k = 0; k <= 6; k++) c.lineTo(-R * 0.56 + k * R * 0.187, k % 2 ? -R * 0.3 : -R * 0.72);
+      c.lineTo(R * 0.56, R * 0.1);
+      c.closePath();
+      paint(c, "#ffd23f");
+      ctx.fillStyle = "rgba(160,110,0,0.35)";
+      ctx.fillRect(-R * 0.54, -R * 0.06, R * 1.08, R * 0.05);
+      for (let k = 0; k < 3; k++) { ctx.fillStyle = ["#d62839", "#2fb7c9", "#ff5fa8"][k]; ctx.beginPath(); ctx.arc(-R * 0.3 + k * R * 0.3, -R * 0.16, R * 0.07, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = lw * 0.5;
+      ctx.beginPath(); ctx.moveTo(-R * 0.44, -R * 0.02); ctx.lineTo(-R * 0.44, -R * 0.4); ctx.stroke();
+    } else if (id === "topper") {
+      ctx.translate(-R * 0.12, 0);
+      const brim = new Path2D();
+      brim.ellipse(0, R * 0.0, R * 0.56, R * 0.12, 0, 0, Math.PI * 2);
+      paint(brim, "#1f1430");
+      const tube = new Path2D();
+      tube.moveTo(-R * 0.32, 0); tube.lineTo(-R * 0.38, -R * 0.8); tube.quadraticCurveTo(0, -R * 0.92, R * 0.38, -R * 0.8); tube.lineTo(R * 0.32, 0); tube.closePath();
+      paint(tube, "#1f1430");
+      ctx.fillStyle = "#d62839";
+      ctx.beginPath(); ctx.moveTo(-R * 0.33, -R * 0.06); ctx.lineTo(R * 0.33, -R * 0.06); ctx.lineTo(R * 0.34, -R * 0.24); ctx.lineTo(-R * 0.34, -R * 0.24); ctx.fill();
+      ctx.fillStyle = "#ffd23f";
+      ctx.fillRect(-R * 0.08, -R * 0.24, R * 0.16, R * 0.18);
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      ctx.fillRect(-R * 0.26, -R * 0.78, R * 0.1, R * 0.5);
+    }
+    ctx.restore();
+  }
+  D.HAT_IDS = ["bow", "cone", "bucket", "pot", "antenna", "shell", "propeller", "wig", "crown", "topper"];
+
   D.jinxLook = function (j) {
     const a = j.align || 0, m = j.moon || 0;
     const adult = j.stage === "adult", mid = Math.abs(a) <= 0.33;
@@ -1426,6 +1594,8 @@
       ctx.ellipse(R * 0.1, hCy - hRy * 1.45 + Math.sin(t * 2) * R * 0.06, R * 0.6, R * 0.15, -0.12, 0, Math.PI * 2);
       ctx.stroke();
     }
+    const hat = o.hat !== undefined ? o.hat : j.hat;
+    if (hat) wearHat(hat, j, R, hRx, hRy, hCy, lw, t, ink, jig);
     ctx.restore();   // head
     ctx.restore();   // body
     };
@@ -3731,6 +3901,97 @@
     return { x, y: y - s * 0.8, r: s * 1.2 };
   }
 
+  // A contestant at the talent show: the Jinx doing its act under a spotlight, its name, and the judges' card.
+  D.performer = function (c, x, y, t, v) {
+    const j = c.j, act = v.acting ? v.stat : null, u = U;
+    if (v.acting) {
+      const g = ctx.createLinearGradient(x, y - 330 * u, x, y);
+      g.addColorStop(0, "rgba(255,244,200,0)");
+      g.addColorStop(1, "rgba(255,244,200,0.3)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(x - 14 * u, y - 330 * u); ctx.lineTo(x + 14 * u, y - 330 * u); ctx.lineTo(x + 62 * u, y); ctx.lineTo(x - 62 * u, y); ctx.fill();
+      ctx.fillStyle = "rgba(255,244,200,0.28)";
+      ctx.beginPath(); ctx.ellipse(x, y, 62 * u, 17 * u, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    const o = { t, scale: c.scale || 1.25, dir: c.dir || 1, happy: !!act || v.cheer > 0 || v.won, hop: 0, look: [0, 0] };
+    let jx = 0;
+    if (act === "tumble") { o.spin = (t * 6) % (Math.PI * 2); o.hop = Math.abs(Math.sin(t * 6)) * 40 * u; }
+    else if (act === "juggle") o.hop = Math.abs(Math.sin(t * 6)) * 5 * u;
+    else if (act === "glow") { o.hop = (0.5 + 0.5 * Math.sin(t * 2.4)) * 24 * u; o.twirl = t * 3; glow(x, y - 44 * u - o.hop, 95 * u, "#8fe9ff", 0.3 + 0.18 * Math.sin(t * 5)); }
+    else if (act === "grit") jx = Math.sin(t * 38) * 1.6 * u;
+    if (v.cheer > 0) o.hop += Math.sin((1 - v.cheer) * Math.PI) * 26 * u;
+    if (v.won) o.hop += Math.abs(Math.sin(t * 5)) * 22 * u;
+    const r = D.drawJinx(j, x + jx, y, o), top = r.topY + 22 * u;
+    if (act === "juggle") {
+      for (let k = 0; k < 5; k++) {
+        const a = t * 4.2 + k * 1.2566, px = x + Math.cos(a) * 34 * u, py = top - 16 * u - Math.abs(Math.sin(a)) * 78 * u;
+        ctx.fillStyle = ["#ff5fa8", "#ffd23f", "#8fe9ff", "#a6d94a", "#fbf8f2"][k];
+        ctx.strokeStyle = GINK;
+        ctx.lineWidth = 1.6 * u;
+        ctx.beginPath(); ctx.arc(px, py, 7.5 * u, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    } else if (act === "grit") {
+      // a barbell, with more plates the longer it holds
+      const by = top - 12 * u + Math.sin(t * 38) * 1.2 * u, n = 1 + Math.min(3, Math.floor((v.k || 0) * 4));
+      ctx.strokeStyle = GINK; ctx.lineWidth = 6 * u;
+      ctx.beginPath(); ctx.moveTo(x - 52 * u, by); ctx.lineTo(x + 52 * u, by); ctx.stroke();
+      ctx.strokeStyle = "#cfc6d8"; ctx.lineWidth = 3 * u; ctx.stroke();
+      for (const sd of [-1, 1]) for (let k = 0; k < n; k++) {
+        const wt = new Path2D();
+        wt.roundRect(x + sd * (38 + k * 9) * u - 4 * u, by - (17 - k * 2) * u, 8 * u, (34 - k * 4) * u, 2 * u);
+        ctx.fillStyle = "#2a2236"; ctx.fill(wt);
+        ctx.strokeStyle = GINK; ctx.lineWidth = 1.5 * u; ctx.stroke(wt);
+      }
+      for (let k = 0; k < 2; k++) { const kk = (t * 1.5 + k * 0.5) % 1; ctx.fillStyle = `rgba(143,233,255,${1 - kk})`; ctx.beginPath(); ctx.arc(x + (k ? 26 : -26) * u, r.faceY - 8 * u + kk * 16 * u, 2.4 * u, 0, Math.PI * 2); ctx.fill(); }
+    } else if (act === "glow") {
+      for (let k = 0; k < 6; k++) { const a = t * 2.2 + k * 1.047; sparkle(x + Math.cos(a) * 46 * u, y - 44 * u - o.hop + Math.sin(a) * 30 * u, 5 * u, k % 2 ? "#ffffff" : "#8fe9ff"); }
+    } else if (act === "tumble") {
+      ctx.strokeStyle = "rgba(255,210,63,0.6)"; ctx.lineWidth = 2.5 * u;
+      ctx.beginPath(); ctx.arc(x, y - 40 * u - o.hop, 46 * u, t * 6, t * 6 + 1.6); ctx.stroke();
+    }
+    // name on a strip of paper, with the running total
+    ctx.save();
+    ctx.font = `${11 * u}px "Bungee", sans-serif`;
+    const label = j.name.toUpperCase(), tw = ctx.measureText(label).width + 12 * u;
+    ctx.translate(x, y + (c.low ? 34 : 16) * u);
+    ctx.rotate(c.me ? -0.03 : 0.02);
+    ctx.fillStyle = "rgba(8,3,16,0.5)";
+    ctx.fillRect(-tw / 2 + 2 * u, -7 * u + 3 * u, tw, 15 * u);
+    ctx.fillStyle = c.me ? "#ffd23f" : "#fbf8f2";
+    ctx.fillRect(-tw / 2, -7 * u, tw, 15 * u);
+    ctx.fillStyle = GINK;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, 0, 1 * u);
+    if (v.total) {
+      ctx.font = `${10 * u}px "Special Elite", monospace`;
+      ctx.fillStyle = "#fbf8f2";
+      ctx.fillText(v.total.toFixed(1), 0, 17 * u);
+    }
+    ctx.restore();
+    // the judges' card, on a stick
+    if (v.card) {
+      const k = clamp((t - v.card.t0) / 0.28, 0, 1), cy = top - 58 * u, flip = Math.sin(k * Math.PI / 2);
+      ctx.save();
+      ctx.fillStyle = GINK; ctx.fillRect(x + 30 * u - 2.5 * u, cy, 5 * u, 60 * u);
+      ctx.fillStyle = "#d9b77a"; ctx.fillRect(x + 30 * u - 1.5 * u, cy, 3 * u, 60 * u);
+      ctx.translate(x + 30 * u, cy);
+      ctx.rotate(0.08);
+      ctx.scale(Math.max(0.05, flip), 1);
+      ctx.fillStyle = "rgba(8,3,16,0.5)";
+      ctx.fillRect(-21 * u + 3 * u, -27 * u + 4 * u, 42 * u, 44 * u);
+      ctx.fillStyle = "#fbf8f2";
+      ctx.fillRect(-21 * u, -27 * u, 42 * u, 44 * u);
+      ctx.fillStyle = v.card.v >= 8 ? "#d62839" : GINK;
+      ctx.font = `${20 * u}px "Bungee", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(v.card.v.toFixed(1), 0, -4 * u);
+      ctx.restore();
+    }
+    return r;
+  };
+
   D.garden = function (t, dt, G) {
     D.paper.neon = false;
     D.paper.edge = "#fbf8f2";
@@ -3754,7 +4015,25 @@
     if (G && G.save) {
       // everything that stands on the island, drawn back to front
       const s = G.save, things = [];
+      const show = G.talent;
+      if (show) show.cast.forEach((c, i) => {
+        const [x, y] = D.toScreen(c.u, c.v);
+        things.push({ y, f: () => { const h = D.performer(c, x, y, t, show.view(i)); if (c.me) hits.push({ kind: "jinx", j: c.j, ...h }); } });
+      });
+      const duet = G.duet && G.duet.phase === "sing" ? G.duet : null;
+      if (duet) {
+        // the heart balloon they share, drifting up between them
+        const [x, y] = D.toScreen(duet.u, duet.v), k = clamp(duet.t / 3.6, 0, 1);
+        things.push({ y: y + 1, f: () => {
+          const by = y - 70 * U - k * 60 * U, bx = x + Math.sin(t * 2) * 6 * U, sz = 15 * U * (1 + 0.08 * Math.sin(t * 6));
+          ctx.strokeStyle = "rgba(239,230,210,0.8)"; ctx.lineWidth = 1.2 * U;
+          ctx.beginPath(); ctx.moveTo(bx, by + sz); ctx.quadraticCurveTo(bx + 8 * U, by + sz + 22 * U, x, y - 34 * U); ctx.stroke();
+          cutout(() => heart(bx, by - sz * 0.2, sz, "#ff5fa8"), bx, by, sz * 2.4, sz * 2.4, sz * 2.4, { edge: 2 });
+          glow(bx, by, sz * 3.2, "#ff5fa8", 0.25);
+        } });
+      }
       for (const j of s.jinxes) {
+        if (show && show.cast.some((c) => c.j === j)) continue;
         const [x, y] = D.toScreen(j.u, j.v);
         things.push({ y: j.held ? 1e9 : y, f: () => {
           if (j.stage === "egg") hits.push({ kind: "jinx", j, ...D.drawEgg(j, x, y, t) });

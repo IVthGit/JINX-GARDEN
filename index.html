@@ -587,6 +587,22 @@ h2 { text-shadow: -2px -1px 0 rgba(143,233,255,0.75), 2.5px 2px 0 var(--pink), 5
   0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px var(--paper), 4px 5px 0 3px rgba(8,3,16,0.72), 0 0 0 3px rgba(255,210,63,0.7); }
   50% { transform: scale(1.1); box-shadow: 0 0 0 3px var(--paper), 4px 5px 0 3px rgba(8,3,16,0.72), 0 0 0 13px rgba(255,210,63,0); }
 }
+
+/* ---------- talent show ---------- */
+#talent {
+  position: absolute; z-index: 12; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) rotate(-0.4deg);
+  width: min(460px, calc(100% - 24px)); padding: 26px 18px 16px; gap: 8px; text-align: center; align-items: center;
+}
+#talent > .row { align-self: center; justify-content: center; min-height: 20px; }
+#tlRound { font-size: 0.85rem; color: var(--gold); }
+#tlMeter { position: relative; width: 100%; height: 26px; background: #120818; border: 2px solid var(--bone); box-shadow: 3px 4px 0 rgba(8,3,16,0.7); }
+#tlMeter .good { position: absolute; top: 0; bottom: 0; left: 36%; width: 28%; background: var(--dots), var(--ether); opacity: 0.75; }
+#tlMeter .sweet { position: absolute; top: 0; bottom: 0; left: 45%; width: 10%; background: var(--gold); }
+#tlMark { position: absolute; top: -7px; bottom: -7px; width: 6px; margin-left: -3px; background: var(--pink); border: 1.5px solid var(--ink); box-shadow: 0 0 0 2px var(--paper); }
+#tlPips { font-family: var(--chunk); color: var(--gold); letter-spacing: 0.2em; }
+body[data-show] #hud, body[data-show] #panel { display: none !important; }
+.chip.on { border-style: solid; border-color: var(--gold); color: var(--gold); }
+.chip:disabled { opacity: 0.5; cursor: default; }
 </style>
 
 <div id="app">
@@ -610,6 +626,7 @@ h2 { text-shadow: -2px -1px 0 rgba(143,233,255,0.75), 2.5px 2px 0 var(--pink), 5
       <button class="btn big" data-act="bigtop">Big Top</button>
       <button class="btn" data-act="shop">Concession</button>
       <button class="btn" data-act="college">College</button>
+      <button class="btn" style="--b:var(--gold);color:var(--ink);text-shadow:none" data-act="talent">Talent show</button>
       <button class="btn ghost" data-act="whistle">Whistle</button>
       <button class="btn ghost" data-act="sky">Sky</button>
       <button class="btn ghost" id="btnSound" data-act="sound" aria-pressed="true">Sound on</button>
@@ -617,6 +634,12 @@ h2 { text-shadow: -2px -1px 0 rgba(143,233,255,0.75), 2.5px 2px 0 var(--pink), 5
   </header>
 
   <aside id="panel" class="flyer" hidden aria-live="polite"></aside>
+  <section id="talent" class="flyer" hidden aria-live="polite">
+    <p class="eyebrow" id="tlRound"></p>
+    <p id="tlHint"></p>
+    <div id="tlMeter" hidden><i class="good"></i><i class="sweet"></i><b id="tlMark"></b></div>
+    <div class="row"><button class="btn big" id="cheerBtn" hidden>Cheer!</button><span id="tlPips" aria-hidden="true"></span></div>
+  </section>
 
   <div id="runbar" hidden></div>
   <button class="btn ghost small" id="btnQuit">Go home</button>

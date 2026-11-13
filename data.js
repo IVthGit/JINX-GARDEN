@@ -24,7 +24,9 @@ JG.ITEMS = {
   shoe:      { name: "Mercury Shoe", desc: "Winged and too small. A huge boost to Tumble.", color: "#ffe680", glyph: "↑", price: 48, belly: 0, xp: { tumble: 28 } },
   shard:     { name: "Halo Shard", desc: "Still humming. A huge boost to Glow.", color: "#8fe9ff", glyph: "◇", price: 48, belly: 0, xp: { glow: 28 } },
   bolt:      { name: "Rust Bolt", desc: "Off the old ferris wheel. A huge boost to Grit.", color: "#c97a3d", glyph: "⚙", price: 48, belly: 0, xp: { grit: 28 } },
-  cd:        { name: "Burned CD", desc: "Sharpie on the label: SAD SONGS 4 U. Cheers them right up.", color: "#d6e1ff", glyph: "◎", price: 20, belly: 0, mood: 40, love: 8 }
+  cd:        { name: "Burned CD", desc: "Sharpie on the label: SAD SONGS 4 U. Cheers them right up.", color: "#d6e1ff", glyph: "◎", price: 20, belly: 0, mood: 40, love: 8 },
+  // not food: two grown Jinxes need one to sing a duet
+  balloon:   { name: "Heart Balloon", desc: "Two grown Jinxes who share one sing a duet, and an egg appears.", color: "#ff5fa8", glyph: "♥", price: 90, keep: true }
 };
 JG.SHOP_ITEMS = ["moonpie", "plum", "spring", "comet", "sludgepop", "cd", "floss", "gum", "papermoon", "jawbreaker"];
 JG.RARE_ITEMS = ["nose", "shoe", "shard", "bolt", "floss", "gum", "papermoon", "jawbreaker"];
@@ -201,6 +203,30 @@ JG.FORMS = {
 JG.TUNE = { hp: [1.5, 1.7, 2.1], dmg: [1.9, 1.9, 2.3], bossHeal: 0.25, baseHp: 30 };   // hp and dmg are per act
 
 // The garden: where the snack tree and the toys stand (in island coordinates, -1 to 1).
+// Hats. Bought at the Concession stand, won at talent shows, or found. They only change how a Jinx looks,
+// though the talent show judges do like one.
+JG.HATS = {
+  bow:       { name: "Big Bow", price: 40, desc: "Ties the whole look together." },
+  cone:      { name: "Traffic Cone", price: 50, desc: "Somebody will be looking for this." },
+  bucket:    { name: "Tin Bucket", price: 55, desc: "Echoes nicely." },
+  pot:       { name: "Flower Pot", price: 60, desc: "With the flower still in it." },
+  antenna:   { name: "Rabbit Ears", price: 110, desc: "Picks up three channels and a ghost." },
+  shell:     { name: "Eggshell", desc: "Some Jinxes never quite leave home.", from: "kept from hatching" },
+  propeller: { name: "Propeller Cap", desc: "Spins when they're pleased with themselves.", from: "Open Mic prize" },
+  wig:       { name: "Rainbow Wig", desc: "Louder than the calliope.", from: "Midway Revue prize" },
+  crown:     { name: "Paper Crown", desc: "Cut from gold wrapping paper. Still counts.", from: "Big Top Gala prize" },
+  topper:    { name: "Tiny Topper", desc: "A Ringmaster dropped it on the way out.", from: "won on a full run" }
+};
+JG.SHOP_HATS = ["bow", "cone", "bucket", "pot", "antenna"];
+
+// Talent shows in the garden ring. lv is about how good the rivals are; speed is how fast the cheer marker moves.
+JG.LEAGUES = [
+  { id: "open",  name: "Open Mic",     lv: 3,  prize: 30,  hat: "propeller", speed: 0.85, blurb: "Anyone with a hat and a dream." },
+  { id: "revue", name: "Midway Revue", lv: 9,  prize: 70,  hat: "wig",       speed: 1.15, blurb: "Seasoned acts from up and down the midway." },
+  { id: "gala",  name: "Big Top Gala", lv: 17, prize: 150, hat: "crown",     speed: 1.5,  blurb: "The best in the cosmos. The judges have seen everything." }
+];
+JG.RIVALS = ["Madame Fizz", "Lil Gasket", "Count Wobble", "Sister Static", "Tuba", "Moxie", "Gherkin", "Dame Sprocket", "Pogo", "Velveteen", "Old Clank", "Sequin", "Bartholomew", "Jellybean"];
+
 JG.TREE = { u: 0.62, v: -0.5, items: ["plum", "spring", "comet", "sludgepop", "moonpie", "moonpie"] };
 // Toys that Jinxes train on by themselves.
 JG.TOYS = {
