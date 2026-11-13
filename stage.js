@@ -1469,6 +1469,7 @@
     const rt = now(), P = D.stagePos(), hz = P.feet - 50 * U;
     if (B !== lastB) { lastB = B; reset(); }
     D.paper.neon = B.act === 3;      // Act III is lit by blacklight: cut edges glow
+    D.paper.act = B.act;             // what the foe is pasted onto is tinted for the act
     D.paper.edge = "#fbf8f2";
     const frozen = rt < stopUntil;
     if (!frozen) stageT += dt;

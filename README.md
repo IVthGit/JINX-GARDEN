@@ -100,7 +100,7 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 The whole game is a paper theatre made from a photocopied zine:
 
 - **Cool, with a little cute:** the Jinxes are small and round-headed, but masked, hooded or eclipsed, and they never smile.
-- **Cut-outs:** Jinxes, foes, the tent, the tree and the toys are paper cut-outs with a white edge and a hard shadow. In a fight they stand on sticks behind a cardboard stage front, and each foe is pasted onto a torn scrap of printed paper. A beaten foe flips over like a card and flutters away.
+- **Cut-outs:** Jinxes, foes, the tent, the tree and the toys are paper cut-outs with a white edge and a hard shadow. In a fight they stand on sticks behind a cardboard stage front, and each foe stands in front of a burst of torn paper strips, in dark paper tinted for the act: wine in Act I, teal in Act II and violet in Act III, where the tears glow. A beaten foe flips over like a card and flutters away.
 - **Puppet foes:** every foe is made of separate pieces of card (legs, body, head, arms, hat) pinned together. Each piece swings a little on its own pin, and they rattle loose when the foe is hit.
 - **Zine print:** titles are cut-out letters from different magazines, buttons and map stops are stickers, and the cards and sky are printed in dots.
 - **Blacklight:** the third act is lit by blacklight, so the cut edges glow green and pink.

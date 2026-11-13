@@ -215,7 +215,7 @@
   // Characters and props are drawn into a small off-screen sheet, then stuck onto the scene with a
   // white cut edge and a hard drop shadow, like pieces of a toy theatre. Soft light (glows, beams,
   // smoke) goes on a second sheet that is laid over the top, so it never gets an edge of its own.
-  D.paper = { on: true, edge: "#fbf8f2", neon: false };
+  D.paper = { on: true, edge: "#fbf8f2", neon: false, act: 1 };
   const sheets = {};
   let glowCtx = null, cutDepth = 0, lightUsed = false, PS = null;
   // Sheets come in size buckets: pasting from a canvas costs by the size of the whole canvas, so a small
@@ -3468,81 +3468,118 @@
     return { r, cy: feetY - r * off };
   };
 
-  // collage: every foe is pasted onto a torn scrap of printed paper that shifts against it
-  const SCRAPS = [["#e9dfc6", "#d62839"], ["#f3d7e6", "#8a3dff"], ["#d5ecef", "#ff4fa3"], ["#f6e7a6", "#2fb7c9"], ["#dfe9c4", "#ff4fa3"]];
-  const scrapShapes = {};
-  function tornScrap(f, x, y, r, t) {
-    const id = f.def.id || f.def.name;
-    let sp = scrapShapes[id];
+  // Behind every foe: a burst of torn paper strips, in night paper tinted for the act. Two layers, long
+  // ones at the back and short dark ones in front. In Act III the tears glow instead of showing pale.
+  const ACT_TONE = [
+    { paper: "#2a1218", ink: "#d62839", edge: "#e6d9bd", a: "#5a1420", core: "#ece3cf" },
+    { paper: "#0e2228", ink: "#2fb7c9", edge: "#bff4ff", a: "#12333c", core: "#cfe6ea" },
+    { paper: "#150c26", ink: "#ff4fa3", edge: "#ff4fa3", a: "#231244", core: "#ff7ab8" }
+  ];
+  const bursts = {};
+  let burstKeys = [];
+  function buildBurst(f, r, act) {
+    const T = ACT_TONE[act - 1], neon = act === 3, id = f.def.id || f.def.name;
+    let h = 7;
+    for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 99991;
+    const rn = rng(h + 11), rx = r * 1.6 * (f.def.boss ? 1.12 : 1), ext = rx * 1.46 + 16 * U;
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = Math.ceil(ext * 2 * DPR);
+    const g = cv.getContext("2d");
+    g.setTransform(DPR, 0, 0, DPR, ext * DPR, ext * DPR);
+    g.lineJoin = "round";
+    const poly = (pts) => { const p = new Path2D(); pts.forEach(([px, py], i) => (i ? p.lineTo(px, py) : p.moveTo(px, py))); p.closePath(); return p; };
+    // a tear: it wanders slowly and frays finely
+    const fray = (pts) => {
+      const out = [], ph = rn() * 6.28;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length], d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, n = Math.max(1, Math.round(d / (r * 0.055)));
+        for (let k = 0; k < n; k++) {
+          const u = k / n, s0 = (i * 7 + k) * 0.55 + ph, j = Math.sin(s0) * r * 0.022 + Math.sin(s0 * 2.7 + 1) * r * 0.012 + (rn() - 0.5) * r * 0.022;
+          out.push([a[0] + (b[0] - a[0]) * u - ((b[1] - a[1]) / d) * j, a[1] + (b[1] - a[1]) * u + ((b[0] - a[0]) / d) * j]);
+        }
+      }
+      return out;
+    };
+    // the pale inside of the sheet shows in patches along the tear, wider in some places than others
+    const core = (pts) => {
+      let area = 0;
+      const n = pts.length, ph = rn() * 6.28;
+      for (let i = 0; i < n; i++) area += pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1];
+      const sg = area > 0 ? 1 : -1;
+      return pts.map((q, i) => {
+        const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n], tx = b[0] - a[0], ty = b[1] - a[1], d = Math.hypot(tx, ty) || 1;
+        const k = r * (0.012 + 0.06 * Math.pow(0.5 + 0.5 * Math.sin(i * 0.23 + ph), 2) + rn() * 0.012);
+        return [q[0] + (ty / d) * sg * k, q[1] - (tx / d) * sg * k];
+      });
+    };
+    const strip = (a, len, wb, wt, bend, back) => {
+      // tapered, a little bent, with a ragged tip
+      const pts = [], N = 5, side = (u) => wb + (wt - wb) * Math.pow(u, 0.8);
+      for (let k = 0; k <= N; k++) { const u = k / N; pts.push([r * 0.1 + (len - r * 0.1) * u, bend * u * u - side(u)]); }
+      pts.push([len + r * (0.06 + rn() * 0.12), bend - wt * 0.4], [len - r * 0.04, bend + wt * 0.1], [len + r * (0.02 + rn() * 0.1), bend + wt * 0.65]);
+      for (let k = N; k >= 0; k--) { const u = k / N; pts.push([r * 0.1 + (len - r * 0.1) * u, bend * u * u + side(u)]); }
+      g.save();
+      g.rotate(a);
+      const face = fray(pts), pf = poly(face), pc = poly(core(face));
+      g.save();
+      g.shadowColor = neon ? T.edge : "rgba(4,2,10,0.6)";
+      g.shadowBlur = (neon ? 9 : 5) * U * DPR;
+      g.shadowOffsetX = neon ? 0 : 3 * U * DPR;      // the shadow falls down the screen whichever way the strip points
+      g.shadowOffsetY = neon ? 0 : 5 * U * DPR;
+      g.fillStyle = T.core;
+      g.fill(pc);
+      g.restore();
+      g.save();
+      g.clip(pf);
+      g.fillStyle = back ? rgb(mix(T.paper, T.a, 0.8)) : T.paper;
+      g.fillRect(0, -r, len + r, r * 2);
+      // newsprint: faint columns of type across the strip
+      g.fillStyle = "rgba(255,255,255,0.05)";
+      for (let xx = r * 0.3; xx < len; xx += r * 0.085) { let yy = -wb; while (yy < wb) { const hh = r * (0.05 + rn() * 0.2); g.fillRect(xx, yy, r * 0.03, hh); yy += hh + r * 0.04; } }
+      // print dots, growing toward the tip
+      const st = Math.max(3.5, r * 0.105);
+      g.fillStyle = rgb(T.ink, back ? 0.3 : 0.2);
+      for (let xx = len * 0.45; xx < len + r * 0.2; xx += st) for (let yy = -wb - st; yy < wb + st; yy += st) {
+        const k = (xx / len - 0.5) * 1.6;
+        if (k > 0) { g.beginPath(); g.arc(xx, yy + (Math.round(xx / st) % 2) * st * 0.5 + bend * (xx / len) * (xx / len), Math.min(st * 0.36, st * 0.42 * k), 0, 7); g.fill(); }
+      }
+      // grain
+      for (let k = 0; k < 70; k++) { g.fillStyle = rn() < 0.5 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.12)"; g.fillRect(rn() * len, (rn() - 0.5) * wb * 2, 1 + rn() * 2.5, 1); }
+      // darker where it passes behind the foe
+      const sh = g.createLinearGradient(0, 0, len, 0);
+      sh.addColorStop(0, "rgba(4,2,10,0.85)");
+      sh.addColorStop(back ? 0.6 : 0.5, "rgba(4,2,10,0)");
+      g.fillStyle = sh;
+      g.fillRect(0, -r, len + r, r * 2);
+      // one lit edge, as if the stage light caught the fold
+      g.strokeStyle = neon ? "rgba(255,180,220,0.35)" : "rgba(255,255,255,0.14)";
+      g.lineWidth = Math.max(1, r * 0.012);
+      g.beginPath();
+      for (let k = 2; k <= N; k++) { const u = k / N, px = r * 0.1 + (len - r * 0.1) * u, py = bend * u * u - side(u) * 0.72; k === 2 ? g.moveTo(px, py) : g.lineTo(px, py); }
+      g.stroke();
+      g.restore();
+      g.restore();
+    };
+    // strips that point down are shorter: the stage is in the way
+    const reach = (a) => 1 - 0.3 * Math.max(0, Math.sin(a)) + 0.08 * Math.max(0, -Math.sin(a));
+    const a0 = rn() * 0.5, nb = 7, nf = 6;
+    for (let i = 0; i < nb; i++) { const a = a0 + (i / nb) * Math.PI * 2 + (rn() - 0.5) * 0.16; strip(a, rx * (1.08 + rn() * 0.2) * reach(a), r * (0.46 + rn() * 0.1), r * (0.17 + rn() * 0.07), (rn() - 0.5) * r * 0.3, true); }
+    for (let i = 0; i < nf; i++) { const a = a0 + ((i + 0.5) / nf) * Math.PI * 2 + (rn() - 0.5) * 0.2; strip(a, rx * (0.72 + rn() * 0.14) * reach(a), r * (0.5 + rn() * 0.1), r * (0.2 + rn() * 0.08), (rn() - 0.5) * r * 0.22, false); }
+    return { cv, size: cv.width / DPR, rot: (rn() - 0.5) * 0.26 };
+  }
+  function tornBurst(f, x, y, r, t) {
+    const act = D.paper.act || 1, key = (f.def.id || f.def.name) + ":" + act + ":" + Math.round(r) + ":" + DPR;
+    let sp = bursts[key];
     if (!sp) {
-      let h = 7;
-      for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 99991;
-      const rn = rng(h + 11), pts = [], n = 30;
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2, sq = Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
-        const k = (0.78 + 0.22 / sq) * (0.94 + rn() * 0.12);      // somewhere between a circle and a square, with a ragged edge
-        pts.push([Math.cos(a) * k, Math.sin(a) * k]);
-      }
-      sp = scrapShapes[id] = { pts, col: SCRAPS[h % SCRAPS.length], rot: (rn() - 0.5) * 0.3, seed: h, big: f.def.boss ? 1.12 : 1 };
-    }
-    const neon = D.paper.neon, rx = r * 1.5 * sp.big, ry = r * 1.62 * sp.big;
-    // printed once, then pasted every frame
-    const key = Math.round(r) + (neon ? "n" : "p") + DPR;
-    if (sp.key !== key) {
-      sp.key = key;
-      const pad = 16 * U, cw = Math.ceil((rx * 2 + pad * 2) * DPR), chh = Math.ceil((ry * 2 + pad * 2) * DPR);
-      const cv = sp.cv || (sp.cv = document.createElement("canvas"));
-      cv.width = cw;
-      cv.height = chh;
-      const g = cv.getContext("2d");
-      g.setTransform(DPR, 0, 0, DPR, (rx + pad) * DPR, (ry + pad) * DPR);
-      const path = new Path2D();
-      sp.pts.forEach(([px, py], i) => (i ? path.lineTo(px * rx, py * ry) : path.moveTo(px * rx, py * ry)));
-      path.closePath();
-      g.save();
-      g.translate(neon ? 0 : 5 * U, neon ? 0 : 6 * U);
-      g.fillStyle = neon ? rgb(sp.col[1], 0.35) : "rgba(8,3,16,0.5)";
-      if (neon) { g.lineWidth = 12 * U; g.strokeStyle = rgb(sp.col[1], 0.22); g.lineJoin = "round"; g.stroke(path); }
-      else g.fill(path);
-      g.restore();
-      g.fillStyle = neon ? "#150c26" : sp.col[0];
-      g.fill(path);
-      g.save();
-      g.clip(path);
-      const rn = rng(sp.seed);
-      // a block of colour printed off register, then columns of small print
-      g.fillStyle = rgb(sp.col[1], neon ? 0.5 : 0.8);
-      g.fillRect(-rx, -ry * (0.75 + rn() * 0.15), rx * 2, ry * 0.34);
-      g.fillStyle = neon ? "rgba(255,255,255,0.1)" : "rgba(20,10,30,0.17)";
-      const lh = Math.max(3, r * 0.11);
-      for (let yy = -ry; yy < ry; yy += lh) {
-        let xx = -rx + rn() * r * 0.3;
-        while (xx < rx) { const w = r * (0.12 + rn() * 0.5); g.fillRect(xx, yy, w, lh * 0.38); xx += w + r * 0.09; }
-      }
-      // halftone creeping in from one corner
-      const step = Math.max(4, r * 0.16);
-      g.fillStyle = neon ? rgb(sp.col[1], 0.5) : "rgba(20,10,30,0.22)";
-      for (let yy = -ry; yy < ry; yy += step) for (let xx = -rx; xx < rx; xx += step) {
-        const k = (xx / rx + yy / ry) * 0.5 - 0.1;
-        if (k > 0) { g.beginPath(); g.arc(xx + (Math.round(yy / step) % 2) * step * 0.5, yy, Math.min(step * 0.48, step * 0.75 * k), 0, Math.PI * 2); g.fill(); }
-      }
-      g.restore();
-      // the torn edge shows the white inside of the paper
-      g.strokeStyle = neon ? sp.col[1] : "#fbf8f2";
-      g.lineWidth = Math.max(2, r * 0.07);
-      g.lineJoin = "round";
-      g.stroke(path);
-      // tape
-      g.rotate(-0.5);
-      g.fillStyle = neon ? "rgba(182,255,92,0.4)" : "rgba(233,211,164,0.75)";
-      g.fillRect(-rx * 1.0, -ry * 0.5, r * 0.62, r * 0.2);
-      sp.w = cw / DPR;
-      sp.h = chh / DPR;
+      // printed once, then pasted every frame; only the last few are kept
+      sp = bursts[key] = buildBurst(f, r, act);
+      burstKeys.push(key);
+      while (burstKeys.length > 4) delete bursts[burstKeys.shift()];
     }
     ctx.save();
     ctx.translate(x, y - r * 0.15);
     ctx.rotate(sp.rot - Math.sin(t * 1.15 + r) * 0.035);
-    ctx.drawImage(sp.cv, -sp.w / 2, -sp.h / 2, sp.w, sp.h);
+    ctx.drawImage(sp.cv, -sp.size / 2, -sp.size / 2, sp.size, sp.size);
     ctx.restore();
   }
   D.drawFoe = function (f, x, feetY, t, o) {
@@ -3562,7 +3599,7 @@
     ctx.fillStyle = sh;
     ctx.fillRect(x - r * 1.4, feetY - r * 1.4, r * 2.8, r * 2.8);
     ctx.restore();
-    if (D.paper.on && !o.flat) tornScrap(f, x, cy - (f.def.id === "comet" ? r * 0.35 : 0), r, t);
+    if (D.paper.on && !o.flat) tornBurst(f, x, cy - (f.def.id === "comet" ? r * 0.35 : 0), r, t);
     ctx.save();
     if (o.tint && (f.def.boss || f.def.elite)) {
       // a slow sunburst behind the big names
