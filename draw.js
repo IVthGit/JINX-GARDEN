@@ -1094,62 +1094,455 @@
   D.HAT_IDS = ["bow", "cone", "bucket", "pot", "antenna", "shell", "propeller", "wig", "crown", "topper"];
 
   D.jinxLook = function (j) {
-    const a = j.align || 0, m = j.moon || 0;
-    const adult = j.stage === "adult", mid = Math.abs(a) <= 0.33;
-    const form = adult ? (a > 0.33 ? "ether" : a < -0.33 ? "grunge" : m >= 0.33 ? "pierrot" : "neutral") : "child";
-    let body = hsl(j.hue, 72, 70);
-    if (a > 0) body = mix(body, "#efeaff", Math.min(0.72, a * (adult ? 1.0 : 0.8)));
-    if (a < 0) body = mix(body, "#56604a", Math.min(1, -a * (adult ? 1.1 : 0.75)));
-    if (mid && m > 0) body = mix(body, "#fbf8f2", Math.min(0.86, m * (adult ? 1.7 : 1.0)));
-    let hat = ["#d62839", "#1b1726"], bell = "#ffd23f";
-    if (form === "ether" || (!adult && a > 0.33)) { hat = ["#c9b8ff", "#8fe9ff"]; bell = "#f4f0ff"; }
-    if (form === "grunge" || (!adult && a < -0.33)) { hat = ["#2a2632", "#7fae3a"]; bell = "#b9b2a6"; }
-    if (form === "pierrot" || (!adult && mid && m >= 0.33)) { hat = ["#fbf8f2", "#e9e4f0"]; bell = "#1b1726"; }
+    const a = j.align || 0, m = j.moon || 0, adult = j.stage === "adult";
+    const lean = !adult ? "base" : a > 0.33 ? "stardust" : a < -0.33 ? "sludge" : m >= 0.33 ? "pierrot" : "harlequin";
     let best = "juggle", bv = -1;
     for (const s of JG.STATS) if (j.stats[s].lv > bv) { bv = j.stats[s].lv; best = s; }
-    return { form, body, hat, bell, best, adult };
+    return { lean, best, adult, head: j.head || "disc", piece: j.piece || "corona", body: j.body || "night" };
   };
-
-  // A Jinx: a big head on a small body, with arms, legs and a tail. The "hat" is part of it:
-  // soft lappets that grow from the head and end in bells. Drawn like an inked cartoon,
-  // with a wobbling line and a lit side. Each grown-up form has its own silhouette.
   const hashN = (n) => { const v = Math.sin(n * 127.1 + 1.3) * 43758.5453; return v - Math.floor(v); };
+
+  // ---------- the Jinx ----------
+  // Three kinds: Umbra (a black disc head, a corona with comet tails, a starry cloak), Hollow (a mask, a hood with
+  // drooping tails, a tattered cloak) and Lantern (a pale bulb head, floating ribbons, a floating body with a
+  // light in its chest). Every Jinx is a head, a headpiece and a body, and a duet's egg takes each from one
+  // parent or the other, so the kinds mix. None has a mouth: the eyes and the chest light show the mood.
+  // Each part has a version for every lean (base for a child, then stardust, sludge, harlequin, pierrot).
+  // paintJinx draws one in its own units: feet at (0, 0), about 2.3 tall, on the current context.
+  const lightAt = (x, y, r, c, a) => glow(x, y, r, c, a);
+  const paintJinx = (function () {
+  const INK = "#120a1e", BONE = "#efe6d2", PAPER = "#fbf8f2", NOIR = "#16101f", RED = "#8f2238";
+  const hash = (n) => { const v = Math.sin(n * 127.1 + 1.3) * 43758.5453; return v - Math.floor(v); };
+  let g, A = { t: 0, walk: false, ph: 0, seed: 0, spinA: 0 }, cH, cL, cU;
+  // things that hang swing a little on their own, and more when it walks
+  const sway = (px, py, sd, amp) => { g.translate(px, py); g.rotate(Math.sin(A.t * 1.8 + sd + A.seed) * amp + (A.walk ? Math.sin(A.ph + sd) * amp * 1.6 : 0)); g.translate(-px, -py); };
+  const foot = (sd, fn) => { g.save(); if (A.walk) g.translate(sd * Math.sin(A.ph) * 0.04, -Math.max(0, Math.sin(A.ph + (sd > 0 ? Math.PI : 0))) * 0.08); fn(); g.restore(); };
+  const path = (fn) => { const p = new Path2D(); fn(p); return p; };
+  const fill = (p, c) => { g.fillStyle = c; g.fill(p); };
+  const line = (p, w, c) => { g.strokeStyle = c || INK; g.lineWidth = w; g.lineJoin = "round"; g.lineCap = "round"; g.stroke(p); };
+  const paint = (p, c, w) => { fill(p, c); line(p, w || 0.045); };
+  const inside = (p, fn) => { g.save(); g.clip(p); fn(); g.restore(); };
+  const ell = (x, y, rx, ry, rot) => path((p) => p.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2));
+  const glow = (x, y, r, rgbs, a) => lightAt(x, y, r, rgbs.split(",").map(Number), a);
+  const shade = (p, a) => inside(p, () => { g.fillStyle = `rgba(18,8,40,${a || 0.28})`; g.save(); g.translate(0.16, 0.1); g.fill(p); g.restore(); });
+  const bell = (x, y, r) => { paint(ell(x, y, r, r), "#e8b923", 0.035); g.fillStyle = INK; g.fillRect(x - r * 0.5, y + r * 0.1, r, r * 0.16); g.fillStyle = "rgba(255,255,255,0.7)"; g.beginPath(); g.arc(x - r * 0.3, y - r * 0.35, r * 0.2, 0, 7); g.fill(); };
+  const starP = (x, y, r) => path((p) => { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 - Math.PI / 2, rr = k % 2 ? r * 0.38 : r; p.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } p.closePath(); });
+  const star = (x, y, r, c) => fill(starP(x, y, r), c);
+  const diamondP = (x, y, w, h) => path((p) => { p.moveTo(x, y - h); p.lineTo(x + w, y); p.lineTo(x, y + h); p.lineTo(x - w, y); p.closePath(); });
+  const dripP = (x, y, w, len) => path((p) => { p.moveTo(x - w, y); p.quadraticCurveTo(x - w, y + len * 0.7, x, y + len); p.quadraticCurveTo(x + w, y + len * 0.7, x + w, y); p.closePath(); });
+  // what hangs on the end of a tail or ribbon
+  function tip(x, y, kind) {
+    if (kind === "star") { paint(starP(x, y, 0.13), "#ffd23f", 0.03); }
+    else if (kind === "pom") paint(ell(x, y, 0.1, 0.1), NOIR, 0.035);
+    else if (kind === "drip") paint(dripP(x, y - 0.06, 0.06, 0.26), "#a6d94a", 0.03);
+    else bell(x, y, 0.085);
+  }
+  const TIP = { base: "bell", stardust: "star", sludge: "drip", harlequin: "bell", pierrot: "pom" };
+
+  // ================= Hollow's parts =================
+  const PAL_H = {
+    base:      { hood: "#241a45", cloak: "#1c1533", m1: BONE, m2: "#cdc2ae", glow: "143,233,255", pupil: "#eafcff", band: BONE, hi: "190,224,255" },
+    stardust:  { hood: "#c3cbee", cloak: "#dcdaf6", m1: "#ffffff", m2: "#eef0ff", glow: "255,225,140", pupil: "#fffbe0", band: "#ffd23f", hi: "255,255,255" },
+    sludge:    { hood: "#1f2b1f", cloak: "#172018", m1: "#d6d8b8", m2: "#a9b08a", glow: "182,255,92", pupil: "#eaffc0", band: "#6f9a22", hi: "182,255,92" },
+    harlequin: { hood: RED, cloak: NOIR, m1: PAPER, m2: NOIR, glow: "255,210,63", pupil: "#fff3c2", band: NOIR, hi: "255,220,220" },
+    pierrot:   { hood: NOIR, cloak: "#f4efe6", m1: "#ffffff", m2: "#ecebf5", glow: "170,200,255", pupil: "#ffffff", band: PAPER, hi: "200,210,255" }
+  };
+  function tails(C, tl, kind) {
+    for (const [sd, len, kink] of [[-1, 1, 0], [1, 0.78, 0.2]]) {
+      g.save();
+      sway(sd * 0.3, -2.12, sd, 0.05);
+      const t = path((p) => {
+        p.moveTo(sd * 0.3, -2.12);
+        p.bezierCurveTo(sd * 0.7, -2.5 * (0.9 + tl * 0.1), sd * (0.9 + tl * 0.35), -2.3, sd * (0.98 + tl * 0.3), -1.95 + (1 - len) * 0.3);
+        p.quadraticCurveTo(sd * (1.05 + tl * 0.34), -1.6 + kink, sd * (0.95 + tl * 0.3), -1.25 - (1 - tl) * 0.5 + (1 - len) * 0.35);
+        p.quadraticCurveTo(sd * (0.86 + tl * 0.26), -1.7, sd * (0.7 + tl * 0.2), -1.92);
+        p.bezierCurveTo(sd * 0.62, -2.05, sd * 0.56, -1.95, sd * 0.5, -1.75);
+        p.closePath();
+      });
+      paint(t, C.hood);
+      inside(t, () => { g.fillStyle = C.band; for (let k = 0; k < 4; k++) { g.save(); g.translate(sd * (0.98 + tl * 0.3), -1.9 + k * 0.2); g.rotate(sd * 0.3); g.fillRect(-0.3, 0, 0.6, 0.07); g.restore(); } });
+      shade(t, 0.3);
+      line(t, 0.045);
+      tip(sd * (0.95 + tl * 0.3), -1.2 - (1 - tl) * 0.5 + (1 - len) * 0.35, kind);
+      g.restore();
+    }
+  }
+  function cloak(C, L, grown) {
+    for (const sd of [-1, 1]) foot(sd, () => paint(path((p) => { p.moveTo(sd * 0.1, -0.02); p.quadraticCurveTo(sd * 0.2, -0.2, sd * 0.4, -0.06); p.quadraticCurveTo(sd * 0.5, -0.12, sd * 0.46, 0); p.closePath(); }), L === "pierrot" ? NOIR : "#0e0a1c", 0.04));
+    const c = path((p) => {
+      p.moveTo(-0.3, -1.12);
+      p.bezierCurveTo(-0.5, -0.8, -0.7, -0.45, -0.66, -0.14);
+      for (let k = 0; k <= 8; k++) p.lineTo(-0.66 + k * 0.165, k % 2 ? -0.06 : -0.2 - (L === "sludge" ? hash(k) * 0.1 : 0));
+      p.bezierCurveTo(0.7, -0.45, 0.5, -0.8, 0.3, -1.12);
+      p.closePath();
+    });
+    fill(c, C.cloak);
+    inside(c, () => {
+      if (L === "harlequin") { for (let r = 0; r < 8; r++) for (let q = 0; q < 10; q++) { g.fillStyle = (r + q) % 2 ? RED : BONE; if ((r * 3 + q) % 3 === 0) continue; g.fill(diamondP(-0.7 + q * 0.16 + (r % 2) * 0.08, -1.1 + r * 0.14, 0.08, 0.07)); } }
+      else if (L === "pierrot") { for (let k = 0; k < 3; k++) fill(ell(0, -0.86 + k * 0.24, 0.07, 0.07), NOIR); }
+      else if (L === "sludge") { g.fillStyle = "#3d5a1c"; g.save(); g.translate(0.22, -0.5); g.rotate(0.2); g.fillRect(-0.12, -0.1, 0.24, 0.2); g.restore(); g.fillStyle = "rgba(166,217,74,0.5)"; for (let k = 0; k < 5; k++) g.fill(dripP(-0.5 + k * 0.25, -0.4 + hash(k) * 0.1, 0.04, 0.2)); }
+      else for (let k = 0; k < 14; k++) star((hash(k) - 0.5) * 1.1, -0.2 - hash(k + 5) * 0.55, 0.03 + hash(k + 9) * 0.02, L === "stardust" ? (k % 3 ? "#ffd23f" : "#8a7ad6") : (k % 3 ? "#7a5ac8" : "#bfe0ff"));
+      g.fillStyle = `rgba(${C.hi},0.14)`; g.beginPath(); g.moveTo(-0.3, -1.12); g.lineTo(-0.66, -0.14); g.lineTo(-0.48, -0.14); g.lineTo(-0.2, -1.12); g.fill();
+    });
+    shade(c, L === "pierrot" || L === "stardust" ? 0.16 : 0.34);
+    line(c, 0.045);
+    if (L === "sludge") for (const x of [-0.42, 0.1, 0.5]) paint(dripP(x, -0.12, 0.045, 0.2), "#a6d94a", 0.03);
+    if (grown || L === "pierrot") ruff(L);
+  }
+  function ruff(L) {
+    const wide = L === "pierrot" ? 1.25 : 1;
+    const r = path((p) => { p.moveTo(-0.46 * wide, -1.08); for (let k = 0; k <= 8; k++) p.lineTo((-0.46 + k * 0.115) * wide, k % 2 ? -0.86 + (wide - 1) * 0.2 : -1.02); p.lineTo(0.46 * wide, -1.08); p.quadraticCurveTo(0, -1.24, -0.46 * wide, -1.08); });
+    paint(r, L === "harlequin" ? "#e8b923" : L === "sludge" ? "#a9b08a" : PAPER, 0.04);
+    if (L !== "pierrot") inside(r, () => { g.fillStyle = L === "harlequin" ? RED : "#1c1533"; for (let k = 1; k <= 8; k += 2) { g.beginPath(); g.arc(-0.46 + k * 0.115, -0.87, 0.045, 0, 7); g.fill(); } });
+  }
+  function hood(C, L, s, open) {
+    s = s || 1;
+    const h = ell(0, -1.62, 0.76 * s, 0.7 * s);
+    fill(h, C.hood);
+    inside(h, () => {
+      if (L === "harlequin") { g.fillStyle = NOIR; g.fillRect(0, -2.4, 1, 1.6); }
+      g.fillStyle = `rgba(${C.hi},0.18)`; g.beginPath(); g.ellipse(-0.3, -1.95, 0.5, 0.3, -0.5, 0, 7); g.fill();
+    });
+    shade(h, L === "stardust" ? 0.18 : 0.3);
+    line(h, 0.045);
+    if (open !== false) paint(ell(0, -1.58, 0.56, 0.56), "#0a0616", 0.03);
+    if (L === "sludge") { line(path((p) => { p.moveTo(-0.62, -2.0); p.lineTo(-0.42, -2.1); }), 0.025, "#cfc6d8"); paint(ell(-0.63, -2.0, 0.035, 0.035), "#cfc6d8", 0.015); }
+    if (L === "stardust") { g.save(); g.translate(0.02, -2.5); g.rotate(-0.12); const hl = path((p) => p.ellipse(0, 0, 0.44, 0.1, 0, 0, 7)); line(hl, 0.1, INK); line(hl, 0.045, "#ffe9a8"); g.restore(); }
+  }
+  // eyes for a mask. kind "slit" is Hollow's, "ring" is Lantern's
+  function slitEye(sd, mood, C) {
+    const x = sd * 0.21, y = -1.62;
+    if (mood === "happy") {
+      const e = path((p) => { p.moveTo(x - 0.13, y + 0.04); p.quadraticCurveTo(x, y - 0.22, x + 0.13, y + 0.04); p.quadraticCurveTo(x, y - 0.08, x - 0.13, y + 0.04); });
+      fill(e, "#05020c"); glow(x, y - 0.06, 0.2, C.glow, 0.7);
+      line(path((p) => { p.moveTo(x - 0.07, y - 0.03); p.quadraticCurveTo(x, y - 0.12, x + 0.07, y - 0.03); }), 0.03, C.pupil);
+    } else if (mood === "asleep") {
+      line(path((p) => { p.moveTo(x - 0.12, y); p.quadraticCurveTo(x, y + 0.05, x + 0.12, y); }), 0.045, "#05020c");
+    } else if (mood === "startled") {
+      fill(ell(x, y, 0.13, 0.15), "#05020c"); glow(x, y, 0.3, C.glow, 0.95); fill(ell(x, y, 0.055, 0.065), C.pupil);
+    } else {
+      const sad = mood === "sad";
+      g.save();
+      g.translate(x, y); if (sad) g.rotate(sd * 0.5);
+      const e = path((p) => { p.moveTo(-sd * 0.01, -0.22 * (sad ? 0.7 : 1)); p.quadraticCurveTo(sd * 0.13, -0.02, sd * 0.03, 0.18 * (sad ? 0.7 : 1)); p.quadraticCurveTo(-sd * 0.11, 0, -sd * 0.01, -0.22 * (sad ? 0.7 : 1)); });
+      fill(e, "#05020c");
+      glow(sd * 0.02, 0.06, 0.2, C.glow, sad ? 0.3 : 0.7);
+      fill(ell(sd * 0.02, 0.06, 0.04, 0.055), sad ? `rgba(${C.glow},0.7)` : C.pupil);
+      g.restore();
+      if (sad && sd < 0) { glow(x - 0.02, y + 0.3, 0.12, C.glow, 0.7); fill(dripP(x - 0.02, y + 0.22, 0.03, 0.1), C.pupil); }
+    }
+  }
+  function ringEye(x, y, sd, mood, ring, glowC, s) {
+    s = s || 1;
+    if (mood === "asleep") { line(path((p) => { p.moveTo(x - 0.14 * s, y); p.quadraticCurveTo(x, y + 0.09 * s, x + 0.14 * s, y); }), 0.05 * s, "#07030f"); return; }
+    const big = mood === "startled" ? 1.18 : 1, sad = mood === "sad";
+    fill(ell(x, y, 0.16 * s * big, 0.21 * s * big, sd * (sad ? 0.45 : 0.1)), "#07030f");
+    glow(x, y + 0.02, 0.24 * s, glowC, mood === "startled" ? 0.85 : sad ? 0.25 : 0.5);
+    const r = 0.075 * s * (mood === "startled" ? 1.25 : 1), yy = y + 0.02 + (sad ? 0.05 * s : 0);
+    if (mood === "happy") line(path((p) => p.arc(x, yy + 0.03 * s, r * 1.15, Math.PI * 1.08, Math.PI * 1.92)), 0.04 * s, ring);
+    else if (sad) { g.globalAlpha = 0.7; line(path((p) => p.arc(x, yy, r, 0.15, Math.PI - 0.15)), 0.028 * s, ring); g.globalAlpha = 1; }
+    else { line(ell(x, yy, r, r), 0.028 * s, ring); if (mood === "startled") fill(ell(x, yy, r * 0.3, r * 0.3), ring); }
+  }
+  function mask(C, L, mood, eyes, ring) {
+    const m = path((p) => { p.moveTo(0, -2.04); p.bezierCurveTo(0.5, -2.04, 0.56, -1.66, 0.42, -1.36); p.quadraticCurveTo(0.24, -1.1, 0, -1.08); p.quadraticCurveTo(-0.24, -1.1, -0.42, -1.36); p.bezierCurveTo(-0.56, -1.66, -0.5, -2.04, 0, -2.04); });
+    fill(m, C.m1);
+    inside(m, () => {
+      g.fillStyle = C.m2; g.fillRect(0, -2.2, 1, 1.4);
+      if (L !== "harlequin") { g.fillStyle = "rgba(18,8,40,0.2)"; g.beginPath(); g.ellipse(0.2, -1.2, 0.5, 0.2, 0, 0, 7); g.fill(); }
+      g.fillStyle = "rgba(255,255,255,0.55)"; g.beginPath(); g.ellipse(-0.24, -1.86, 0.16, 0.07, -0.5, 0, 7); g.fill();
+      if (L === "sludge") { g.fillStyle = "rgba(111,154,34,0.35)"; g.beginPath(); g.ellipse(0.26, -1.3, 0.2, 0.14, 0.4, 0, 7); g.fill(); }
+      if (L === "harlequin") fill(diamondP(-0.21, -1.62, 0.17, 0.3), RED);
+    });
+    line(m, 0.045);
+    if (L === "stardust") {
+      // cracks with light behind them
+      const cr = path((p) => { p.moveTo(-0.34, -1.98); p.lineTo(-0.24, -1.84); p.lineTo(-0.32, -1.74); p.moveTo(0.1, -2.03); p.lineTo(0.16, -1.9); p.lineTo(0.08, -1.82); p.lineTo(0.14, -1.72); p.moveTo(0.3, -1.24); p.lineTo(0.2, -1.32); p.lineTo(0.26, -1.42); });
+      inside(m, () => { glow(-0.28, -1.86, 0.22, C.glow, 0.8); glow(0.12, -1.86, 0.24, C.glow, 0.8); glow(0.24, -1.32, 0.2, C.glow, 0.8); });
+      line(cr, 0.035, "#e8b923"); line(cr, 0.014, "#fffbe0");
+    } else if (L !== "harlequin") line(path((p) => { p.moveTo(-0.3, -2.0); p.lineTo(-0.24, -1.86); p.lineTo(-0.3, -1.78); p.lineTo(-0.22, -1.7); }), 0.02);
+    for (const sd of [-1, 1]) {
+      if (eyes === "ring") ringEye(sd * 0.21, -1.6, sd, mood, ring, C.glow, 0.92);
+      else if (eyes === "slit") slitEye(sd, mood, C);
+      if (L === "sludge") paint(dripP(sd * 0.22, -1.48, 0.035, sd < 0 ? 0.32 : 0.2), "#a6d94a", 0.022);
+    }
+    if (L === "pierrot") { line(path((p) => { p.moveTo(-0.22, -1.4); p.lineTo(-0.22, -1.22); }), 0.03, NOIR); fill(dripP(-0.22, -1.24, 0.035, 0.09), NOIR); for (const sd of [-1, 1]) line(path((p) => { p.moveTo(sd * 0.1, -1.92); p.lineTo(sd * 0.3, -1.88); }), 0.025, NOIR); }
+    else if (L === "base" && mood !== "sad") fill(diamondP(-0.24, -1.28, 0.05, 0.08), "#05020c");
+  }
+  // ================= Lantern's parts =================
+  const PAL_L = {
+    base:      { robe: ["#f1edff", "#b9aeea", "rgba(134,114,214,0.35)"], sl: ["#e6e0fb", "#e6e0fb"], head: ["#ffffff", "#d6ccf6"], ring: "#bff4ff", glow: "143,233,255", rib: "#d9d0f8", light: "255,225,140" },
+    stardust:  { robe: ["#fffdf2", "#f6e6a8", "rgba(255,210,63,0.4)"], sl: ["#fff6d8", "#fff6d8"], head: ["#ffffff", "#fff0c2"], ring: "#ffe9a8", glow: "255,225,140", rib: "#ffe9a8", light: "255,225,140" },
+    sludge:    { robe: ["#cfd6b4", "#7f9a5a", "rgba(63,90,28,0.55)"], sl: ["#b9c49a", "#b9c49a"], head: ["#e4e8cc", "#a9b88a"], ring: "#b6ff5c", glow: "182,255,92", rib: "#7f9a5a", light: "182,255,92" },
+    harlequin: { robe: ["#f4efe6", "#cdbfd0", "rgba(143,34,56,0.5)"], sl: [RED, NOIR], head: ["#ffffff", "#e6d6dc"], ring: "#ffd23f", glow: "255,210,63", rib: RED, light: "255,90,110" },
+    pierrot:   { robe: ["#ffffff", "#e4e0f0", "rgba(200,200,230,0.45)"], sl: ["#f4f1fb", "#f4f1fb"], head: ["#ffffff", "#e9e6f4"], ring: "#bfd8ff", glow: "170,200,255", rib: NOIR, light: "200,220,255" }
+  };
+  function ribbons(C, L, tl) {
+    for (const sd of [-1, 1]) {
+      g.save();
+      sway(sd * 0.3, -1.9, sd, 0.07);
+      const droop = L === "sludge";
+      const ex = sd * (0.95 + tl * 0.1), ey = droop ? -1.5 + tl * 0.2 : -2.9 - tl * 0.25;
+      const r = path((p) => { p.moveTo(sd * 0.3, -1.9); if (droop) p.bezierCurveTo(sd * 0.8, -2.2, sd * 1.0, -2.0, ex, ey); else p.bezierCurveTo(sd * 0.7, -2.3, sd * 0.6, -2.7 - tl * 0.2, ex, ey); });
+      line(r, 0.1, INK); line(r, 0.045, C.rib);
+      tip(ex, ey - (droop ? -0.04 : 0.05), TIP[L] === "bell" && L === "base" ? "star" : TIP[L]);
+      g.restore();
+    }
+  }
+  function robe(C, L, tl) {
+    const r = path((p) => {
+      p.moveTo(-0.32, -1.1); p.bezierCurveTo(-0.6, -0.9, -0.62, -0.5, -0.4, -0.3);
+      p.bezierCurveTo(-0.2, -0.1, 0.1, -0.1, 0.16, 0.12 + tl * 0.1); p.bezierCurveTo(0.2, 0.3, 0.0, 0.34, -0.06, 0.24);
+      p.bezierCurveTo(0.3, 0.2, 0.36, -0.2, 0.5, -0.4); p.bezierCurveTo(0.64, -0.6, 0.56, -0.92, 0.32, -1.1); p.closePath();
+    });
+    const rg = g.createLinearGradient(0, -1.1, 0, 0.3);
+    rg.addColorStop(0, C.robe[0]); rg.addColorStop(0.6, C.robe[1]); rg.addColorStop(1, C.robe[2]);
+    fill(r, rg);
+    inside(r, () => {
+      if (L === "harlequin") for (let q = 0; q < 9; q++) { g.fillStyle = q % 2 ? RED : NOIR; g.fill(diamondP(-0.56 + q * 0.14, -0.42 + Math.abs(q - 4) * 0.012, 0.07, 0.1)); }
+      if (L === "pierrot") for (const [x, y] of [[-0.32, -0.6], [0.34, -0.62]]) fill(ell(x, y, 0.06, 0.06), NOIR);
+      if (L === "sludge") { g.fillStyle = "rgba(63,90,28,0.45)"; for (let k = 0; k < 4; k++) g.fill(dripP(-0.4 + k * 0.26, -0.5 + hash(k + 3) * 0.1, 0.05, 0.24)); }
+    });
+    shade(r, 0.2);
+    line(r, 0.045);
+    for (const sd of [-1, 1]) {
+      const sl = path((p) => { p.moveTo(sd * 0.3, -1.06); p.quadraticCurveTo(sd * 0.74, -0.9, sd * 0.72, -0.5); p.lineTo(sd * 0.66, -0.34); p.lineTo(sd * 0.6, -0.46); p.lineTo(sd * 0.54, -0.32); p.quadraticCurveTo(sd * 0.46, -0.7, sd * 0.3, -0.84); p.closePath(); });
+      paint(sl, C.sl[sd < 0 ? 0 : 1], 0.04);
+      if (L === "sludge") paint(dripP(sd * 0.6, -0.4, 0.035, 0.2), "#a6d94a", 0.025);
+      if (L === "pierrot") fill(ell(sd * 0.58, -0.62, 0.05, 0.05), NOIR);
+    }
+  }
+  // the barred window, and whatever is burning in it
+  function chest(C, L, mood) {
+    const win = path((p) => p.roundRect(-0.19, -1.0, 0.38, 0.5, 0.17));
+    const k = mood === "happy" ? 1.25 : mood === "startled" ? 1.5 : mood === "sad" ? 0.45 : mood === "asleep" ? 0.3 : 1;
+    fill(win, "#140a2a");
+    glow(0, -0.74, 0.5 * Math.sqrt(k), C.light, Math.min(1, 0.75 * k) * (0.86 + 0.14 * Math.sin(A.t * 6 + A.seed)));
+    const s = 0.7 + 0.3 * Math.min(1.3, k);
+    if (L === "sludge") { fill(ell(0, -0.68, 0.12 * s, 0.14 * s), "#b6ff5c"); fill(ell(-0.04, -0.72, 0.03, 0.03), "#eaffc0"); }
+    else if (L === "harlequin") { g.save(); g.translate(0, -0.74); g.rotate(0.2); fill(diamondP(0, 0, 0.09 * s, 0.14 * s), "#ff5a6e"); fill(diamondP(-0.02, -0.03, 0.03, 0.05), "#ffd0d6"); g.restore(); }
+    else if (L === "pierrot") { fill(ell(0, -0.74, 0.11 * s, 0.11 * s), "#eef4ff"); fill(ell(0.06 * s, -0.78, 0.09 * s, 0.09 * s), "#140a2a"); }
+    else star(0, -0.74, 0.12 * s, "#fff3c2");
+    line(win, 0.04);
+    for (const x of [-0.07, 0.07]) line(path((p) => { p.moveTo(x, -1.0); p.lineTo(x, -0.5); }), 0.03, BONE);
+    if (L === "sludge") for (const x of [-0.07, 0.07]) paint(dripP(x, -0.52, 0.035, 0.22 + (x > 0 ? 0.1 : 0)), "#a6d94a", 0.025);
+  }
+  function lhead(C, L, o, tl) {
+    const h = path((p) => {
+      p.moveTo(0, -1.08); p.bezierCurveTo(-0.5, -1.08, -0.76, -1.36, -0.66, -1.72);
+      p.bezierCurveTo(-0.56, -2.06, -0.2, -2.14, 0.0, -2.36 - tl * 0.1); p.bezierCurveTo(0.1, -2.5, 0.3, -2.44, 0.24, -2.3);
+      p.bezierCurveTo(0.2, -2.38, 0.1, -2.36, 0.12, -2.24); p.bezierCurveTo(0.3, -2.1, 0.6, -2.0, 0.66, -1.72); p.bezierCurveTo(0.76, -1.36, 0.5, -1.08, 0, -1.08);
+    });
+    const hg = g.createLinearGradient(0, -2.4, 0, -1.08);
+    hg.addColorStop(0, C.head[0]); hg.addColorStop(1, C.head[1]);
+    fill(h, hg);
+    inside(h, () => {
+      if (L === "pierrot") { g.fillStyle = NOIR; g.beginPath(); g.moveTo(-0.8, -1.96); g.quadraticCurveTo(0, -2.12, 0.8, -1.96); g.lineTo(0.8, -2.7); g.lineTo(-0.8, -2.7); g.fill(); }
+      if (L === "sludge") { g.fillStyle = "rgba(63,90,28,0.4)"; g.fill(dripP(-0.4, -2.1, 0.08, 0.5)); g.fill(dripP(0.36, -2.1, 0.06, 0.36)); }
+      if (L === "harlequin") { g.fillStyle = RED; g.fill(diamondP(0.27, -1.5, 0.2, 0.33)); }
+    });
+    shade(h, 0.16);
+    line(h, 0.045);
+    if (!o.noEyes) for (const sd of [-1, 1]) ringEye(sd * 0.27, -1.52, sd, o.mood, C.ring, C.glow);
+    if (L === "pierrot") { line(path((p) => { p.moveTo(-0.27, -1.28); p.lineTo(-0.27, -1.16); }), 0.03, NOIR); fill(dripP(-0.27, -1.18, 0.035, 0.09), NOIR); }
+    else if (L !== "harlequin") line(path((p) => p.arc(0.02, -1.9, 0.08, 0.6, 2.6)), 0.03, L === "sludge" ? "#6f9a22" : L === "stardust" ? "#e8b923" : "#7fd8ea");
+    if (L === "stardust") { g.save(); g.translate(0.04, -2.72); g.rotate(-0.2); const hl = path((p) => p.ellipse(0, 0, 0.42, 0.1, 0, 0.5, 5.6)); line(hl, 0.09, INK); line(hl, 0.04, "#ffe9a8"); g.restore(); }
+  }
+  const PAL_U = {
+    base:      { disc: "#05030c", rim: "#eaf4ff", ray: "#bfe0ff", ray2: "#7f96dc", cloak: "#0d0b22", eye: "#eaf4ff", glow: "190,225,255", speck: "#bfe0ff" },
+    stardust:  { disc: "#15103a", rim: "#fff3c2", ray: "#ffd23f", ray2: "#fff0b8", cloak: "#2a2460", eye: "#fff3c2", glow: "255,225,140", speck: "#ffd23f" },
+    sludge:    { disc: "#070b06", rim: "#b6ff5c", ray: "#6f9a22", ray2: "#3d5a1c", cloak: "#111a10", eye: "#b6ff5c", glow: "182,255,92", speck: "#6f9a22" },
+    harlequin: { disc: "#0a0612", rim: PAPER, ray: RED, ray2: BONE, cloak: NOIR, eye: "#ffd23f", glow: "255,210,63", speck: RED },
+    pierrot:   { disc: "#f6f3ec", rim: NOIR, ray: NOIR, ray2: "#ffffff", cloak: "#f4efe6", eye: NOIR, glow: "170,200,255", speck: NOIR }
+  };
+  // an eye that is a moon: its phase is the mood
+  function phaseEye(x, y, r, sd, mood, C) {
+    if (mood === "asleep") { g.globalAlpha = 0.55; line(ell(x, y, r * 0.8, r * 0.8), 0.022, C.eye); g.globalAlpha = 1; return; }
+    const e = ell(x, y, r, r);
+    glow(x, y, r * 2.4, C.glow, mood === "startled" ? 0.8 : mood === "sad" ? 0.2 : 0.45);
+    g.globalAlpha = mood === "sad" ? 0.75 : 1;
+    fill(e, C.eye);
+    g.globalAlpha = 1;
+    if (mood === "startled") return;
+    // the shadow across it
+    const [ox, oy, rr] = mood === "happy" ? [0, r * 0.62, r * 1.05] : mood === "sad" ? [sd * r * 0.2, -r * 0.55, r * 1.1] : [sd * r * 0.55, -r * 0.3, r * 0.98];
+    inside(e, () => fill(ell(x + ox, y + oy, rr, rr), C.disc));
+    line(e, 0.012, C.disc);
+  }
+  // ================= Umbra, cut into the same three parts as the others =================
+  function cometTails(C, L, k) {
+    for (const [sd, len] of [[-1, 1], [1, 0.8]]) {
+      g.save();
+      sway(sd * 0.36, -2.0, sd, 0.06);
+      const ex = sd * (0.86 + k * 0.3), ey = -1.2 - (1 - k) * 0.35 + (1 - len) * 0.3;
+      const t = path((p) => { p.moveTo(sd * 0.36, -2.0); p.bezierCurveTo(sd * 0.9, -2.3, sd * (1.0 + k * 0.3), -1.9, ex, ey); });
+      line(t, 0.17, INK); line(t, 0.09, C.cloak === "#f4efe6" ? NOIR : C.cloak); line(t, 0.03, C.ray);
+      if (L === "base") { paint(ell(ex, ey, 0.085, 0.085), "#c9b8ff", 0.03); line(path((p) => p.ellipse(ex, ey, 0.17, 0.05, -0.4, 0, 7)), 0.025, "#eaf4ff"); }
+      else tip(ex, ey, TIP[L]);
+      g.restore();
+    }
+  }
+  function nightCloak(C, L) {
+    for (const sd of [-1, 1]) foot(sd, () => paint(path((p) => { p.moveTo(sd * 0.08, -0.02); p.quadraticCurveTo(sd * 0.18, -0.18, sd * 0.36, -0.05); p.quadraticCurveTo(sd * 0.46, -0.1, sd * 0.42, 0); p.closePath(); }), L === "pierrot" ? NOIR : "#07051a", 0.04));
+    const cl = path((p) => {
+      p.moveTo(-0.24, -1.1); p.bezierCurveTo(-0.44, -0.8, -0.62, -0.45, -0.58, -0.16);
+      for (let q = 1; q <= 6; q++) p.quadraticCurveTo(-0.58 + (q - 0.5) * 0.193, -0.02 - (L === "sludge" ? hash(q) * 0.08 : 0), -0.58 + q * 0.193, -0.16);
+      p.bezierCurveTo(0.62, -0.45, 0.44, -0.8, 0.24, -1.1); p.closePath();
+    });
+    fill(cl, C.cloak);
+    inside(cl, () => {
+      if (L === "harlequin") { for (let r = 0; r < 8; r++) for (let q = 0; q < 9; q++) if ((r + q) % 2) { g.fillStyle = (r + q) % 4 === 1 ? RED : BONE; g.fill(diamondP(-0.62 + q * 0.155, -1.05 + r * 0.135, 0.075, 0.065)); } }
+      else if (L === "pierrot") { for (let q = 0; q < 3; q++) fill(ell(0, -0.84 + q * 0.23, 0.065, 0.065), NOIR); }
+      else if (L === "sludge") { g.fillStyle = "rgba(166,217,74,0.5)"; for (let q = 0; q < 5; q++) g.fill(dripP(-0.44 + q * 0.22, -0.9 + hash(q + 1) * 0.3, 0.035, 0.24)); }
+      else for (let q = 0; q < 16; q++) star((hash(q + 20) - 0.5) * 1.0, -0.22 - hash(q + 25) * 0.75, 0.025 + hash(q + 29) * 0.025, q % 4 ? C.speck : "#ffffff");
+      g.strokeStyle = `rgba(${C.glow},0.5)`; g.lineWidth = 0.03; g.beginPath(); g.moveTo(-0.22, -1.08); g.bezierCurveTo(-0.42, -0.8, -0.6, -0.45, -0.56, -0.18); g.stroke();
+    });
+    shade(cl, L === "pierrot" ? 0.14 : 0.3);
+    line(cl, 0.045);
+    if (L === "sludge") for (const x of [-0.38, 0.12, 0.44]) paint(dripP(x, -0.1, 0.04, 0.18), "#a6d94a", 0.028);
+  }
+  const HY = -1.62;
+  function coronaRays(C, L, R, k, grown) {
+    const n = grown ? 16 : 12, w = 0.13 * 0.56 / R;
+    for (let q = 0; q < n; q++) {
+      const a = (q / n) * Math.PI * 2 + 0.1 + A.spinA, long = q % 2 === 0, len = R + (long ? 0.42 : 0.24) * k * (L === "sludge" ? 0.6 + hash(q + 3) * 0.8 : 1);
+      const ray = path((p) => { p.moveTo(Math.cos(a - w) * R * 0.9, HY + Math.sin(a - w) * R * 0.9); p.lineTo(Math.cos(a) * len, HY + Math.sin(a) * len); p.lineTo(Math.cos(a + w) * R * 0.9, HY + Math.sin(a + w) * R * 0.9); p.closePath(); });
+      paint(ray, long ? C.ray : C.ray2, 0.035);
+    }
+  }
+  // the ring a Stardust Jinx wears round its head like a planet's: back half first, front half last
+  function planetRing(R, front) {
+    g.save(); g.translate(0, HY); g.rotate(-0.3);
+    const arc = path((p) => front ? p.ellipse(0, 0, R * 1.78, R * 0.4, 0, 0.08, Math.PI - 0.08) : p.ellipse(0, 0, R * 1.78, R * 0.4, 0, Math.PI, Math.PI * 2));
+    line(arc, 0.12, INK); line(arc, 0.06, "#ffe9a8");
+    g.restore();
+  }
+  function discHead(C, L, R) {
+    const disc = ell(0, HY, R, R);
+    paint(disc, C.disc, 0.05);
+    line(ell(0, HY, R - 0.055, R - 0.055), 0.04, C.rim);
+    if (L !== "pierrot") { glow(R * 0.64, HY - R * 0.71, 0.26, "255,255,255", 0.9); fill(ell(R * 0.64, HY - R * 0.71, 0.035, 0.035), "#ffffff"); }
+    else inside(disc, () => { g.fillStyle = "rgba(18,8,40,0.1)"; for (const [x, y, r] of [[0.2, -0.26, 0.1], [-0.3, 0.16, 0.07], [0.3, 0.2, 0.05]]) { g.beginPath(); g.arc(x * R / 0.56, HY + y * R / 0.56, r, 0, 7); g.fill(); } });
+    if (L === "harlequin") inside(disc, () => fill(diamondP(-0.2, HY - 0.02, 0.18, 0.3), RED));
+  }
+  function discMarks(C, L, R, mood) {
+    if (L === "pierrot") { line(path((p) => { p.moveTo(-0.2, HY + 0.16); p.lineTo(-0.2, HY + 0.3); }), 0.03, NOIR); fill(dripP(-0.2, HY + 0.28, 0.035, 0.09), NOIR); }
+    if (L === "sludge") for (const [x, len] of [[-0.3, 0.3], [0.05, 0.2], [0.34, 0.36]]) paint(dripP(x * R / 0.56, HY + Math.sqrt(Math.max(0, R * R - x * x * R * R / 0.3136)) - 0.04, 0.045, len), "#0c120a", 0.03);
+    if (mood === "sad") { glow(-0.2, HY + 0.26, 0.1, C.glow, 0.7); fill(dripP(-0.2, HY + 0.18, 0.028, 0.09), C.eye); }
+  }
+  function ribbonCap(R, color) {
+    const a0 = -Math.PI / 2 - 0.62, a1 = -Math.PI / 2 + 0.62;
+    const cap = path((p) => { p.arc(0, HY, R + 0.01, a0, a1); p.quadraticCurveTo(0, HY - R + 0.2, Math.cos(a0) * (R + 0.01), HY + Math.sin(a0) * (R + 0.01)); p.closePath(); });
+    paint(cap, color, 0.04);
+    for (const sd of [-1, 1]) paint(ell(sd * 0.24, HY - R + 0.05, 0.055, 0.055), "#ffd23f", 0.03);
+  }
+  // eyes on a head that isn't their own
+  function otherEyes(kind, where, mood, L) {
+    const [ex, ey] = where === "bulb" ? [0.27, -1.52] : where === "mask" ? [0.21, -1.62] : [0.2, -1.64];
+    for (const sd of [-1, 1]) {
+      const x = sd * ex, y = ey;
+      if (kind === "moon") { fill(ell(x, y, 0.16, 0.19), "#07030f"); phaseEye(x, y, 0.115, sd, mood, { eye: L === "pierrot" ? "#eef4ff" : cU.eye, glow: cU.glow, disc: "#07030f" }); }
+      else if (kind === "ring") ringEye(x, y + 0.02, sd, mood, cL.ring, cL.glow, where === "bulb" ? 1 : 0.92);
+      else if (where === "disc") { const e = path((p) => { p.moveTo(x - sd * 0.01, y - 0.2); p.quadraticCurveTo(x + sd * 0.12, y, x + sd * 0.03, y + 0.18); p.quadraticCurveTo(x - sd * 0.1, y, x - sd * 0.01, y - 0.2); }); glow(x, y, 0.3, cH.glow, 0.6); fill(e, cH.pupil); }
+      else { g.save(); g.translate(x - sd * 0.21, y + 1.62); slitEye(sd, mood, cH); g.restore(); }
+    }
+  }
+  const OWN = { disc: "moon", mask: "slit", bulb: "ring" };
+
+  // o: { head: disc|mask|bulb, piece: corona|hood|ribbons, body: night|tatter|wisp, grown, lean, mood,
+  //      t, walk, ph, seed, tilt, look, hat, hue, evil, j }
+  return function (o) {
+    g = ctx;
+    A = { t: o.t || 0, walk: !!o.walk, ph: o.ph || 0, seed: o.seed || 0, spinA: (o.t || 0) * (o.mood === "happy" ? 0.5 : 0.12) };
+    const L = o.lean || "base";
+    cH = PAL_H[L]; cL = PAL_L[L]; cU = PAL_U[L];
+    if (o.evil) { cH = Object.assign({}, cH, { glow: "255,60,80", pupil: "#ffd0d6" }); cL = Object.assign({}, cL, { ring: "#ff5a6e", glow: "255,60,80" }); cU = Object.assign({}, cU, { eye: "#ff8a94", glow: "255,60,80" }); }
+    else if (L === "base" && o.hue !== undefined) {
+      // a child's eyes shine in its own colour
+      const c = hsl(o.hue, 90, 76), cs = c.map((v) => v | 0).join(","), pale = rgb(mix(c, "#ffffff", 0.6));
+      cH = Object.assign({}, cH, { glow: cs, pupil: pale }); cL = Object.assign({}, cL, { ring: pale, glow: cs }); cU = Object.assign({}, cU, { eye: pale, glow: cs });
+    }
+    const H = cH, Lc = cL, Uc = cU;
+    const grown = o.grown, floats = o.body === "wisp", k = grown ? 1 : 0.72, tl = grown ? 1 : 0.6, ek = OWN[o.head];
+    const R = o.head === "bulb" ? 0.7 : o.head === "mask" ? 0.6 : o.piece === "hood" ? 0.5 : 0.56;
+    const look = o.look || [0, 0];
+    const headXf = () => { g.translate(0, -1.1); g.rotate(o.tilt || 0); g.translate(0, 1.1); };
+    g.save();
+    g.lineJoin = "round";
+    g.lineCap = "round";
+    g.translate(0, floats ? -0.22 + (o.mood === "sad" ? 0.12 : o.mood === "asleep" && o.asleep ? 0.2 : o.mood === "happy" ? -0.08 : 0) : grown ? 0 : 0.22);
+    // what hangs behind the head
+    g.save();
+    headXf();
+    if (o.piece === "hood") tails(H, grown ? 1 : 0.55, TIP[L]);
+    if (o.piece === "ribbons") ribbons(Lc, L, tl);
+    if (o.piece === "corona") cometTails(Uc, L, k);
+    g.restore();
+    // the body; a child has the same head on a shorter one
+    g.save();
+    if (!grown) { g.translate(0, -1.1); g.scale(0.92, 0.8); g.translate(0, 1.1); }
+    if (floats) {
+      g.translate(0, -1.1); g.rotate(Math.sin(A.t * 1.6 + A.seed) * 0.05 + (A.walk ? 0.1 : 0)); g.translate(0, 1.1);
+      robe(Lc, L, tl);
+      chest(Lc, L, o.mood);
+    } else if (o.body === "tatter") cloak(H, L, false);
+    else nightCloak(Uc, L);
+    g.restore();
+    // the headpiece, the head, the eyes, a hat
+    g.save();
+    headXf();
+    if (o.piece === "hood" && (grown || L === "pierrot") && !(o.body === "tatter" && L === "pierrot")) ruff(L);
+    if (o.piece === "corona") { coronaRays(Uc, L, R, k, grown); if (L === "stardust") planetRing(R, false); }
+    if (o.piece === "hood") hood(H, L, o.head === "bulb" ? 1.14 : 1, o.head !== "bulb");
+    const eyesNow = () => {
+      g.save();
+      g.translate(look[0] * 0.035, look[1] * 0.03);
+      if (o.head === "disc") for (const sd of [-1, 1]) phaseEye(sd * 0.2, HY - 0.02, 0.125, sd, o.mood, Uc);
+      else otherEyes(ek, o.head, o.mood, L);
+      g.restore();
+    };
+    if (o.head === "disc") { discHead(Uc, L, R); eyesNow(); discMarks(Uc, L, R, o.mood); }
+    else if (o.head === "mask") {
+      if (o.piece !== "hood") { const back = ell(0, HY, 0.6, 0.6); paint(back, L === "harlequin" ? NOIR : H.hood); inside(back, () => { g.fillStyle = `rgba(${H.hi},0.16)`; g.beginPath(); g.ellipse(-0.28, HY - 0.34, 0.3, 0.13, -0.5, 0, 7); g.fill(); }); }
+      mask(H, L, o.mood, "none", Lc.ring);
+      eyesNow();
+    } else { lhead(Lc, L, { mood: o.mood, noEyes: true }, tl); eyesNow(); }
+    if (o.piece === "ribbons" && o.head !== "bulb") ribbonCap(R, Lc.rib === NOIR ? "#3a3350" : Lc.rib);
+    if (o.piece === "corona" && L === "stardust") planetRing(R, true);
+    if (o.hat) { const hr = o.piece === "hood" ? 0.74 : R; wearHat(o.hat, o.j || { hue: 300 }, 0.62, hr, hr * 0.96, HY, 0.045, A.t, INK, 0); }
+    g.restore();
+    g.restore();
+  };
+  })();
+
+  D.KINDS = { Umbra: { head: "disc", piece: "corona", body: "night" }, Hollow: { head: "mask", piece: "hood", body: "tatter" }, Lantern: { head: "bulb", piece: "ribbons", body: "wisp" } };
+
   D.drawJinx = function (j, x, y, o) {
     o = o || {};
-    const t = o.t || 0, L = D.jinxLook(j), sd = j.seed || 0, A = L.adult, form = L.form, best = A ? L.best : null;
-    const s = (A ? 1 : 0.88) * (o.scale || 1), R = 20 * U * s;
+    const t = o.t || 0, K = D.jinxLook(j), sd = j.seed || 0, grown = K.adult, floats = K.body === "wisp";
+    const u = 27 * U * (grown ? 1 : 0.92) * (o.scale || 1);
     const walk = !!o.walk, dir = o.dir || 1, hop = o.hop || 0, sit = !!o.sleep;
-    const ph = t * 9 + sd, beat = Math.sin((t * Math.PI * 2) / 0.6 + sd);
-    const ink = form === "grunge" ? "#0b0810" : "#1b1029", lw = Math.max(1.4, R * 0.085);
-    const ft8 = t * 5, frame = Math.floor(ft8), fk = ft8 - frame, fs = fk * fk * (3 - 2 * fk);
-    const wb = (i) => ((hashN(i + sd * 10 + frame * 13.1) - 0.5) * (1 - fs) + (hashN(i + sd * 10 + (frame + 1) * 13.1) - 0.5) * fs) * R * 0.035;
-    const pier = form === "pierrot";
-    const mood = j.mood === undefined ? 60 : j.mood, sad = mood < 30 && !o.happy;
-    const skin = L.body, skinD = rgb(mix(skin, "#2a1050", 0.28)), skinL = rgb(mix(skin, "#ffffff", 0.35));
-
-    // proportions
-    const hover = form === "ether" && !sit ? R * (0.34 + 0.08 * Math.sin(t * 2 + sd)) : 0;
-    const legH = sit ? R * 0.06 : R * (A ? (best === "tumble" ? 0.82 : 0.5) : 0.32);
-    const bodyH = R * (A ? 1.0 : 0.78), hipW = R * (best === "grit" ? 1.0 : A ? 0.8 : 0.74), neckW = R * (best === "grit" ? 0.72 : 0.46);
-    const pulse = (0.5 + 0.5 * beat) * (0.5 + 0.5 * beat);
-    const bounce = walk ? Math.abs(Math.sin(ph)) * R * 0.22 : sit ? 0 : pulse * R * 0.07;
+    const ph = t * 9 + sd, beat = Math.sin((t * Math.PI * 2) / 0.6 + sd), pulse = (0.5 + 0.5 * beat) * (0.5 + 0.5 * beat);
+    const sad = (j.mood === undefined ? 60 : j.mood) < 30 && !o.happy;
+    // a floater bobs in the air; a walker bounces on its feet
+    const hover = floats && !sit ? u * 0.07 * Math.sin(t * 2 + sd) : 0;
+    const bounce = walk ? (floats ? 0 : Math.abs(Math.sin(ph)) * u * 0.14) : sit ? 0 : pulse * u * 0.045;
     const lift = bounce + hop + hover;
-    const hipY = -legH, neckY = hipY - bodyH;
-    const hRx = R * 1.05, hRy = R * 0.86, hCy = neckY - hRy * 0.72, topY = hCy - hRy * 0.8;
-    const headTilt = o.hurt ? -0.22 : sit ? 0.18 : walk ? Math.sin(ph) * 0.05 : Math.sin((t * Math.PI) / 0.6 + sd) * 0.06;
-    const lean = o.hurt ? -0.16 : walk ? 0.07 : 0;
-    const squash = o.hurt ? 0.1 : walk ? Math.cos(ph * 2) * 0.04 : sit ? 0 : -beat * 0.02;
+    const tilt = o.hurt ? -0.22 : sit ? 0.16 : walk ? Math.sin(ph) * 0.05 : Math.sin((t * Math.PI) / 0.6 + sd) * 0.05;
+    const lean = o.hurt ? -0.16 : walk ? 0.06 : 0;
+    const squash = o.hurt ? 0.1 : walk ? Math.cos(ph * 2) * 0.03 : sit ? 0 : -beat * 0.015;
+    const blink = (t + sd * 3) % 4.3 < 0.13;
+    const mood = sit ? "asleep" : o.hurt ? "startled" : o.happy ? "happy" : sad ? "sad" : blink ? "asleep" : null;
 
     // shadow
-    const sh = ctx.createRadialGradient(x, y, 0, x, y, R * 1.5);
-    sh.addColorStop(0, "rgba(5,2,12,0.55)");
+    const sh = ctx.createRadialGradient(x, y, 0, x, y, u * 1.1);
+    sh.addColorStop(0, floats ? "rgba(5,2,12,0.35)" : "rgba(5,2,12,0.55)");
     sh.addColorStop(1, "rgba(5,2,12,0)");
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(Math.max(0.5, 1 - lift / (R * 5)), 0.24);
+    ctx.scale(Math.max(0.5, 1 - lift / (u * 4)), 0.24);
     ctx.translate(-x, -y);
     ctx.fillStyle = sh;
-    ctx.fillRect(x - R * 1.6, y - R * 1.6, R * 3.2, R * 3.2);
+    ctx.fillRect(x - u * 1.2, y - u * 1.2, u * 2.4, u * 2.4);
     ctx.restore();
     if (o.selected) {
       ctx.save();
@@ -1158,692 +1551,37 @@
       ctx.setLineDash([5, 5]);
       ctx.lineDashOffset = -t * 20;
       ctx.beginPath();
-      ctx.ellipse(x, y, R * 1.9, R * 0.55, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y, u * 1.4, u * 0.4, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
 
     const drawBody = () => {
-    ctx.save();
-    ctx.translate(x, y);
-    if (o.spin) { ctx.translate(0, neckY); ctx.rotate(o.spin); ctx.translate(0, -neckY); }
-    ctx.rotate(lean);
-    const tw = o.twirl ? Math.cos(o.twirl) : 1;
-    const fdir = Math.abs(dir) < 0.14 ? 0.14 * (dir < 0 ? -1 : 1) : dir;
-    ctx.scale((1 + squash) * fdir * (Math.abs(tw) < 0.12 ? 0.12 * (tw < 0 ? -1 : 1) : tw), 1 - squash);
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-
-    const seg = (pts, w, fill) => {
-      for (const [width, col] of [[w + lw * 2, ink], [w, fill]]) {
-        ctx.strokeStyle = col;
-        ctx.lineWidth = width;
-        ctx.beginPath();
-        pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
-        ctx.stroke();
-      }
-    };
-    const paint = (p, fill, w) => { ctx.fillStyle = fill; ctx.fill(p); ctx.strokeStyle = ink; ctx.lineWidth = w || lw; ctx.stroke(p); };
-    const shade = (p, cx, cy, rr, k) => {
       ctx.save();
-      ctx.clip(p);
-      ctx.fillStyle = `rgba(27,10,50,${k || 0.12})`;
-      ctx.beginPath();
-      ctx.rect(-R * 4, -R * 6, R * 8, R * 8);
-      ctx.arc(cx, cy, rr, 0, Math.PI * 2, true);
-      ctx.fill("evenodd");
-      const ds = Math.max(3, R * 0.16);
-      ctx.fillStyle = "rgba(27,10,50,0.3)";
-      ctx.beginPath();
-      for (let yy = cy - rr * 1.7, row = 0; yy < cy + rr * 1.7; yy += ds, row++) {
-        for (let xx = cx - rr * 1.9 + (row % 2) * ds * 0.5; xx < cx + rr * 1.9; xx += ds) {
-          const d = Math.hypot(xx - cx, yy - cy);
-          if (d < rr) continue;
-          const dr = Math.min(ds * 0.36, (d - rr) * 0.12 + ds * 0.12);
-          ctx.moveTo(xx + dr, yy);
-          ctx.arc(xx, yy, dr, 0, Math.PI * 2);
-        }
-      }
-      ctx.fill();
-      ctx.strokeStyle = form === "ether" ? "rgba(200,245,255,0.45)" : "rgba(255,255,255,0.2)";
-      ctx.lineWidth = R * 0.13;
-      ctx.stroke(p);
+      ctx.translate(x, y);
+      if (o.spin) { ctx.translate(0, -u * 1.1); ctx.rotate(o.spin); ctx.translate(0, u * 1.1); }
+      ctx.rotate(lean);
+      // it turns like a paper cut-out: flat on, then edge on, then the other way
+      const tw = o.twirl ? Math.cos(o.twirl) : 1;
+      const fdir = Math.abs(dir) < 0.14 ? 0.14 * (dir < 0 ? -1 : 1) : dir;
+      ctx.scale((1 + squash) * fdir * (Math.abs(tw) < 0.12 ? 0.12 * (tw < 0 ? -1 : 1) : tw), 1 - squash);
+      ctx.scale(u, u);
+      paintJinx({ head: K.head, piece: K.piece, body: K.body, grown, lean: K.lean, mood, asleep: sit, t, walk, ph, seed: sd, tilt,
+        look: o.look ? [o.look[0] * (dir < 0 ? -1 : 1), o.look[1]] : null, hat: o.hat !== undefined ? o.hat : j.hat, hue: j.hue, evil: o.evil, j });
       ctx.restore();
     };
+    const tall = u * 4.4, wide = o.spin ? tall : u * 1.75;
+    cutout(drawBody, x, y, wide, tall, o.spin ? tall : u * 0.65, { dy: -lift, flat: o.flat, edgeColor: o.edgeColor, edge: Math.max(2.2, 2.6 * (o.scale || 1)) });
 
-    if (form === "ether") glow(0, neckY, R * 3.2, "#8fe9ff", 0.18 + 0.06 * Math.sin(t * 3));
-    if (pier) glow(0, hCy, R * 3, "#cfe3ff", 0.13 + 0.04 * Math.sin(t * 1.5));
-    if (form === "grunge") {
-      lightLayer(() => {
-        for (let i = 0; i < 3; i++) {
-          const k = (t * 0.35 + i / 3 + sd) % 1;
-          ctx.fillStyle = `rgba(166,217,74,${0.2 * (1 - k)})`;
-          ctx.beginPath();
-          ctx.arc(Math.sin(i * 4 + t) * R, hCy - k * R * 1.8, R * (0.2 + k * 0.35), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      });
-    }
-
-    // ---- tail ----
-    const wag = Math.sin(t * 3 + sd) * 0.25 + (walk ? Math.sin(ph) * 0.3 : 0);
-    const tb = [-hipW * 0.4, hipY - bodyH * 0.2];
-    if (form === "ether") {
-      for (let k = 1; k <= 6; k++) {
-        const px = tb[0] - k * R * 0.26, py = tb[1] + Math.sin(t * 3 + k) * R * 0.1 + k * R * 0.05, a = 1 - k / 7;
-        glow(px, py, R * 0.4 * a, "#8fe9ff", 0.5 * a);
-        sparkle(px, py, R * 0.1 * a, `rgba(255,255,255,${a})`);
-      }
-    } else {
-      const pts = [];
-      if (form === "grunge") {
-        for (let k = 0; k <= 8; k++) { const kk = k / 8; pts.push([tb[0] - kk * R * 0.95, tb[1] + kk * kk * (-tb[1] - R * 0.12) + Math.sin(kk * 3 + wag * 2) * R * 0.05]); }
-      } else if (pier) {
-        for (let k = 0; k <= 8; k++) { const kk = k / 8; pts.push([tb[0] - kk * R * 0.8, tb[1] - Math.sin(kk * 2.6) * R * 0.5 + wag * kk * R * 0.25]); }
-      } else if (form === "neutral") {
-        const cx0 = tb[0] - R * 0.55, cy0 = tb[1] - R * 0.25;
-        for (let k = 0; k <= 12; k++) { const kk = k / 12, a = 0.38 + kk * Math.PI * 1.7 + wag * kk, rr = R * (0.55 - 0.36 * kk); pts.push([cx0 + Math.cos(a) * rr, cy0 + Math.sin(a) * rr]); }
-      } else {
-        for (let k = 0; k <= 5; k++) { const kk = k / 5; pts.push([tb[0] - kk * R * 0.55, tb[1] - Math.sin(kk * 1.5) * R * 0.35 + wag * kk * R * 0.3]); }
-      }
-      seg(pts, R * (pier ? 0.09 : 0.15), pier ? "#1b1726" : skinD);
-      const e = pts[pts.length - 1];
-      if (pier) {
-        const d = new Path2D();
-        d.arc(e[0], e[1], R * 0.2, 0.5, Math.PI * 2 - 0.9);
-        d.arc(e[0] + R * 0.09, e[1] - R * 0.05, R * 0.15, Math.PI * 2 - 1.2, 0.7, true);
-        d.closePath();
-        paint(d, "#ffe680", lw * 0.7);
-      } else if (form === "neutral") {
-        const d = new Path2D();
-        d.moveTo(e[0], e[1] - R * 0.2); d.lineTo(e[0] + R * 0.13, e[1]); d.lineTo(e[0], e[1] + R * 0.2); d.lineTo(e[0] - R * 0.13, e[1]); d.closePath();
-        paint(d, "#d62839", lw * 0.8);
-      } else if (form === "grunge") {
-        const d = new Path2D();
-        d.arc(e[0], e[1], R * 0.17, 0, Math.PI * 2);
-        paint(d, rgb(mix(skin, "#a6d94a", 0.5)), lw * 0.8);
-      } else {
-        const d = new Path2D();
-        d.arc(e[0], e[1], R * 0.13, 0, Math.PI * 2);
-        paint(d, L.bell, lw * 0.8);
-      }
-    }
-
-    // ---- arms (the far one goes behind the body) ----
-    const aL = R * (best === "juggle" ? 0.82 : form === "pierrot" ? 0.74 : 0.6);
-    const armA = (side) => (o.hurt ? 1.5 : o.happy ? 2.6 + Math.sin(t * 14 + side) * 0.25 : sit ? 0.12 : walk ? 0.3 + Math.sin(ph) * 0.7 * side : 0.38 + Math.sin(t * 2 + sd + side) * 0.1);
-    const arm = (side) => {
-      const a = armA(side), sx = side * neckW * 0.55, sy = neckY + R * 0.22;
-      const hx = sx + side * Math.sin(a) * aL, hy = sy + Math.cos(a) * aL;
-      seg([[sx, sy], [(sx + hx) / 2 + side * R * 0.08, (sy + hy) / 2], [hx, hy]], R * (pier ? 0.26 : 0.2), pier ? (side < 0 ? "#dcd8e8" : "#fbf8f2") : side < 0 ? skinD : rgb(skin));
-      const hand = new Path2D();
-      if (pier) {
-        const ang = Math.atan2(hy - sy, hx - sx);
-        ctx.save();
-        ctx.translate(hx, hy);
-        ctx.rotate(ang);
-        hand.moveTo(-R * 0.12, -R * 0.16); hand.lineTo(R * 0.24, -R * 0.3); hand.quadraticCurveTo(R * 0.32, 0, R * 0.24, R * 0.3); hand.lineTo(-R * 0.12, R * 0.16); hand.closePath();
-        paint(hand, side < 0 ? "#dcd8e8" : "#fbf8f2", lw * 0.8);
-        ctx.fillStyle = "rgba(27,16,41,0.35)";
-        ctx.beginPath(); ctx.ellipse(R * 0.24, 0, R * 0.05, R * 0.24, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-      } else if (best === "juggle") {
-        hand.arc(hx, hy, R * 0.25, 0, Math.PI * 2);
-        paint(hand, "#fbf8f2", lw * 0.8);
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = lw * 0.5;
-        ctx.beginPath(); ctx.moveTo(hx - R * 0.08, hy - R * 0.2); ctx.lineTo(hx - R * 0.08, hy - R * 0.02); ctx.moveTo(hx + R * 0.06, hy - R * 0.22); ctx.lineTo(hx + R * 0.06, hy - R * 0.04); ctx.stroke();
-      } else {
-        hand.arc(hx, hy, R * 0.17, 0, Math.PI * 2);
-        paint(hand, side < 0 ? skinD : skinL, lw * 0.8);
-      }
-      if (best === "grit") {
-        ctx.fillStyle = "#16101c";
-        ctx.beginPath(); ctx.arc((sx + hx * 2) / 3, (sy + hy * 2) / 3, R * 0.15, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#d9d2e6";
-        for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc((sx + hx * 2) / 3 + (k - 1) * R * 0.09, (sy + hy * 2) / 3, R * 0.035, 0, Math.PI * 2); ctx.fill(); }
-      }
-    };
-    arm(-1);
-
-    // ---- legs and feet: curled toes, like jester shoes that grew there ----
-    const step = walk ? Math.sin(ph) : 0;
-    for (const side of [-1, 1]) {
-      const hx = side * hipW * 0.24;
-      let fx = hx + (walk ? side * step * R * 0.3 : 0) + R * 0.05, fy = walk && side * step > 0 ? -Math.abs(step) * R * 0.18 : 0;
-      if (sit) { fx = hx + R * 0.5; fy = 0; }
-      if (hover) { fx = hx - R * 0.12 + Math.sin(t * 2 + side) * R * 0.04; fy = -R * 0.02; }
-      seg([[hx, hipY - R * 0.05], [(hx + fx) / 2, (hipY + fy) / 2 - R * 0.05], [fx, fy - R * 0.14]], R * (pier ? 0.3 : 0.24), pier ? (side < 0 ? "#dcd8e8" : "#fbf8f2") : side < 0 ? skinD : rgb(skin));
-      if (best === "tumble") {
-        ctx.strokeStyle = "#fbf8f2";
-        ctx.lineWidth = R * 0.07;
-        for (let k = 1; k <= 3; k++) {
-          const kk = k / 4, px = hx + (fx - hx) * kk, py = hipY + (fy - R * 0.14 - hipY) * kk;
-          ctx.beginPath(); ctx.moveTo(px - R * 0.1, py); ctx.lineTo(px + R * 0.1, py); ctx.stroke();
-        }
-      }
-      const boot = new Path2D(), bs = best === "tumble" ? 1.2 : 1;
-      boot.moveTo(fx - R * 0.22 * bs, fy - R * 0.2);
-      boot.quadraticCurveTo(fx - R * 0.3 * bs, fy, fx - R * 0.05, fy);
-      boot.lineTo(fx + R * 0.3 * bs, fy);
-      boot.quadraticCurveTo(fx + R * 0.58 * bs, fy - R * 0.02, fx + R * 0.56 * bs, fy - R * 0.26);
-      boot.quadraticCurveTo(fx + R * 0.5 * bs, fy - R * 0.38, fx + R * 0.4 * bs, fy - R * 0.27);
-      boot.quadraticCurveTo(fx + R * 0.38 * bs, fy - R * 0.12, fx + R * 0.18, fy - R * 0.2);
-      boot.quadraticCurveTo(fx, fy - R * 0.32, fx - R * 0.22 * bs, fy - R * 0.2);
-      paint(boot, pier ? "#1b1726" : side < 0 ? L.hat[0] : L.hat[1]);
-      if (pier) {
-        const pm = new Path2D();
-        pm.arc(fx + R * 0.14, fy - R * 0.2, R * 0.09, 0, Math.PI * 2);
-        paint(pm, "#fbf8f2", lw * 0.6);
-      } else if (A && form !== "ether") {
-        const bl = new Path2D();
-        bl.arc(fx + R * 0.44 * bs, fy - R * 0.34, R * 0.08, 0, Math.PI * 2);
-        paint(bl, L.bell, lw * 0.6);
-      }
-    }
-
-    // ---- body ----
-    const body = new Path2D();
-    body.moveTo(-neckW / 2 + wb(1), neckY);
-    body.bezierCurveTo(-hipW * 0.62, neckY + bodyH * 0.35, -hipW * 0.68 + wb(2), hipY - bodyH * 0.05, -hipW * 0.3, hipY + R * 0.06);
-    body.quadraticCurveTo(0, hipY + R * 0.16, hipW * 0.3, hipY + R * 0.06);
-    body.bezierCurveTo(hipW * 0.68 + wb(3), hipY - bodyH * 0.05, hipW * 0.62, neckY + bodyH * 0.35, neckW / 2 + wb(4), neckY);
-    body.closePath();
-    const bgr = ctx.createLinearGradient(0, neckY, 0, hipY);
-    bgr.addColorStop(0, pier ? "#ffffff" : rgb(skin));
-    bgr.addColorStop(1, pier ? "#d9d5ea" : rgb(mix(skin, "#2a1050", 0.16)));
-    ctx.fillStyle = bgr;
-    if (form === "ether") ctx.globalAlpha = 0.92;
-    ctx.fill(body);
-    ctx.globalAlpha = 1;
-    ctx.save();
-    ctx.clip(body);
-    const by0 = neckY, bh0 = bodyH;
-    if (form === "ether") {
-      ctx.globalCompositeOperation = "lighter";
-      glow(-R * 0.2, by0 + bh0 * 0.4, R * 0.7, "#ff5fa8", 0.3);
-      glow(R * 0.25, by0 + bh0 * 0.7, R * 0.7, "#8a3dff", 0.3);
-      ctx.globalCompositeOperation = "source-over";
-      for (let i = 0; i < 7; i++) {
-        const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 2 + i * 1.7));
-        sparkle((hashN(i + sd) - 0.5) * hipW, by0 + hashN(i + sd + 20) * bh0, R * 0.035 * (1 + a), `rgba(255,255,255,${a})`);
-      }
-    } else if (form === "grunge") {
-      for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = "rgba(13,10,18,0.26)";
-        ctx.fillRect(-R, by0 + i * bh0 * 0.22, R * 2, bh0 * 0.09);
-        ctx.fillRect(-R * 0.8 + i * R * 0.4, by0, R * 0.1, bh0 * 1.2);
-        ctx.fillStyle = "rgba(182,255,92,0.3)";
-        ctx.fillRect(-R, by0 + i * bh0 * 0.22 + bh0 * 0.12, R * 2, bh0 * 0.025);
-      }
-      ctx.save();
-      ctx.translate(-hipW * 0.22, by0 + bh0 * 0.68);
-      ctx.rotate(-0.25);
-      ctx.fillStyle = rgb(mix(skin, "#d62839", 0.6));
-      ctx.fillRect(-R * 0.15, -R * 0.13, R * 0.3, R * 0.26);
-      ctx.strokeStyle = "#e6e0d6";
-      ctx.lineWidth = Math.max(1, R * 0.03);
-      ctx.setLineDash([R * 0.06, R * 0.05]);
-      ctx.strokeRect(-R * 0.15, -R * 0.13, R * 0.3, R * 0.26);
-      ctx.restore();
-    } else if (pier) {
-      ctx.strokeStyle = "rgba(27,16,41,0.18)";
-      ctx.lineWidth = Math.max(1, R * 0.03);
-      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * R * 0.16, by0); ctx.quadraticCurveTo(i * R * 0.3, by0 + bh0 * 0.5, i * R * 0.24, by0 + bh0 * 1.1); ctx.stroke(); }
-    } else if (form === "neutral") {
-      ctx.fillStyle = "rgba(214,40,57,0.55)";
-      ctx.fillRect(-R * 1.2, by0, R * 1.2, bh0 * 1.3);
-      ctx.fillStyle = "rgba(27,23,38,0.6)";
-      ctx.fillRect(0, by0, R * 1.2, bh0 * 1.3);
-      for (let i = -2; i <= 2; i++) {
-        ctx.fillStyle = i % 2 ? "#1b1726" : "#d62839";
-        ctx.strokeStyle = "rgba(255,210,63,0.85)";
-        ctx.lineWidth = Math.max(0.8, R * 0.025);
-        const dx = i * R * 0.3, dy = hipY - bh0 * 0.2;
-        ctx.beginPath();
-        ctx.moveTo(dx, dy - R * 0.2); ctx.lineTo(dx + R * 0.15, dy); ctx.lineTo(dx, dy + R * 0.2); ctx.lineTo(dx - R * 0.15, dy);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      }
-    } else {
-      ctx.fillStyle = "rgba(255,255,255,0.3)";
-      ctx.beginPath();
-      ctx.ellipse(R * 0.08, hipY - bh0 * 0.38, hipW * 0.36, bh0 * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-    shade(body, -R * 0.25, neckY + bodyH * 0.3, R * 0.95);
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = lw;
-    ctx.stroke(body);
-    if (pier) {
-      for (let i = 0; i < 3; i++) {
-        const pm = new Path2D();
-        pm.arc(R * 0.07, neckY + bodyH * (0.36 + i * 0.25), R * 0.115, 0, Math.PI * 2);
-        paint(pm, "#1b1726", lw * 0.5);
-        ctx.fillStyle = "rgba(255,255,255,0.35)";
-        ctx.beginPath(); ctx.arc(R * 0.04, neckY + bodyH * (0.36 + i * 0.25) - R * 0.04, R * 0.035, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    if (best === "glow") {
-      glow(R * 0.05, neckY + bodyH * 0.5, R * 0.6, "#8fe9ff", 0.7);
-      const gem = new Path2D();
-      gem.moveTo(R * 0.05, neckY + bodyH * 0.34); gem.lineTo(R * 0.19, neckY + bodyH * 0.5); gem.lineTo(R * 0.05, neckY + bodyH * 0.68); gem.lineTo(-R * 0.09, neckY + bodyH * 0.5); gem.closePath();
-      paint(gem, "#dff8ff", lw * 0.7);
-    }
-    if (form === "grunge" || (!A && (j.align || 0) < -0.5)) {
-      ctx.fillStyle = rgb(mix(skin, "#a6d94a", 0.45));
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = lw * 0.7;
-      for (let i = 0; i < 2; i++) {
-        const dx = (i - 0.5) * hipW * 0.5, len = R * (0.14 + 0.14 * Math.abs(Math.sin(t * 1.3 + i * 2)));
-        ctx.beginPath();
-        ctx.moveTo(dx - R * 0.08, hipY + R * 0.05);
-        ctx.quadraticCurveTo(dx, hipY + R * 0.05 + len * 2, dx + R * 0.08, hipY + R * 0.05);
-        ctx.fill();
-        ctx.stroke();
-      }
-    }
-    arm(1);
-
-    // ---- head, with everything that grows from it ----
-    ctx.save();
-    ctx.translate(0, neckY);
-    ctx.rotate(headTilt);
-    ctx.translate(0, -neckY);
-
-    // the ruff sits behind the chin
-    const ruffY = neckY + R * 0.02;
-    if (best === "grit") {
-      const band = new Path2D();
-      band.roundRect(-neckW * 0.75, ruffY - R * 0.02, neckW * 1.5, R * 0.2, R * 0.08);
-      paint(band, "#16101c");
-      for (let i = 0; i < 5; i++) {
-        const sp = new Path2D(), xx = (i - 2) * neckW * 0.33;
-        sp.moveTo(xx - R * 0.09, ruffY + R * 0.14); sp.lineTo(xx, ruffY + R * 0.42); sp.lineTo(xx + R * 0.09, ruffY + R * 0.14); sp.closePath();
-        paint(sp, "#d9d2e6", lw * 0.6);
-      }
-    } else {
-      const rows = pier ? 3 : A ? 2 : 1;
-      for (let row = rows - 1; row >= 0; row--) {
-        const n = row === 2 ? 8 : row ? 7 : 6, w = R * (row === 2 ? 0.33 : row ? 0.3 : 0.26) * (pier ? 1.08 : 1), span = (n - 1) * w;
-        for (let i = 0; i < n; i++) {
-          const xx = i * w - span / 2, k = xx / (span / 2 + 0.001);
-          const yy = ruffY + R * (row === 2 ? 0.32 : row ? 0.2 : 0.08) - k * k * R * 0.14;
-          const pt = new Path2D();
-          if (form === "grunge") {
-            const len = R * (0.2 + hashN(i + row * 9 + sd) * 0.22);
-            pt.moveTo(xx - w * 0.55, yy); pt.lineTo(xx + w * 0.55, yy); pt.lineTo(xx + w * 0.1, yy + len); pt.closePath();
-          } else {
-            pt.arc(xx, yy, w * 0.58, 0, Math.PI);
-            pt.closePath();
-          }
-          paint(pt, pier ? (row === 1 ? "#e4e0f0" : "#ffffff") : row ? L.hat[i % 2] : rgb(mix(L.hat[(i + 1) % 2], "#ffffff", 0.4)), lw * 0.7);
-        }
-      }
-    }
-
-    // lappets: tapered ribbons that follow a curve
-    const jig = Math.sin(t * 2.6 + sd) * R * 0.08 + (walk ? Math.sin(ph - 0.8) * R * 0.14 : beat * R * 0.05) + (o.hurt ? R * 0.25 : 0);
-    const lappet = (bx, by, cx1, cy1, tx, ty, w0, w1, col, k, tip, studs) => {
-      const Lp = [], Rp = [], mid = [];
-      for (let q = 0; q <= 9; q++) {
-        const u = q / 9, a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c2 = u * u;
-        const px = a * bx + b * cx1 + c2 * tx, py = a * by + b * cy1 + c2 * ty;
-        const dx = 2 * (1 - u) * (cx1 - bx) + 2 * u * (tx - cx1), dy = 2 * (1 - u) * (cy1 - by) + 2 * u * (ty - cy1), dl = Math.hypot(dx, dy) || 1;
-        const w = (w0 + (w1 - w0) * u) / 2 + (q ? wb(40 + k * 7 + q) * 0.5 : 0);
-        Lp.push([px - (dy / dl) * w, py + (dx / dl) * w]);
-        Rp.push([px + (dy / dl) * w, py - (dx / dl) * w]);
-        mid.push([px, py, -dy / dl, dx / dl, w]);
-      }
-      const p = new Path2D();
-      Lp.forEach((q, i) => (i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])));
-      Rp.reverse().forEach((q) => p.lineTo(q[0], q[1]));
-      p.closePath();
-      ctx.fillStyle = col;
-      ctx.fill(p);
-      ctx.save();
-      ctx.clip(p);
-      if (form === "grunge") {
-        ctx.strokeStyle = "rgba(182,255,92,0.35)";
-        ctx.lineWidth = R * 0.035;
-        for (let q = -8; q < 10; q++) { ctx.beginPath(); ctx.moveTo(q * R * 0.3, hCy - R * 3); ctx.lineTo(q * R * 0.3 + R * 0.8, hCy + R * 1.5); ctx.stroke(); }
-      } else if (form === "ether") {
-        mid.forEach((m, i) => { if (i % 2) sparkle(m[0], m[1], R * 0.04, "rgba(255,255,255,0.95)"); });
-      } else if (pier) {
-        /* plain white */
-      } else {
-        mid.forEach((m, i) => {
-          if (i % 2 === 0 || i > 7) return;
-          ctx.fillStyle = k % 2 ? "#d62839" : "#ffd23f";
-          ctx.beginPath(); ctx.moveTo(m[0], m[1] - R * 0.1); ctx.lineTo(m[0] + R * 0.07, m[1]); ctx.lineTo(m[0], m[1] + R * 0.1); ctx.lineTo(m[0] - R * 0.07, m[1]); ctx.fill();
-        });
-      }
-      // darker along one edge
-      ctx.strokeStyle = "rgba(20,8,40,0.3)";
-      ctx.lineWidth = w0 * 0.5;
-      ctx.beginPath();
-      Lp.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])));
-      ctx.stroke();
-      ctx.restore();
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = lw;
-      ctx.stroke(p);
-      if (studs) {
-        for (const q of [3, 5, 7]) {
-          const m = mid[q], sp = new Path2D();
-          sp.moveTo(m[0] - m[2] * m[4] - m[3] * R * 0.08, m[1] - m[3] * m[4] + m[2] * R * 0.08);
-          sp.lineTo(m[0] - m[2] * (m[4] + R * 0.24), m[1] - m[3] * (m[4] + R * 0.24));
-          sp.lineTo(m[0] - m[2] * m[4] + m[3] * R * 0.08, m[1] - m[3] * m[4] - m[2] * R * 0.08);
-          sp.closePath();
-          paint(sp, "#d9d2e6", lw * 0.6);
-        }
-      }
-      // what hangs on the end
-      if (tip === "star") {
-        glow(tx, ty, R * 0.6, "#8fe9ff", 0.7);
-        sparkle(tx, ty, R * 0.13, "#ffffff");
-      } else if (tip === "orb") {
-        glow(tx, ty, R * 1.1, "#8fe9ff", 0.75);
-        const ob = new Path2D();
-        ob.arc(tx, ty, R * 0.2, 0, Math.PI * 2);
-        paint(ob, "#eafcff", lw * 0.7);
-        sparkle(tx, ty, R * 0.09, "#ffffff");
-      } else if (tip !== "none") {
-        let by2 = ty;
-        if (tip === "rust") {
-          by2 = ty + R * 0.22;
-          ctx.strokeStyle = ink;
-          ctx.lineWidth = lw * 0.5;
-          ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, by2); ctx.stroke();
-        }
-        const bl = new Path2D(), br = R * (tip === "pom" ? 0.14 : 0.18);
-        bl.arc(tx, by2, br, 0, Math.PI * 2);
-        paint(bl, L.bell, lw * 0.8);
-        ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.beginPath(); ctx.arc(tx - br * 0.35, by2 - br * 0.35, br * 0.3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = ink;
-        ctx.fillRect(tx - br * 0.55, by2 + br * 0.2, br * 1.1, br * 0.2);
-      }
-    };
-    const orb = best === "glow";
-    const studs = best === "grit";
-    if (form === "ether") {
-      for (let i = 0; i < 3; i++) {
-        const bx = (i - 1) * hRx * 0.42, wv = Math.sin(t * 1.8 + i * 1.4 + sd) * R * 0.18;
-        lappet(bx, topY + R * 0.1, bx - R * 0.15, topY - R * (1.0 + i * 0.1), bx - R * (0.95 + i * 0.3) + wv, topY - R * (1.45 - i * 0.4) + wv * 0.6 + jig * 0.3,
-          R * 0.38, R * 0.07, L.hat[i % 2], i, orb && i === 1 ? "orb" : "star", studs);
-      }
-    } else if (form === "grunge") {
-      lappet(0, topY + R * 0.05, R * 0.1, topY - R * 0.45, R * 0.34, topY - R * 0.6, R * 0.42, R * 0.24, L.hat[0], 2, orb ? "orb" : "none", false);
-      for (const side of [-1, 1]) {
-        lappet(side * hRx * 0.55, topY + R * 0.15, side * hRx * 1.4, topY - R * 0.4, side * hRx * 1.22 + jig * 0.4, hCy + hRy * 0.7 + Math.abs(jig) * 0.5,
-          R * 0.62, R * 0.24, L.hat[side < 0 ? 0 : 1], side < 0 ? 0 : 1, "rust", studs);
-      }
-    } else if (pier) {
-      for (const side of [-1, 1]) {
-        lappet(side * hRx * 0.6, topY + R * 0.2, side * hRx * 1.45, topY - R * 0.2, side * hRx * 1.3 + jig * 0.5, hCy + hRy * 1.25 + Math.abs(jig) * 0.5,
-          R * 0.5, R * 0.2, L.hat[side < 0 ? 1 : 0], side < 0 ? 0 : 1, "pom", studs);
-      }
-    } else if (A) {
-      for (const side of [-1, 1]) {
-        lappet(side * hRx * 0.5, topY + R * 0.12, side * hRx * 0.95, topY - R * 1.2, side * hRx * 1.55, topY - R * 0.4 + jig * side,
-          R * 0.58, R * 0.15, L.hat[side < 0 ? 0 : 1], side < 0 ? 0 : 1, "bell", studs);
-      }
-      lappet(0, topY + R * 0.05, R * 0.3, topY - R * 0.85, -R * 0.08 + jig, topY - R * 1.55, R * 0.5, R * 0.13, L.hat[0], 2, orb ? "orb" : "bell", false);
-    } else {
-      for (const side of [-1, 1]) {
-        lappet(side * hRx * 0.45, topY + R * 0.12, side * hRx * 0.85, topY - R * 0.8, side * hRx * 1.3 + jig * 0.4, topY + R * 0.05 + jig * side,
-          R * 0.5, R * 0.16, L.hat[side < 0 ? 0 : 1], side < 0 ? 0 : 1, "pom", false);
-      }
-    }
-
-    // the head itself: wide at the cheeks
-    const head = new Path2D();
-    const hx = (v, i) => v * hRx + wb(20 + i), hy = (v, i) => hCy + v * hRy + wb(30 + i);
-    head.moveTo(hx(0, 0), hy(-1, 0));
-    head.bezierCurveTo(hx(0.75, 1), hy(-1.02, 1), hx(1.08, 2), hy(-0.25, 2), hx(1.0, 3), hy(0.25, 3));
-    head.bezierCurveTo(hx(0.92, 4), hy(0.85, 4), hx(0.4, 5), hy(1.02, 5), hx(0, 6), hy(1.0, 6));
-    head.bezierCurveTo(hx(-0.4, 7), hy(1.02, 7), hx(-0.92, 8), hy(0.85, 8), hx(-1.0, 9), hy(0.25, 9));
-    head.bezierCurveTo(hx(-1.08, 10), hy(-0.25, 10), hx(-0.75, 11), hy(-1.02, 11), hx(0, 0), hy(-1, 0));
-    const hg = ctx.createRadialGradient(-hRx * 0.3, hCy - hRy * 0.4, R * 0.1, 0, hCy, hRx * 1.3);
-    hg.addColorStop(0, skinL);
-    hg.addColorStop(0.6, rgb(skin));
-    hg.addColorStop(1, rgb(mix(skin, "#2a1050", 0.25)));
-    ctx.fillStyle = hg;
-    if (form === "ether") ctx.globalAlpha = 0.94;
-    ctx.fill(head);
-    ctx.globalAlpha = 1;
-    if (form === "ether") {
-      ctx.save();
-      ctx.clip(head);
-      ctx.globalCompositeOperation = "lighter";
-      glow(hRx * 0.4, hCy + hRy * 0.5, R * 0.9, "#8a3dff", 0.22);
-      glow(-hRx * 0.5, hCy + hRy * 0.3, R * 0.8, "#ff5fa8", 0.18);
-      ctx.restore();
-    }
-    shade(head, -hRx * 0.25, hCy - hRy * 0.3, hRx * 1.12);
-    ctx.save();
-    ctx.clip(head);
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.beginPath(); ctx.ellipse(-hRx * 0.5, hCy - hRy * 0.55, R * 0.26, R * 0.12, -0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = lw;
-    ctx.stroke(head);
-
-    // the cap trim across the crown, where the lappets come out
-    const trim = new Path2D();
-    const a0 = Math.PI * 1.13, a1 = Math.PI * 1.87;
-    for (let q = 0; q <= 10; q++) {
-      const a = a0 + ((a1 - a0) * q) / 10, px = Math.cos(a) * hRx * 1.01, py = hCy + Math.sin(a) * hRy * 1.03;
-      q ? trim.lineTo(px, py) : trim.moveTo(px, py);
-    }
-    for (let q = 10; q >= 0; q--) {
-      const a = a0 + ((a1 - a0) * q) / 10, rr = q % 2 ? 0.66 : 0.84;
-      trim.lineTo(Math.cos(a) * hRx * (0.98 - (1 - rr) * 0.25), hCy + Math.sin(a) * hRy * rr);
-    }
-    trim.closePath();
-    if (pier) {
-      const cap = new Path2D();
-      for (let q = 0; q <= 12; q++) {
-        const a = Math.PI * 1.06 + (Math.PI * 0.88 * q) / 12, px = Math.cos(a) * hRx * 1.01, py = hCy + Math.sin(a) * hRy * 1.03;
-        q ? cap.lineTo(px, py) : cap.moveTo(px, py);
-      }
-      cap.quadraticCurveTo(hRx * 0.55, hCy - hRy * 0.6, R * 0.1, hCy - hRy * 0.28);
-      cap.quadraticCurveTo(-hRx * 0.45, hCy - hRy * 0.6, -hRx * 0.99, hCy - hRy * 0.2);
-      cap.closePath();
-      paint(cap, "#1b1726");
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.beginPath(); ctx.ellipse(-hRx * 0.4, hCy - hRy * 0.78, R * 0.26, R * 0.08, -0.5, 0, Math.PI * 2); ctx.fill();
-      // a small cone hat, tipped to one side
-      ctx.save();
-      ctx.translate(-hRx * 0.25, hCy - hRy * 0.93);
-      ctx.rotate(-0.32 + jig / (R * 2));
-      const cone = new Path2D();
-      cone.moveTo(-R * 0.34, R * 0.06); cone.quadraticCurveTo(-R * 0.08, -R * 0.5, R * 0.02, -R * 0.95); cone.quadraticCurveTo(R * 0.2, -R * 0.45, R * 0.34, R * 0.06); cone.closePath();
-      paint(cone, "#fbf8f2");
-      for (let q = 0; q < 2; q++) { const pm = new Path2D(); pm.arc(R * (0.0 + q * 0.03), -R * (0.22 + q * 0.3), R * 0.085, 0, Math.PI * 2); paint(pm, "#1b1726", lw * 0.5); }
-      const tip = new Path2D();
-      tip.arc(R * 0.02, -R * 0.98, R * 0.11, 0, Math.PI * 2);
-      paint(tip, "#1b1726", lw * 0.6);
-      ctx.restore();
-    } else paint(trim, L.hat[1]);
-    if (form === "grunge") {
-      ctx.save();
-      ctx.translate(hRx * 0.38, hCy - hRy * 0.72);
-      ctx.rotate(-0.5);
-      ctx.strokeStyle = "#e6e0d6";
-      ctx.lineWidth = lw * 0.6;
-      ctx.beginPath();
-      ctx.moveTo(-R * 0.2, -R * 0.03); ctx.lineTo(R * 0.16, -R * 0.03);
-      ctx.moveTo(-R * 0.2, R * 0.03); ctx.lineTo(R * 0.16, R * 0.03);
-      ctx.arc(-R * 0.2, 0, R * 0.03, Math.PI / 2, -Math.PI / 2);
-      ctx.stroke();
-      ctx.fillStyle = "#e6e0d6";
-      ctx.fillRect(R * 0.13, -R * 0.055, R * 0.09, R * 0.11);
-      ctx.restore();
-    }
-
-    // ---- face, turned a little toward where it's heading ----
-    const fx0 = R * 0.1, eyeY = hCy + hRy * 0.2, eH = R * 0.27;
-    const lk = o.look || [0.5 * dir, 0.1];
-    const lx = clamp(lk[0] * dir, -1, 1) * R * 0.06, ly = clamp(lk[1], -1, 1) * R * 0.05;
-    const blink = (t * 0.7 + sd) % 4 < 0.12;
-    const iris = o.evil ? "#ff3b4a" : form === "ether" ? "#5fd4ff" : form === "grunge" ? "#b6ff5c" : form === "neutral" ? "#ff5fa8" : pier ? "#9fc4ff" : rgb(hsl((j.hue + 180) % 360, 80, 68));
-    for (const side of [-1, 1]) {
-      const eW = R * (side > 0 ? 0.18 : 0.21), ex = fx0 + side * hRx * 0.42;
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = lw;
-      if (o.hurt) {
-        ctx.beginPath();
-        ctx.moveTo(ex - side * eW * 0.9, eyeY - eH * 0.5); ctx.lineTo(ex + side * eW * 0.6, eyeY); ctx.lineTo(ex - side * eW * 0.9, eyeY + eH * 0.5);
-        ctx.stroke();
-      } else if (o.happy) {
-        ctx.beginPath(); ctx.arc(ex, eyeY + eH * 0.3, eW, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
-      } else if (blink || sit) {
-        ctx.beginPath(); ctx.arc(ex, eyeY - eH * 0.1, eW, 0.2, Math.PI - 0.2); ctx.stroke();
-      } else {
-        ctx.fillStyle = "#16091f";
-        ctx.beginPath(); ctx.ellipse(ex + lx, eyeY + ly, eW, eH, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.save();
-        ctx.clip();
-        ctx.fillStyle = iris;
-        ctx.beginPath(); ctx.ellipse(ex + lx, eyeY + ly + eH * 0.55, eW * 1.05, eH * 0.65, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#16091f";
-        ctx.beginPath(); ctx.ellipse(ex + lx * 1.4, eyeY + ly * 1.4 + eH * 0.05, eW * 0.5, eH * 0.5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = "#ffffff";
-        if (form === "ether") sparkle(ex + lx - eW * 0.3, eyeY + ly - eH * 0.35, eW * 0.24, "#ffffff");
-        else { ctx.beginPath(); ctx.arc(ex + lx - eW * 0.3, eyeY + ly - eH * 0.35, eW * 0.36, 0, Math.PI * 2); ctx.fill(); }
-        ctx.beginPath(); ctx.arc(ex + lx + eW * 0.35, eyeY + ly + eH * 0.4, eW * 0.16, 0, Math.PI * 2); ctx.fill();
-        if (sad || form === "grunge" || o.evil || pier) {
-          const inK = o.evil ? -0.05 : sad ? 0.5 : pier ? 0.42 : 0.45, outK = o.evil ? 0.7 : sad ? 0.05 : pier ? 0.22 : 0.45;
-          const yL = eyeY - eH * (side > 0 ? inK : outK), yR = eyeY - eH * (side > 0 ? outK : inK);
-          ctx.fillStyle = rgb(mix(skin, "#1b1029", form === "grunge" || o.evil ? 0.35 : pier ? 0.04 : 0.1));
-          ctx.beginPath();
-          ctx.moveTo(ex - eW * 1.3, eyeY - eH * 1.2); ctx.lineTo(ex + eW * 1.3, eyeY - eH * 1.2); ctx.lineTo(ex + eW * 1.3, yR); ctx.lineTo(ex - eW * 1.3, yL);
-          ctx.fill();
-          ctx.strokeStyle = ink;
-          ctx.lineWidth = lw * (form === "grunge" || o.evil ? 1.3 : 0.8);
-          ctx.beginPath(); ctx.moveTo(ex - eW * 1.25, yL); ctx.lineTo(ex + eW * 1.25, yR); ctx.stroke();
-        }
-      }
-      // blush and face paint
-      const cx2 = fx0 + side * hRx * 0.7, cy2 = hCy + hRy * 0.55;
-      ctx.fillStyle = pier ? "rgba(159,196,255,0.3)" : "rgba(255,95,140,0.32)";
-      ctx.beginPath(); ctx.ellipse(cx2, cy2, R * 0.15, R * 0.09, 0, 0, Math.PI * 2); ctx.fill();
-      if (pier) {
-        if (side < 0) {
-          // a painted tear under one eye
-          ctx.fillStyle = "#6fa8ff";
-          ctx.strokeStyle = ink;
-          ctx.lineWidth = lw * 0.4;
-          ctx.beginPath();
-          ctx.moveTo(ex, eyeY + eH * 1.15);
-          ctx.quadraticCurveTo(ex + R * 0.1, eyeY + eH * 1.75, ex, eyeY + eH * 1.9);
-          ctx.quadraticCurveTo(ex - R * 0.1, eyeY + eH * 1.75, ex, eyeY + eH * 1.15);
-          ctx.fill(); ctx.stroke();
-        } else {
-          ctx.fillStyle = "#1b1726";
-          ctx.beginPath();
-          ctx.moveTo(ex, eyeY + eH * 1.2); ctx.lineTo(ex + R * 0.06, eyeY + eH * 1.5); ctx.lineTo(ex, eyeY + eH * 1.8); ctx.lineTo(ex - R * 0.06, eyeY + eH * 1.5);
-          ctx.fill();
-        }
-      } else if (form === "ether") sparkle(cx2, cy2 - R * 0.02, R * 0.05, "rgba(255,255,255,0.95)");
-      else if (form === "grunge") {
-        ctx.strokeStyle = "rgba(10,8,14,0.85)";
-        ctx.lineWidth = lw * 0.6;
-        ctx.beginPath();
-        ctx.moveTo(cx2 - R * 0.07, cy2 - R * 0.07); ctx.lineTo(cx2 + R * 0.07, cy2 + R * 0.07);
-        ctx.moveTo(cx2 + R * 0.07, cy2 - R * 0.07); ctx.lineTo(cx2 - R * 0.07, cy2 + R * 0.07);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = form === "neutral" ? "#d62839" : "rgba(255,95,168,0.85)";
-        ctx.beginPath();
-        ctx.moveTo(cx2, cy2 - R * 0.11); ctx.lineTo(cx2 + R * 0.075, cy2); ctx.lineTo(cx2, cy2 + R * 0.11); ctx.lineTo(cx2 - R * 0.075, cy2);
-        ctx.fill();
-      }
-    }
-    if (form === "ether") {
-      // a crescent on the brow
-      ctx.fillStyle = "#ffe680";
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = lw * 0.5;
-      ctx.beginPath();
-      ctx.arc(fx0, hCy - hRy * 0.3, R * 0.15, 0.3, Math.PI * 2 - 0.9);
-      ctx.arc(fx0 + R * 0.07, hCy - hRy * 0.34, R * 0.11, Math.PI * 2 - 1.2, 0.5, true);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-    // mouth
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = lw * 0.8;
-    const mx = fx0 + R * 0.02, my = hCy + hRy * 0.58;
-    ctx.beginPath();
-    if (o.hurt) {
-      for (let k = 0; k <= 4; k++) { const px = mx + (k - 2) * R * 0.07, py = my + R * 0.04 + (k % 2 ? -1 : 1) * R * 0.035; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
-      ctx.stroke();
-    } else if (o.evil) {
-      ctx.moveTo(mx - R * 0.26, my - R * 0.04);
-      for (let k = 1; k <= 8; k++) ctx.lineTo(mx - R * 0.26 + k * R * 0.065, my + (k % 2 ? R * 0.1 : 0) + Math.sin((k / 8) * Math.PI) * R * 0.05);
-      ctx.closePath();
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-      ctx.stroke();
-    } else if (o.happy) {
-      ctx.moveTo(mx - R * 0.17, my - R * 0.05);
-      ctx.quadraticCurveTo(mx, my + R * 0.28, mx + R * 0.17, my - R * 0.05);
-      ctx.closePath();
-      ctx.fillStyle = "#5a1030";
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#ff7aa8";
-      ctx.beginPath(); ctx.ellipse(mx, my + R * 0.07, R * 0.07, R * 0.045, 0, 0, Math.PI * 2); ctx.fill();
-    } else if (sit) {
-      ctx.ellipse(mx, my, R * 0.04, R * 0.05, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (sad) {
-      ctx.arc(mx, my + R * 0.1, R * 0.1, Math.PI + 0.4, -0.4);
-      ctx.stroke();
-    } else {
-      ctx.arc(mx - R * 0.075, my - R * 0.04, R * 0.075, 0.1, Math.PI - 0.3);
-      ctx.moveTo(mx + R * 0.15, my - R * 0.03);
-      ctx.arc(mx + R * 0.075, my - R * 0.04, R * 0.075, 0.3, Math.PI - 0.1);
-      ctx.stroke();
-      if (form === "grunge") {
-        ctx.fillStyle = "#ffffff";
-        ctx.lineWidth = lw * 0.5;
-        ctx.beginPath(); ctx.moveTo(mx + R * 0.1, my + R * 0.02); ctx.lineTo(mx + R * 0.14, my + R * 0.13); ctx.lineTo(mx + R * 0.18, my + R * 0.01); ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-    }
-    if (form === "ether" && !sit) {
-      // a ring of light above the head
-      ctx.strokeStyle = `rgba(255,236,150,${0.8 + 0.2 * Math.sin(t * 2)})`;
-      ctx.lineWidth = lw * 1.2;
-      glow(R * 0.1, hCy - hRy * 1.45, R * 1.1, "#ffd23f", 0.45);
-      ctx.beginPath();
-      ctx.ellipse(R * 0.1, hCy - hRy * 1.45 + Math.sin(t * 2) * R * 0.06, R * 0.6, R * 0.15, -0.12, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    const hat = o.hat !== undefined ? o.hat : j.hat;
-    if (hat) wearHat(hat, j, R, hRx, hRy, hCy, lw, t, ink, jig);
-    ctx.restore();   // head
-    ctx.restore();   // body
-    };
-    const tall = -(hCy - hRy) + R * 2.4, wide = o.spin ? tall : R * 3.1;
-    cutout(drawBody, x, y, wide, tall, o.spin ? tall : R * 0.7, { dy: -lift, flat: o.flat, edgeColor: o.edgeColor, edge: Math.max(2.2, 2.6 * (o.scale || 1)) });
-
-    const topScreen = y - lift + hCy - hRy;
-    if (best === "juggle") {
+    const topScreen = y - lift - u * 2.2;
+    if (grown && K.best === "juggle") {
+      // a Jinx whose best stat is Juggle keeps three small planets in the air
       for (let k = 0; k < 3; k++) {
-        const a = t * 3 + k * 2.09;
-        const px = x + Math.cos(a) * R * 1.3, py = topScreen - R * 1.9 - Math.abs(Math.sin(a)) * R * 1.1;
+        const a = t * 3 + k * 2.09, R = u * 0.75;
+        const px = x + Math.cos(a) * R * 1.5, py = topScreen - R * 1.5 - Math.abs(Math.sin(a)) * R * 1.0;
         ctx.fillStyle = ["#ff5fa8", "#ffd23f", "#8fe9ff"][k];
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = lw * 0.6;
+        ctx.strokeStyle = "#120a1e";
+        ctx.lineWidth = Math.max(1, u * 0.035);
         ctx.beginPath(); ctx.arc(px, py, R * 0.19, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.strokeStyle = "rgba(255,255,255,0.7)";
         ctx.beginPath(); ctx.ellipse(px, py, R * 0.32, R * 0.08, -0.4, 0, Math.PI * 2); ctx.stroke();
@@ -1854,12 +1592,12 @@
       for (let k = 0; k < 3; k++) {
         const q = (t * 0.5 + k / 3) % 1;
         ctx.globalAlpha = 1 - q;
-        ctx.font = `${(8 + q * 10) * U * s}px "Permanent Marker", cursive`;
-        ctx.fillText("z", x + dir * R * (1.0 + q * 0.7), topScreen - q * R * 1.4);
+        ctx.font = `${(8 + q * 10) * U * (o.scale || 1)}px "Permanent Marker", cursive`;
+        ctx.fillText("z", x + dir * u * (0.8 + q * 0.5), topScreen - q * u * 1.0);
       }
       ctx.globalAlpha = 1;
     }
-    return { x, y: y - lift + (hCy - hRy) / 2, r: R * 1.35, faceY: y - lift + hCy + hRy * 0.25, topY: topScreen - R * 1.3, feetY: y };
+    return { x, y: y - lift - u * 1.3, r: u, faceY: y - lift - u * 1.6, topY: topScreen - u * 1.0, feetY: y };
   };
 
   D.drawEgg = function (e, x, y, t) {

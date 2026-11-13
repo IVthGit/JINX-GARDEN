@@ -1,6 +1,6 @@
 # Jinx Garden
 
-A cosmic circus roguelike. Raise little jester creatures called Jinxes on a floating sludge island, then send one at a time into a three-act card-battle run through the circus at the end of the universe. How they play on a run decides how they grow.
+A cosmic circus roguelike. Raise strange little creatures called Jinxes on a floating sludge island, then send one at a time into a three-act card-battle run through the circus at the end of the universe. How they play on a run decides how they grow.
 
 Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `npx serve circus`). Nothing to install. Progress saves in the browser.
 
@@ -24,7 +24,8 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
   - Your first hatchling keeps its Eggshell as a hat, and now and then a later one does too.
 - **Duets:** two grown Jinxes with 40 Love each can share a **Heart Balloon** from the Concession stand. Tap one, then Duet, and pick who sings with it.
   - They sing in the ring and leave an egg. The garden holds 6.
-  - The egg takes its colour, its lean, a trait and its aptitude grades from both of them. Now and then a grade comes out a step better.
+  - The egg takes its head, its headpiece and its body each from one parent or the other. Two different kinds can leave something new, such as a hooded Umbra or a Lantern that walks. There are 27 mixes.
+  - It also takes its colour, its lean, a trait and its aptitude grades from both of them. Now and then a grade comes out a step better.
   - Each singer needs 2 more shows before the next duet.
 - **Aptitude:** the letter beside each stat, E up to S, is how fast that Jinx learns it. It is set at birth. An egg left by a loved Jinx often has better grades.
 - **Feed** from the pantry. Food fills the Belly and raises stats:
@@ -33,11 +34,18 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
   - Burned CDs cheer a Jinx up.
 - **Lean:** Cotton Comets and Angel Floss lean a Jinx toward Stardust. Sludge Pops and Black Hole Gum lean it toward Sludge. Some sideshows on runs change the lean too.
 - **Motley or Moonlit:** a second lean that only matters for a Jinx that stays between Stardust and Sludge. Moon Pies and Paper Moons lean Moonlit. Motley Jawbreakers lean Motley.
-- **Growing up:** after 3 shows a child becomes an adult:
-  - **Stardust** Jinxes glow and wear a halo.
-  - **Sludge** Jinxes drip and wear a safety pin.
-  - Jinxes in the middle become **Harlequins**, or **Pierrots** if they lean Moonlit: a white face, a black skullcap, a wide ruff, long sleeves and a painted tear.
-  - The best stat shows too: juggled planets, spring feet, a glowing antenna, or a spiked hat.
+- **Three kinds:** every Jinx is a head, a headpiece and a body.
+  - **Umbra:** a black disc for a head with two moons for eyes, a corona of rays with comet tails, and a starry cloak. A new game starts with one.
+  - **Hollow:** a mask with two slits of light, a hood with drooping tails and bells, and a tattered cloak.
+  - **Lantern:** a pale head with rings of light for eyes, ribbons that float upward, and a floating body with a light in its chest.
+  - A mystery egg from the Concession stand can be any of the three. The egg you start with is a Hollow or a Lantern.
+  - None of them has a mouth. The eyes show the mood: curved when happy, dim and low when sad, closed when asleep, wide when startled. A Lantern's chest light burns brighter or dimmer too.
+  - A child's eyes shine in its own colour.
+- **Growing up:** after 3 shows a child becomes an adult, and its lean changes its colours and details:
+  - **Stardust** turns it pale and gold, with a halo or a ring like a planet's.
+  - **Sludge** stains it green, and it drips.
+  - Jinxes in the middle grow up as **Harlequins**, in red, black and diamonds, or as **Pierrots** if they lean Moonlit, in black and white with a painted tear.
+  - A Jinx whose best stat is Juggle keeps three small planets in the air.
 - **The last show:** after 12 shows a Jinx rises into the sky as a constellation. If its Love is 50 or more, it leaves an egg that keeps a little of its stats and lean.
 - **Concession stand:** buy snacks, or an egg for 80 Tix. The garden holds 6.
 - **On their own**, Jinxes wander, nap, watch the old TV, splash in the sludge pond and play with each other, which lifts their Mood. Their eyes follow your pointer, and they bob in time with the music.
@@ -68,6 +76,7 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
   - **Harlequins** get one Wild card in every hand that plays twice. Their Showstopper is Harlequin Shuffle.
   - **Pierrots** can hold 2 cards instead of 1, and a card they held costs 1 less. Their Showstopper is Moonlit Pirouette.
 - **Training:** every card played trains its stat. Attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.
+- **Strange eggs:** a Headliner or a Ringmaster sometimes leaves an egg behind. It comes home with you and hatches into a Hollow or a Lantern. If the garden is full it is sold for 40 Tix.
 - **Winning** all three acts brings home everything in the bag, the Tix and 1.5 times the training.
 - **Fainting** keeps half the Tix, one thing from the bag and 0.6 times the training, and the Jinx comes home sad.
 - **Keys:** 1 to 9 play cards, E ends the turn.
@@ -76,6 +85,7 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 
 The whole game is a paper theatre made from a photocopied zine:
 
+- **Cool, with a little cute:** the Jinxes are small and round-headed, but masked, hooded or eclipsed, and they never smile.
 - **Cut-outs:** Jinxes, foes, the tent, the tree and the toys are paper cut-outs with a white edge and a hard shadow. In a fight they stand on sticks behind a cardboard stage front, and each foe is pasted onto a torn scrap of printed paper. A beaten foe flips over like a card and flutters away.
 - **Puppet foes:** every foe is made of separate pieces of card (legs, body, head, arms, hat) pinned together. Each piece swings a little on its own pin, and they rattle loose when the foe is hit.
 - **Zine print:** titles are cut-out letters from different magazines, buttons and map stops are stickers, and the cards and sky are printed in dots.

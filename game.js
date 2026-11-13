@@ -156,6 +156,8 @@
           if (j.moon === undefined) j.moon = 0;
           if (!j.grades) j.grades = rollGrades();
           if (!Array.isArray(j.learned)) j.learned = [];
+          // Jinxes from before the three kinds become Umbras
+          if (!j.head || !j.piece || !j.body) Object.assign(j, KINDS.Umbra);
         }
         j.held = false;
         j.act = null; j.after = null; j.waitFor = null; j.moving = false;
@@ -174,10 +176,23 @@
     const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.8;
     return [Math.cos(a) * d, Math.sin(a) * d];
   }
+  // Every Jinx is a head, a headpiece and a body. The three kinds are the matching sets.
+  const KINDS = D.KINDS, KIND_NAMES = Object.keys(KINDS);
+  const partsOf = (j) => ({ head: j.head, piece: j.piece, body: j.body });
+  const randomKind = (names) => Object.assign({}, KINDS[pick(names || KIND_NAMES)]);
+  // what to call it: the head gives the name, and a borrowed headpiece or body gives the first word
+  function kindName(j) {
+    const name = { disc: "Umbra", mask: "Hollow", bulb: "Lantern" }[j.head] || "Umbra", K = KINDS[name];
+    if (j.piece === K.piece && j.body === K.body) return name;
+    if (j.piece !== K.piece) return { corona: "Crowned", hood: "Hooded", ribbons: "Ribboned" }[j.piece] + " " + name;
+    return (j.body === "wisp" ? "Floating " : "Cloaked ") + name;
+  }
   function makeJinx(o) {
     o = o || {};
     const [u, v] = spot();
+    const parts = o.parts || KINDS.Umbra;
     return {
+      head: parts.head, piece: parts.piece, body: parts.body,
       id: uid++ + "-" + Date.now().toString(36), name: o.name || pick(JG.NAMES), stage: "child",
       hue: o.hue !== undefined ? o.hue : (rand() * 360) | 0, seed: rand() * 10, align: o.align || 0,
       stats: o.stats || blankStats(1, 3), belly: 70, mood: 70, love: 10, age: 0, gen: o.gen || 1, u, v,
@@ -200,11 +215,12 @@
     o = o || {};
     const [u, v] = spot();
     return { id: uid++ + "-" + Date.now().toString(36), stage: "egg", hatch: o.hatch || 40, hatchMax: o.hatch || 40, hue: o.hue !== undefined ? o.hue : (rand() * 360) | 0,
-      seed: rand() * 10, inherit: o.inherit || null, u, v };
+      seed: rand() * 10, inherit: o.inherit || null, parts: o.parts || randomKind(), u, v };
   }
   function newSave() {
     const first = makeJinx({ name: "Pickles", hue: 320 });
-    const egg = makeEgg({ hatch: 30 });
+    // the first egg is one of the other two kinds, so a duet can mix them early
+    const egg = makeEgg({ hatch: 30, parts: randomKind(["Hollow", "Lantern"]) });
     return gardenDefaults({ v: 1, tix: 40, inv: { moonpie: 2, plum: 1, comet: 1 }, jinxes: [first, egg], sky: [], records: { runs: 0, wins: 0, bestAct: 0, hatched: 1 } });
   }
   function gardenDefaults(s) {
@@ -218,18 +234,18 @@
   }
   function demoSave() {
     const s = newSave();
-    const b = makeJinx({ name: "Static", hue: 160, align: -0.6 });
+    const b = makeJinx({ name: "Static", hue: 160, align: -0.6, parts: KINDS.Hollow });
     b.stage = "adult";
     b.stats.grit.lv = 12;
-    const c = makeJinx({ name: "Halley", hue: 260, align: 0.7 });
+    const c = makeJinx({ name: "Halley", hue: 260, align: 0.7, parts: KINDS.Lantern });
     c.stage = "adult";
     c.stats.juggle.lv = 14;
-    const d = makeJinx({ name: "Tinsel", hue: 210, moon: 0.8 });
+    const d = makeJinx({ name: "Tinsel", hue: 210, moon: 0.8, parts: { head: "disc", piece: "hood", body: "wisp" } });
     d.stage = "adult";
     d.stats.tumble.lv = 12;
     s.jinxes.push(b, c, d);
     s.toys = { tramp: true, crystal: true };
-    b.hat = "bucket"; c.hat = "crown"; d.hat = "bow";
+    b.hat = null; c.hat = "crown"; d.hat = null;
     s.sky = [{ name: "Bobo", pts: [[0.12, 0.1], [0.17, 0.16], [0.22, 0.12], [0.26, 0.2], [0.2, 0.25]] }];
     return s;
   }
@@ -342,7 +358,7 @@
       ? `<input id="renameBox" maxlength="14" value="${esc(j.name)}" aria-label="New name">`
       : `<h2>${esc(j.name)}</h2>`;
     p.innerHTML = `<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">\u00D7</button></div>
-      <p class="tag">${formName(j)} \u00B7 show ${j.age} of 12${j.gen > 1 ? " \u00B7 generation " + j.gen : ""}${rib}</p>
+      <p class="tag">${kindName(j)} \u00B7 ${formName(j)} \u00B7 show ${j.age} of 12${j.gen > 1 ? " \u00B7 generation " + j.gen : ""}${rib}</p>
       <div class="row">
         <button class="btn small" data-act="pet">Pet</button>
         <button class="btn small${feedOpen ? " on" : ""}" data-act="feed" aria-expanded="${feedOpen}">Feed</button>
@@ -598,7 +614,7 @@
 
   function hatchEgg(e) {
     const inh = e.inherit;
-    const j = makeJinx({ hue: e.hue, name: inh ? inh.name : undefined, align: inh ? inh.align : 0, moon: inh ? inh.moon : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined,
+    const j = makeJinx({ hue: e.hue, parts: (inh && inh.parts) || e.parts || randomKind(), name: inh ? inh.name : undefined, align: inh ? inh.align : 0, moon: inh ? inh.moon : 0, gen: inh ? inh.gen : 1, trait: inh ? inh.trait : undefined,
       grades: inh && inh.grades ? (inh.exact ? inh.grades : rollGrades(inh.grades)) : undefined });
     if (inh) for (const s of JG.STATS) j.stats[s].lv = Math.max(j.stats[s].lv, inh.stats[s]);
     j.u = e.u; j.v = e.v; j.love = inh ? 30 : 10;
@@ -613,7 +629,7 @@
     // the first hatchling keeps its shell as a hat, and now and then so does a later one
     const shell = !G.demo && (!G.save.hats.shell || rand() < 0.25);
     if (shell) { grantHat("shell"); j.hat = "shell"; }
-    toast((inh && inh.duet ? `${j.name} hatched: the child of ${inh.parents.join(" and ")}.` : inh ? `${j.name} was born again!` : `An egg hatched! Say hi to ${j.name}.`) + (shell ? " It kept its shell as a hat." : ""));
+    toast((inh && inh.duet ? `${j.name} hatched, ${/^[AEIOU]/.test(kindName(j)) ? "an" : "a"} ${kindName(j)}: the child of ${inh.parents.join(" and ")}.` : inh ? `${j.name} was born again!` : `An egg hatched! Say hi to ${j.name}, ${/^[AEIOU]/.test(kindName(j)) ? "an" : "a"} ${kindName(j)}.`) + (shell ? " It kept its shell as a hat." : ""));
     persist();
     renderPanel();
   }
@@ -751,10 +767,10 @@
     const others = s.jinxes.filter((o) => o !== j && o.stage === "adult");
     const mine = why(j);
     const rows = others.length
-      ? others.map((o) => { const w = mine || why(o); return `<div class="shoprow"><div>${esc(o.name)}<small>${formName(o)}${w && !mine ? " · " + w : ""}</small></div><span class="have"></span><button class="btn small" data-act="sing" data-id="${o.id}" ${w || !have || full ? "disabled" : ""}>Sing</button></div>`; }).join("")
+      ? others.map((o) => { const w = mine || why(o); return `<div class="shoprow"><div>${esc(o.name)}<small>${kindName(o)} \u00B7 ${formName(o)}${w && !mine ? " · " + w : ""}</small></div><span class="have"></span><button class="btn small" data-act="sing" data-id="${o.id}" ${w || !have || full ? "disabled" : ""}>Sing</button></div>`; }).join("")
       : `<p class="note">There's no other grown Jinx in the garden yet. A child grows up after 3 shows.</p>`;
     modal(`<p class="eyebrow">Duet</p><h2>Who sings with ${esc(j.name)}?</h2>
-      <p>Two grown Jinxes who share a <b>Heart Balloon</b> sing a duet in the ring, and an egg appears. The egg takes its colour, its lean, a trait and its aptitude grades from both of them, and now and then a grade comes out a step better.</p>
+      <p>Two grown Jinxes who share a <b>Heart Balloon</b> sing a duet in the ring, and an egg appears. The egg takes its head, its headpiece and its body each from one of them, so two different kinds can leave something new. It also takes its colour, its lean, a trait and its aptitude grades from both, and now and then a grade comes out a step better.</p>
       <p class="tag">Heart Balloons: <b>${have}</b>${have ? "" : " · the Concession stand sells them"}${full ? " · the garden is full (6 at most)" : ""}${mine ? " · " + esc(j.name) + " " + mine : ""}</p>
       <div class="shoplist">${rows}</div>
       <button class="btn ghost" data-act="close">Not now</button>`, {
@@ -821,7 +837,8 @@
       stats[st] = Math.max(1, Math.floor((a.stats[st].lv + b.stats[st].lv) * 0.12));
     }
     const r = rand();
-    return { duet: true, exact: true, parents: [a.name, b.name], align: clamp((a.align + b.align) / 2 * 0.6 + (rand() - 0.5) * 0.2, -1, 1), moon: clamp(((a.moon || 0) + (b.moon || 0)) / 2 * 0.6 + (rand() - 0.5) * 0.2, -1, 1),
+    const from = () => (rand() < 0.5 ? a : b);
+    return { duet: true, exact: true, parents: [a.name, b.name], parts: { head: from().head, piece: from().piece, body: from().body }, align: clamp((a.align + b.align) / 2 * 0.6 + (rand() - 0.5) * 0.2, -1, 1), moon: clamp(((a.moon || 0) + (b.moon || 0)) / 2 * 0.6 + (rand() - 0.5) * 0.2, -1, 1),
       gen: Math.max(a.gen, b.gen) + 1, trait: r < 0.45 ? a.trait : r < 0.9 ? b.trait : pick(Object.keys(JG.TRAITS)), grades, stats };
   }
 
@@ -847,7 +864,7 @@
     });
   }
   function makeRival(L, name) {
-    const r = makeJinx({ name, align: pick([-0.8, 0, 0, 0.8]), moon: pick([-0.6, 0.8]) });
+    const r = makeJinx({ name, align: pick([-0.8, 0, 0, 0.8]), moon: pick([-0.6, 0.8]), parts: rand() < 0.6 ? randomKind() : { head: randomKind().head, piece: randomKind().piece, body: randomKind().body } });
     r.stage = L.lv >= 8 ? "adult" : "child";
     for (const st of JG.STATS) r.stats[st].lv = Math.max(1, Math.round(L.lv + (rand() - 0.5) * 4));
     r.stats[pick(JG.STATS)].lv += 3;
@@ -1048,7 +1065,7 @@
     }).join("");
     modal(`<h2>Concession Stand</h2><p class="tag">You have <b class="tixnum">${s.tix}</b> Tix. Snacks go in the pantry.</p>
       <div class="shoplist">${rows}
-      <div class="shoprow"><div><span class="glyph" style="color:#ffd23f">⬮</span>A mystery egg<small>${full ? "The garden is full (6 at most)." : "Something wriggles inside."}</small></div><span class="have"></span><button class="btn small" data-act="egg" ${s.tix < 80 || full ? "disabled" : ""}>80 Tix</button></div>
+      <div class="shoprow"><div><span class="glyph" style="color:#ffd23f">⬮</span>A mystery egg<small>${full ? "The garden is full (6 at most)." : "An Umbra, a Hollow or a Lantern. You find out when it hatches."}</small></div><span class="have"></span><button class="btn small" data-act="egg" ${s.tix < 80 || full ? "disabled" : ""}>80 Tix</button></div>
       <div class="shoprow"><div>${itemChip("balloon")}<small>${esc(JG.ITEMS.balloon.desc)}</small></div><span class="have">have ${s.inv.balloon || 0}</span><button class="btn small" data-act="buy" data-item="balloon" ${s.tix < JG.ITEMS.balloon.price ? "disabled" : ""}>${JG.ITEMS.balloon.price} Tix</button></div>
       </div>
       <h3>Hats</h3>
@@ -1153,7 +1170,8 @@
         <li>Tap the candy-floss tree to shake down ripe snacks. Tap a snack to put it in the pantry, or drag it onto a Jinx. A hungry Jinx will find snacks on its own.</li>
         <li>Toys from the Concession stand train a stat a little at a time. Clown College teaches a Jinx a trick it brings on every run.</li>
         <li>Food raises stats. Cotton Comets and Angel Floss lean a Jinx toward Stardust; Sludge Pops and Black Hole Gum lean it toward Sludge.</li>
-        <li>After 3 shows a child grows up. How it leans, and its best stat, decide what it becomes.</li>
+        <li>There are three kinds of Jinx: Umbra, Hollow and Lantern. Each is a head, a headpiece and a body. None of them has a mouth: watch the eyes, and a Lantern's chest light, to see how one feels.</li>
+        <li>After 3 shows a child grows up, and how it leans decides its colours and details.</li>
         <li>On a run, the cards you play train the matching stat: attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.</li>
         <li>Card order matters. Many cards have a bonus for being played first, played after two others, or played right after a certain kind of card. A card glows when its bonus is live.</li>
         <li>You can hold one card when you end your turn. It stays in your hand instead of a new draw, so you can save a Guard for a big hit.</li>
@@ -1166,7 +1184,8 @@
         <li>The letter beside each stat is aptitude, E up to S. Better grades learn faster. An egg left by a loved Jinx often has better grades.</li>
         <li>The Talent show is three rounds in the ring against three rivals. Tap Cheer as the marker crosses the middle of the bar. Winning gives Tix, a ribbon, and a hat the first time.</li>
         <li>Hats live in the hat box: tap a Jinx, then Hat. They are only for looks, though the talent show judges like one.</li>
-        <li>Two grown Jinxes with 40 Love each can share a Heart Balloon and sing a Duet. The egg takes after both of them.</li>
+        <li>Two grown Jinxes with 40 Love each can share a Heart Balloon and sing a Duet. The egg takes its head, headpiece and body each from one parent, so different kinds mix.</li>
+        <li>Headliners and Ringmasters sometimes leave a strange egg, which hatches into a Hollow or a Lantern.</li>
         <li>If your Jinx faints, it comes home sad with less of what it learned and only one thing from its bag.</li>
       </ul>
       <button class="btn" data-act="close">Back</button>`, { close: closeModal });
@@ -2086,6 +2105,13 @@
       charm = randomCharm();
       if (charm) { addCharm(charm); lines.push(`<li><span class="glyph" style="color:${JG.CHARMS[charm].color}">${JG.CHARMS[charm].glyph}</span><b>${JG.CHARMS[charm].name}</b>: ${JG.CHARMS[charm].desc}</li>`); }
     }
+    // a Headliner or a Ringmaster sometimes leaves a strange egg behind: a Hollow or a Lantern
+    if (kind !== "fight" && rand() < (kind === "boss" ? 0.4 : 0.25)) {
+      const name = pick(["Hollow", "Lantern"]);
+      r.eggs = r.eggs || [];
+      r.eggs.push(name);
+      lines.push(`<li><span class="glyph" style="color:#bfe0ff">\u2B2E</span><b>A strange egg</b> <small>(still warm; it goes to the garden)</small></li>`);
+    }
     if (kind === "boss") {
       const h = Math.round(r.maxHp * JG.TUNE.bossHeal);
       r.hp = Math.min(r.maxHp, r.hp + h);
@@ -2260,6 +2286,12 @@
     if (!won && loot.length > 1) { const keep = pick(loot); lost = loot.length - 1; loot = [keep]; }
     let tix = won ? r.tix + 60 : Math.floor(r.tix / 2);
     loot.forEach((id) => (s.inv[id] = (s.inv[id] || 0) + 1));
+    // strange eggs come home either way; if the garden is full they are sold for Tix
+    let eggsHome = 0, eggsSold = 0;
+    for (const name of r.eggs || []) {
+      if (s.jinxes.length < 6) { s.jinxes.push(makeEgg({ hatch: 45, parts: Object.assign({}, KINDS[name] || KINDS.Hollow) })); eggsHome++; }
+      else { tix += 40; eggsSold++; }
+    }
     s.tix += tix;
     j.age++;
     j.belly = clamp(j.belly - 25, 0, 100);
@@ -2285,7 +2317,7 @@
       <h2>${won ? `${esc(j.name)} conquered the Big Top Below!` : `${esc(j.name)} fainted in Act ${["I", "II", "III"][r.act - 1]}`}</h2>
       <p>${won ? "The whole cosmos is clapping. Every snack in the bag comes home, plus a 60 Tix bonus." + (topper ? " A Ringmaster dropped a Tiny Topper on the way out: it's in the hat box." : "") : `They wobble home sad and a bit sticky.${lost ? ` ${lost} thing${lost > 1 ? "s" : ""} fell out of the bag on the way.` : ""}`}</p>
       <div class="cols"><div><h3>What they learned</h3><ul class="loot">${gl}</ul></div>
-      <div><h3>Brought home</h3><ul class="loot"><li><span class="glyph" style="color:#ffd23f">✂</span><b>${tix}</b> Tix</li>${lootHtml}</ul></div></div>
+      <div><h3>Brought home</h3><ul class="loot"><li><span class="glyph" style="color:#ffd23f">✂</span><b>${tix}</b> Tix</li>${lootHtml}${eggsHome ? `<li><span class="glyph" style="color:#bfe0ff">\u2B2E</span>${eggsHome > 1 ? eggsHome + " strange eggs" : "A strange egg"}, now in the garden</li>` : ""}${eggsSold ? `<li><small>The garden was full, so ${eggsSold > 1 ? eggsSold + " strange eggs were" : "a strange egg was"} sold for 40 Tix each.</small></li>` : ""}</ul></div></div>
       <button class="btn big" data-act="home">Back to the garden</button>`, {
       home: () => {
         closeModal();
@@ -2302,7 +2334,7 @@
     D.burst(x, y - 20, "heart", 8, "#ff5fa8");
     sfx("hatch");
     modal(`<p class="eyebrow">All grown up</p><h2>${esc(j.name)} is now a ${formName(j)}!</h2>
-      <p>${j.align > 0.33 ? "All that stardust made them glow. Look for the halo." : j.align < -0.33 ? "All that sludge made them gloriously grungy. Note the safety pin." : "They stayed right in the middle, a classic harlequin."} Their best stat shows on them too, and they now start runs with an extra trick.</p>
+      <p>${j.align > 0.33 ? "All that stardust has turned them pale and gold." : j.align < -0.33 ? "All that sludge has stained them green, and they drip a little." : (j.moon || 0) >= 0.33 ? "They leaned Moonlit and grew up in black and white, with a painted tear." : "They stayed right in the middle and grew up in red, black and diamonds."} They now start runs with an extra trick for their best stat.</p>
       <button class="btn" data-act="ok">Aww</button>`, { ok: () => { closeModal(); renderPanel(); } });
   }
   function retireJinx(j) {
@@ -2314,7 +2346,7 @@
     s.sky.push({ name: j.name, pts, note: `${formName(j)}, 12 shows, generation ${j.gen}` });
     const i = s.jinxes.indexOf(j);
     if (loved) {
-      const inherit = { name: j.name, align: j.align * 0.5, moon: (j.moon || 0) * 0.5, gen: j.gen + 1, stats: {}, trait: j.trait, grades: j.grades };
+      const inherit = { name: j.name, align: j.align * 0.5, moon: (j.moon || 0) * 0.5, gen: j.gen + 1, stats: {}, trait: j.trait, grades: j.grades, parts: partsOf(j) };
       for (const st of JG.STATS) inherit.stats[st] = Math.floor(j.stats[st].lv * 0.3);
       const e = makeEgg({ hue: j.hue, inherit, hatch: 30 });
       e.u = j.u; e.v = j.v;
@@ -2417,5 +2449,5 @@
   setMode("title");
   requestAnimationFrame(frame);
   // test hook for automated checks
-  JG.debug = { openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, effFx, dmgValue, foeHitValue, bonuses, typeMult, gunkValue };
+  JG.debug = { kindName, makeJinx, makeEgg, openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, effFx, dmgValue, foeHitValue, bonuses, typeMult, gunkValue };
 })();
