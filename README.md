@@ -2,7 +2,7 @@
 
 A cosmic circus roguelike. Raise strange little creatures called Jinxes on a floating sludge island, then send one at a time into a three-act card-battle run through the circus at the end of the universe. How they play on a run decides how they grow.
 
-Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `npx serve circus`). Nothing to install. Progress saves in the browser.
+Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve .`). Nothing to install. Progress saves in the browser.
 
 ## The garden
 

@@ -3,15 +3,19 @@
 These drive the real game in a headless Chromium with Playwright. They are checks to run and read, not a
 pass/fail suite: most print what happened and save pictures to `tests/out/` to look at.
 
-From `circus/`:
+From the top folder:
 
 ```
-npm install --prefix tests        # once: installs Playwright
-npx --prefix tests playwright install chromium
+cd tests                          # once: install Playwright and its browser
+npm install
+npx playwright install chromium
+cd ..
 node tests/run.cjs quick          # the fast ones
 node tests/run.cjs smoke          # one by name
 PHONE=1 node tests/run.cjs fps    # some take settings from the environment
 ```
+
+In Windows PowerShell, set a setting first and then run the check: `$env:PHONE = 1; node tests/run.cjs fps`.
 
 `run.cjs` serves the game on port 8765 while a check runs. To use a server that is already running, set
 `JINX_URL` and run the file directly: `JINX_URL=http://localhost:8000/index.html node tests/smoke.cjs`.

@@ -1,8 +1,8 @@
 """Builds a copy of the game with the foe drafts switched in, without touching the game itself.
 
-    python3 drafts/apply.py /tmp/jinx-drafts      # from circus/
+    python3 drafts/apply.py /tmp/jinx-drafts      # from the top folder
     cd /tmp/jinx-drafts && python3 -m http.server 8766
-    JINX_URL=http://localhost:8766/index.html node drafts/shots.cjs      # from circus/, in another terminal
+    JINX_URL=http://localhost:8766/index.html node drafts/shots.cjs      # from the top folder, in another terminal
 
 In the copy, JG.draw.foeArt chooses how foes are drawn: "now", "night" (the repaint) or "redo" (redrawn).
 The hooks below are found by exact text, so if draw.js has changed since, an assert says which one moved.
