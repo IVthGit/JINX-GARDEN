@@ -1,0 +1,7 @@
+{
+  "name": "jinx-garden-checks",
+  "private": true,
+  "description": "Headless checks for Jinx Garden. See README.md.",
+  "scripts": { "quick": "node run.cjs quick" },
+  "devDependencies": { "playwright": "^1.48.0" }
+}

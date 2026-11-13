@@ -130,5 +130,7 @@ All of it is made in the browser, so there are no sound files. Each place has it
 - `stage.js`: the battle stage: a backdrop for each act, the crowd, attack animations, impacts and Showstoppers.
 - `music.js`: the music: a small step sequencer and the instruments it plays.
 - `game.js`: garden sim, talent shows, duets, runs, battles, events, shops, sound effects, saving.
+- `tests/`: checks that play the real game in a headless browser (`node tests/run.cjs quick`). See `tests/README.md`.
+- `drafts/`: work that has been shown but not chosen yet, such as the foe revisions. The game doesn't load it. See `drafts/README.md`.
 
 The look and the creatures are original. The genre (a pet-raising garden plus a roguelike deckbuilder) is borrowed from games we love.
