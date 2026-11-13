@@ -227,74 +227,140 @@
     return L;
   }
   // draw(): draws in the usual coordinates. The box around (x, y) is hw to each side, up above and down below.
+  //
+  // Making a cut-out costs about a dozen copies between canvases, and those copies are nearly all of a
+  // frame's cost. So a cut-out with a key keeps its finished sticker (shadow, edge and face in one canvas,
+  // soft light in another) and only remakes it opt.fps times a second, or at once when opt.sig changes.
+  // In between it is pasted where the thing is now: positions stay smooth, poses tick like stop motion.
+  const stickers = {}, tmpSticker = {};
+  let stickerSweep = 0;
+  function stickerCanvas(rec, k, w, h) {
+    let cv = rec[k];
+    if (!cv) { cv = rec[k] = document.createElement("canvas"); cv.width = 0; rec[k + "g"] = cv.getContext("2d"); }
+    if (cv.width < w || cv.height < h) { cv.width = Math.max(cv.width, Math.ceil(w / 64) * 64); cv.height = Math.max(cv.height, Math.ceil(h / 64) * 64); }
+    const g = rec[k + "g"];
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = "source-over";
+    g.filter = "none";
+    g.clearRect(0, 0, cv.width, cv.height);
+    return g;
+  }
   function cutout(draw, x, y, hw, up, down, opt) {
     opt = opt || {};
     if (!D.paper.on || cutDepth || opt.flat) {
       if (opt.dy) { ctx.save(); ctx.translate(0, opt.dy); draw(); ctx.restore(); } else draw();
       return;
     }
-    const w = Math.max(2, Math.ceil(hw * 2 * DPR)), h = Math.max(2, Math.ceil((up + down) * DPR));
-    const S = sheet("sprite", w, h), Gl = sheet("light", w, h);
-    for (const L of [S, Gl]) {
-      L.g.setTransform(1, 0, 0, 1, 0, 0);
-      L.g.globalCompositeOperation = "source-over";
-      L.g.globalAlpha = 1;
-      L.g.filter = "none";
-      if (L === S || L.dirty) L.g.clearRect(0, 0, L.cv.width, L.cv.height);
-      L.g.setTransform(DPR, 0, 0, DPR, (hw - x) * DPR, (up - y) * DPR);
-    }
-    Gl.dirty = false;
-    const main = ctx;
-    ctx = S.g;
-    glowCtx = Gl.g;
-    lightUsed = false;
-    cutDepth++;
-    S.g.save();
-    Gl.g.save();
-    try { draw(); } finally { S.g.restore(); Gl.g.restore(); ctx = main; glowCtx = null; cutDepth--; Gl.dirty = lightUsed; }
-    // The silhouette, fattened by the width of the cut edge. It is built at reduced size: its outer rim is
-    // all that shows, and this is most of the cost of a cut-out.
-    const ES = DPR >= 2 ? 0.5 : 0.75, ew = Math.ceil(w * ES), eh = Math.ceil(h * ES), M = sheet("edge", ew, eh);
-    const e = (opt.edge || 3) * U, ee = e * DPR * ES, col = opt.edgeColor || D.paper.edge;
-    M.g.setTransform(1, 0, 0, 1, 0, 0);
-    M.g.globalCompositeOperation = "source-over";
-    M.g.clearRect(0, 0, ew, eh);
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; M.g.drawImage(S.cv, 0, 0, w, h, Math.cos(a) * ee, Math.sin(a) * ee, w * ES, h * ES); }
-    const tint = (c) => { M.g.globalCompositeOperation = "source-in"; M.g.fillStyle = c; M.g.fillRect(0, 0, ew, eh); M.g.globalCompositeOperation = "source-over"; };
-    const dx = x - hw, dy = y - up + (opt.dy || 0), dw = hw * 2, dh = up + down;
-    main.save();
-    const ga = main.globalAlpha;
-    if (D.paper.neon) {
-      // blacklight: the edge glows. The glow is a tiny blurred copy, blown back up.
+    const now = performance.now() / 1000, neon = D.paper.neon, col = opt.edgeColor || D.paper.edge;
+    let rec = opt.key ? stickers[opt.key] : tmpSticker;
+    if (!rec) rec = stickers[opt.key] = { next: 0 };
+    const sig = (opt.sig || "") + "|" + col + "|" + neon + "|" + DPR + "|" + (opt.edge || 3) + "|" + U;
+    if (!opt.key || rec.sig !== sig || now >= rec.next || Math.abs(hw / rec.hw - 1) > 0.3 || Math.abs((up + down) / (rec.up + rec.down) - 1) > 0.3) {
+      const w = Math.max(2, Math.ceil(hw * 2 * DPR)), h = Math.max(2, Math.ceil((up + down) * DPR));
+      const S = sheet("sprite", w, h), Gl = sheet("light", w, h);
+      for (const L of [S, Gl]) {
+        L.g.setTransform(1, 0, 0, 1, 0, 0);
+        L.g.globalCompositeOperation = "source-over";
+        L.g.globalAlpha = 1;
+        L.g.filter = "none";
+        if (L === S || L.dirty) L.g.clearRect(0, 0, L.cv.width, L.cv.height);
+        L.g.setTransform(DPR, 0, 0, DPR, (hw - x) * DPR, (up - y) * DPR);
+      }
+      Gl.dirty = false;
+      const main = ctx;
+      ctx = S.g;
+      glowCtx = Gl.g;
+      lightUsed = false;
+      cutDepth++;
+      S.g.save();
+      Gl.g.save();
+      try { draw(); } finally { S.g.restore(); Gl.g.restore(); ctx = main; glowCtx = null; cutDepth--; Gl.dirty = lightUsed; }
+      // The silhouette, fattened by the width of the cut edge. It is built at reduced size: its outer rim is
+      // all that shows.
+      const ES = DPR >= 2 ? 0.5 : 0.75, ew = Math.ceil(w * ES), eh = Math.ceil(h * ES), M = sheet("edge", ew, eh);
+      const e = (opt.edge || 3) * U, ee = e * DPR * ES, lift = neon ? 0 : (opt.lift || 4) * U;
+      M.g.setTransform(1, 0, 0, 1, 0, 0);
+      M.g.globalCompositeOperation = "source-over";
+      M.g.clearRect(0, 0, ew, eh);
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; M.g.drawImage(S.cv, 0, 0, w, h, Math.cos(a) * ee, Math.sin(a) * ee, w * ES, h * ES); }
+      const tint = (c) => { M.g.globalCompositeOperation = "source-in"; M.g.fillStyle = c; M.g.fillRect(0, 0, ew, eh); M.g.globalCompositeOperation = "source-over"; };
+      // the sticker: shadow, edge, face
+      const pad = Math.ceil((e + lift * 1.5 + 2) * DPR), cw = w + pad * 2, ch = h + pad * 2, g = stickerCanvas(rec, "cv", cw, ch);
+      if (!neon) {
+        // the shadow the paper throws on whatever is behind it
+        tint("#08030f");
+        g.globalAlpha = 0.5;
+        g.drawImage(M.cv, 0, 0, ew, eh, pad + lift * DPR, pad + lift * 1.5 * DPR, w, h);
+        g.globalAlpha = 1;
+      }
       tint(col);
-      const tw = Math.ceil(ew / 5), th = Math.ceil(eh / 5), T = sheet("halo", tw, th);
-      T.g.setTransform(1, 0, 0, 1, 0, 0);
-      T.g.clearRect(0, 0, tw, th);
-      T.g.filter = `blur(${Math.max(1, (9 * U * DPR * ES) / 5).toFixed(1)}px)`;
-      T.g.drawImage(M.cv, 0, 0, ew, eh, 0, 0, tw, th);
-      T.g.filter = "none";
-      main.globalCompositeOperation = "lighter";
-      main.globalAlpha = ga * 0.85;
-      main.drawImage(T.cv, 0, 0, tw, th, dx, dy, dw, dh);
-      main.globalCompositeOperation = "source-over";
-    } else {
-      // the shadow the paper throws on whatever is behind it
-      const lift = (opt.lift || 4) * U;
-      tint("#08030f");
-      main.globalAlpha = ga * 0.5;
-      main.drawImage(M.cv, 0, 0, ew, eh, dx + lift, dy + lift * 1.5, dw, dh);
-      tint(col);
+      g.drawImage(M.cv, 0, 0, ew, eh, pad, pad, w, h);
+      g.drawImage(S.cv, 0, 0, w, h, pad, pad, w, h);
+      rec.light = lightUsed || neon;
+      if (rec.light) {
+        const lg = stickerCanvas(rec, "lcv", cw, ch);
+        if (neon) {
+          // blacklight: the edge glows. The glow is a tiny blurred copy blown back up, kept to the outside.
+          const tw = Math.ceil(ew / 5), th = Math.ceil(eh / 5), T = sheet("halo", tw, th);
+          T.g.setTransform(1, 0, 0, 1, 0, 0);
+          T.g.clearRect(0, 0, T.cv.width, T.cv.height);
+          T.g.filter = `blur(${Math.max(1, (9 * U * DPR * ES) / 5).toFixed(1)}px)`;
+          T.g.drawImage(M.cv, 0, 0, ew, eh, 0, 0, tw, th);
+          T.g.filter = "none";
+          lg.globalAlpha = 0.85;
+          lg.drawImage(T.cv, 0, 0, tw, th, pad, pad, w, h);
+          lg.globalAlpha = 1;
+          lg.globalCompositeOperation = "destination-out";
+          lg.drawImage(M.cv, 0, 0, ew, eh, pad, pad, w, h);
+          lg.globalCompositeOperation = "lighter";
+        }
+        if (lightUsed) lg.drawImage(Gl.cv, 0, 0, w, h, pad, pad, w, h);
+      }
+      Object.assign(rec, { sig, hw, up, down, pad: pad / DPR, cw, ch, next: now + (1 / (opt.fps || 12)) * (0.85 + 0.3 * Math.random()) });
     }
-    main.globalAlpha = ga;
-    main.drawImage(M.cv, 0, 0, ew, eh, dx, dy, dw, dh);
-    main.drawImage(S.cv, 0, 0, w, h, dx, dy, dw, dh);
-    if (lightUsed) {
-      main.globalCompositeOperation = "lighter";
-      main.drawImage(Gl.cv, 0, 0, w, h, dx, dy, dw, dh);
+    rec.used = now;
+    // paste it where the thing is now, at the size it is now
+    const kx = hw / rec.hw, ky = (up + down) / (rec.up + rec.down);
+    const dx = x - hw - rec.pad * kx, dy = y - up + (opt.dy || 0) - rec.pad * ky, dw = (rec.cw / DPR) * kx, dh = (rec.ch / DPR) * ky;
+    ctx.drawImage(rec.cv, 0, 0, rec.cw, rec.ch, dx, dy, dw, dh);
+    if (rec.light) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(rec.lcv, 0, 0, rec.cw, rec.ch, dx, dy, dw, dh);
+      ctx.restore();
     }
-    main.restore();
+    // forget stickers nothing has asked for in a while
+    if (now > stickerSweep) {
+      stickerSweep = now + 3;
+      for (const k in stickers) if (now - stickers[k].used > 5) delete stickers[k];
+    }
   }
   D.cutout = cutout;
+  // Scenery that barely changes from one frame to the next (the island, the far sky, a stage backdrop) is
+  // painted into a layer of its own a few times a second and copied to the screen every frame.
+  // paint() draws in the usual screen coordinates. A change of sig repaints at once.
+  const layers = {};
+  function cachedLayer(key, fps, paint, sig) {
+    const now = performance.now() / 1000, pw = Math.max(1, Math.round(W * DPR)), ph = Math.max(1, Math.round(H * DPR));
+    let L = layers[key];
+    if (!L) { const lc = document.createElement("canvas"); L = layers[key] = { cv: lc, g: lc.getContext("2d"), next: 0 }; }
+    if (L.cv.width !== pw || L.cv.height !== ph) { L.cv.width = pw; L.cv.height = ph; L.next = 0; }
+    if (now >= L.next || L.sig !== sig) {
+      L.sig = sig;
+      L.next = now + (1 / fps) * (0.9 + 0.2 * Math.random());
+      const main = ctx, g = L.g;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = "source-over";
+      g.clearRect(0, 0, pw, ph);
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx = g;
+      g.save();
+      try { paint(); } finally { g.restore(); ctx = main; }
+    }
+    ctx.drawImage(L.cv, 0, 0, W, H);
+  }
   // run fn so that what it draws lands on the light sheet (when a cut-out is being made)
   function lightLayer(fn) {
     if (PS) {
@@ -411,27 +477,40 @@
     ctx.setLineDash([]);
   }
   // fog: big soft blobs drifting sideways in a band
-  const fogBlobs = {};
+  // fog: big soft blobs drifting sideways in a band. Each band is painted small into its own layer a few
+  // times a second and stretched over the scene: it is soft and slow, so nobody can tell.
+  const fogBlobs = {}, fogBands = {};
   function fog(y, h, a, t, speed, seed, tint) {
     tint = tint || "#aab4e6";
-    // one soft blob per colour, drawn once and stretched: far cheaper than a fresh gradient for every puff
     let blob = fogBlobs[tint];
     if (!blob) {
       blob = fogBlobs[tint] = document.createElement("canvas");
-      blob.width = blob.height = 96;
-      const bg2 = blob.getContext("2d"), gr = bg2.createRadialGradient(48, 48, 0, 48, 48, 48);
+      blob.width = blob.height = 64;
+      const bg2 = blob.getContext("2d"), gr = bg2.createRadialGradient(32, 32, 0, 32, 32, 32);
       gr.addColorStop(0, rgb(tint, 1));
       gr.addColorStop(0.5, rgb(tint, 0.42));
       gr.addColorStop(1, rgb(tint, 0));
       bg2.fillStyle = gr;
-      bg2.fillRect(0, 0, 96, 96);
+      bg2.fillRect(0, 0, 64, 64);
+    }
+    const key = seed + tint, now = performance.now() / 1000, k = 1 / 8, bw = Math.max(8, Math.ceil(W * k)), bh = Math.max(4, Math.ceil(h * 3 * k));
+    let band = fogBands[key];
+    if (!band) { const cv = document.createElement("canvas"); band = fogBands[key] = { cv, g: cv.getContext("2d"), next: 0 }; }
+    if (band.cv.width !== bw || band.cv.height !== bh) { band.cv.width = bw; band.cv.height = bh; band.next = 0; }
+    if (now >= band.next) {
+      band.next = now + 0.16 + Math.random() * 0.05;
+      const g = band.g;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, bw, bh);
+      g.setTransform(k, 0, 0, k, 0, h * 1.5 * k);      // the band's middle is y; it reaches 1.5 h above and below
+      for (let i = 0; i < 5; i++) {
+        const w = W * (0.35 + hashN(seed + i) * 0.3), x = ((hashN(seed + i * 3) * 1.6 + t * speed * (0.6 + hashN(seed + i * 7))) % 1.6 + 1.6) % 1.6 * W - 0.3 * W, yy = (hashN(seed + i * 11) - 0.5) * h;
+        g.drawImage(blob, x - w, yy - h, w * 2, h * 2);
+      }
     }
     ctx.save();
     ctx.globalAlpha *= a;
-    for (let i = 0; i < 5; i++) {
-      const w = W * (0.35 + hashN(seed + i) * 0.3), x = ((hashN(seed + i * 3) * 1.6 + t * speed * (0.6 + hashN(seed + i * 7))) % 1.6 + 1.6) % 1.6 * W - 0.3 * W, yy = y + (hashN(seed + i * 11) - 0.5) * h;
-      ctx.drawImage(blob, x - w, yy - h, w * 2, h * 2);
-    }
+    ctx.drawImage(band.cv, 0, y - h * 1.5, W, h * 3);
     ctx.restore();
   }
   // the long shadow a thing throws toward us, away from the black sun behind it
@@ -1571,7 +1650,11 @@
       ctx.restore();
     };
     const tall = u * 4.4, wide = o.spin ? tall : u * 1.75;
-    cutout(drawBody, x, y, wide, tall, o.spin ? tall : u * 0.65, { dy: -lift, flat: o.flat, edgeColor: o.edgeColor, edge: Math.max(2.2, 2.6 * (o.scale || 1)) });
+    // poses tick at 12 a second like stop motion; anything that turns or spins is redrawn every frame
+    const quick = o.spin || o.twirl || o.hurt || Math.abs(dir) < 0.97;
+    cutout(drawBody, x, y, wide, tall, o.spin ? tall : u * 0.65, { dy: -lift, flat: o.flat, edgeColor: o.edgeColor, edge: Math.max(2.2, 2.6 * (o.scale || 1)),
+      key: "j:" + (j.id || j.name) + ":" + Math.round((o.scale || 1) * 4) + (o.evil ? "e" : ""), fps: quick ? 60 : walk ? 15 : 12,
+      sig: [mood, walk ? 1 : 0, K.head, K.piece, K.body, K.lean, o.hat !== undefined ? o.hat : j.hat, sit ? 1 : 0, dir < 0 ? -1 : 1, o.spin ? 1 : 0, j.hue].join(",") });
 
     const topScreen = y - lift - u * 2.2;
     if (grown && K.best === "juggle") {
@@ -1660,7 +1743,7 @@
     ctx.lineWidth = 2;
     ctx.stroke(egg);
     ctx.restore();
-    }, x, y, r * 1.7, r * 2.8, r * 0.3, { edge: 2.4 });
+    }, x, y, r * 1.7, r * 2.8, r * 0.3, { edge: 2.4, key: "egg:" + e.id, fps: wob > 0 ? 30 : 10, sig: prog > 0.8 ? 2 : prog > 0.55 ? 1 : 0 });
     return { x, y: y - r * 1.15, r };
   };
 
@@ -3371,6 +3454,10 @@
     for (const b of boxes.concat(fixed)) if (b) { u[0] = Math.min(u[0], b[0]); u[1] = Math.min(u[1], b[1]); u[2] = Math.max(u[2], b[2]); u[3] = Math.max(u[3], b[3]); }
     return { boxes, hw: Math.min(hw, Math.max(-u[0], u[2]) + 2), up: Math.min(up, -u[1] + 2), down: Math.min(down, u[3] + 2) };
   }
+  // The art is redrawn and cut into part stickers only a dozen times a second. Every frame the stored parts
+  // are pasted, each swinging on its own pin, so the puppet still moves smoothly.
+  const foeCache = {};
+  let foeKeys = [];
   function puppet(f, r, t, lw, ft, hpK, art, o, hw, up, down) {
     const main = ctx, e = 2.3 * U, lift = 2.6 * U, key = f.def.id + ":" + Math.round(r) + ":" + DPR;
     let info = puppets[key];
@@ -3380,22 +3467,78 @@
     }
     const boxes = info.boxes;
     hw = info.hw; up = info.up; down = info.down;
-    const W = Math.ceil(hw * 2 * DPR), H = Math.ceil((up + down) * DPR), S = sheet("foe", W, H), g = S.g;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalAlpha = 1;
-    g.globalCompositeOperation = "source-over";
-    g.filter = "none";
-    g.clearRect(0, 0, W, H);
-    g.setTransform(DPR, 0, 0, DPR, hw * DPR, up * DPR);
-    g.lineJoin = "round";
-    g.lineCap = "round";
-    const col = o.edgeColor || D.paper.edge, hk = o.hurtK || 0, ga = main.globalAlpha;
-    const finish = () => {
-      const i = PS.i, op = PS.opts;
-      if (i < 0) return;
-      let b = boxes[i];
-      if (op.box) b = [op.box[0] * r, op.box[1] * r, op.box[2] * r, op.box[3] * r];
-      // how this part hangs on its pin right now
+    const neon = D.paper.neon, col = o.edgeColor || D.paper.edge, hk = o.hurtK || 0, now = performance.now() / 1000;
+    let rec = foeCache[key];
+    if (!rec) {
+      rec = foeCache[key] = { parts: [], next: 0 };
+      foeKeys.push(key);
+      while (foeKeys.length > 2) delete foeCache[foeKeys.shift()];
+    }
+    const sig = col + "|" + neon + "|" + (f.charge ? 1 : 0) + "|" + Math.round(hpK * 8) + "|" + (f.mimic ? f.mimic.id + f.mimic.hat : "");
+    if (rec.sig !== sig || now >= rec.next) {
+      rec.sig = sig;
+      rec.next = now + 1 / 12;
+      rec.n = 0;
+      const W = Math.ceil(hw * 2 * DPR), H = Math.ceil((up + down) * DPR), S = sheet("foe", W, H), g = S.g;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = "source-over";
+      g.filter = "none";
+      g.clearRect(0, 0, S.cv.width, S.cv.height);
+      g.setTransform(DPR, 0, 0, DPR, hw * DPR, up * DPR);
+      g.lineJoin = "round";
+      g.lineCap = "round";
+      const finish = () => {
+        const i = PS.i, op = PS.opts;
+        if (i < 0) return;
+        const part = rec.parts[rec.n] || (rec.parts[rec.n] = {});
+        rec.n++;
+        part.i = i;
+        part.op = op;
+        part.lights = PS.lights.slice();
+        part.has = false;
+        PS.lights.length = 0;
+        let b = boxes[i];
+        if (op.box) b = [op.box[0] * r, op.box[1] * r, op.box[2] * r, op.box[3] * r];
+        if (!b) return;
+        const sx = Math.max(0, Math.floor((b[0] + hw) * DPR)), sy = Math.max(0, Math.floor((b[1] + up) * DPR));
+        const sw = Math.min(W, Math.ceil((b[2] + hw) * DPR)) - sx, sh = Math.min(H, Math.ceil((b[3] + up) * DPR)) - sy;
+        if (sw <= 1 || sh <= 1) return;
+        const pad = Math.ceil((e + lift * 1.4 + 2) * DPR), cw = sw + pad * 2, ch = sh + pad * 2, pg = stickerCanvas(part, "cv", cw, ch);
+        if (op.edge !== 0) {
+          const ES = DPR >= 2 ? 0.5 : 0.75, ew = Math.ceil(sw * ES), eh = Math.ceil(sh * ES), M = sheet("edge", ew, eh), ee = e * DPR * ES;
+          M.g.setTransform(1, 0, 0, 1, 0, 0);
+          M.g.globalCompositeOperation = "source-over";
+          M.g.clearRect(0, 0, ew, eh);
+          for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; M.g.drawImage(S.cv, sx, sy, sw, sh, Math.cos(a) * ee, Math.sin(a) * ee, sw * ES, sh * ES); }
+          const tint = (c) => { M.g.globalCompositeOperation = "source-in"; M.g.fillStyle = c; M.g.fillRect(0, 0, ew, eh); M.g.globalCompositeOperation = "source-over"; };
+          if (!neon) {
+            // the shadow this piece of card throws on the pieces beneath it
+            tint("#08030f");
+            pg.globalAlpha = 0.42;
+            pg.drawImage(M.cv, 0, 0, ew, eh, pad + lift * DPR, pad + lift * 1.4 * DPR, sw, sh);
+            pg.globalAlpha = 1;
+          }
+          tint(col);
+          pg.drawImage(M.cv, 0, 0, ew, eh, pad, pad, sw, sh);
+        }
+        pg.drawImage(S.cv, sx, sy, sw, sh, pad, pad, sw, sh);
+        g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(sx, sy, sw, sh); g.restore();
+        Object.assign(part, { has: true, cw, ch, x: (sx - pad) / DPR - hw, y: (sy - pad) / DPR - up, w: cw / DPR, h: ch / DPR });
+      };
+      PS = { g, i: -1, opts: {}, lights: [], binv: new DOMMatrix([DPR, 0, 0, DPR, hw * DPR, up * DPR]).inverse(), mark(op) { finish(); this.i++; this.opts = op; } };
+      ctx = g;
+      cutDepth++;
+      g.save();
+      try {
+        PS.mark({ z: 0.5 });
+        art(f, r, t, lw, ft, hpK, -r * 4);
+        finish();
+      } finally { g.restore(); ctx = main; cutDepth--; PS = null; }
+    }
+    // every frame: paste the parts, each hanging on its pin as it does right now
+    for (let n = 0; n < rec.n; n++) {
+      const part = rec.parts[n], op = part.op, i = part.i;
       const z = op.z === undefined ? 1 : op.z, pv = op.pv || [0, 0], side = i % 2 ? 1 : -1;
       const ang = (op.sw || 0) * Math.sin(t * (op.sp || 1.5) + (op.ph || 0)) + hk * 0.2 * z * side + (f.charge ? Math.sin(t * 43 + i * 2) * 0.012 * z : 0);
       const ox = Math.sin(t * 0.9 + i * 1.7) * r * 0.012 * z + hk * r * 0.07 * z * side, oy = -hk * r * 0.09 * z;
@@ -3403,34 +3546,7 @@
       main.translate(pv[0] * r + ox, pv[1] * r + oy);
       main.rotate(ang);
       main.translate(-pv[0] * r, -pv[1] * r);
-      if (b) {
-        const sx = Math.max(0, Math.floor((b[0] + hw) * DPR)), sy = Math.max(0, Math.floor((b[1] + up) * DPR));
-        const sw = Math.min(W, Math.ceil((b[2] + hw) * DPR)) - sx, sh = Math.min(H, Math.ceil((b[3] + up) * DPR)) - sy;
-        if (sw > 1 && sh > 1) {
-          const lx = sx / DPR - hw, ly = sy / DPR - up, lwd = sw / DPR, lh = sh / DPR;
-          const Pc = sheet("part", sw, sh);
-          Pc.g.globalCompositeOperation = "copy";
-          Pc.g.drawImage(S.cv, sx, sy, sw, sh, 0, 0, sw, sh);
-          if (op.edge !== 0) {
-            const ES = DPR >= 2 ? 0.5 : 0.75, ew = Math.ceil(sw * ES), eh = Math.ceil(sh * ES), M = sheet("edge", ew, eh), ee = e * DPR * ES;
-            M.g.setTransform(1, 0, 0, 1, 0, 0);
-            M.g.globalCompositeOperation = "source-over";
-            M.g.clearRect(0, 0, ew, eh);
-            for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; M.g.drawImage(Pc.cv, 0, 0, sw, sh, Math.cos(a) * ee, Math.sin(a) * ee, sw * ES, sh * ES); }
-            const tint = (c) => { M.g.globalCompositeOperation = "source-in"; M.g.fillStyle = c; M.g.fillRect(0, 0, ew, eh); M.g.globalCompositeOperation = "source-over"; };
-            if (!D.paper.neon) {
-              tint("#08030f");
-              main.globalAlpha = ga * 0.42;
-              main.drawImage(M.cv, 0, 0, ew, eh, lx + lift, ly + lift * 1.4, lwd, lh);
-              main.globalAlpha = ga;
-            }
-            tint(col);
-            main.drawImage(M.cv, 0, 0, ew, eh, lx, ly, lwd, lh);
-          }
-          main.drawImage(Pc.cv, 0, 0, sw, sh, lx, ly, lwd, lh);
-          g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(sx, sy, sw, sh); g.restore();
-        }
-      }
+      if (part.has) main.drawImage(part.cv, 0, 0, part.cw, part.ch, part.x, part.y, part.w, part.h);
       if (op.brad) {
         // the split pin holding this part on
         main.fillStyle = "#3a2a10";
@@ -3440,26 +3556,16 @@
         main.fillStyle = "rgba(255,255,255,0.7)";
         main.beginPath(); main.arc(pv[0] * r - r * 0.014, pv[1] * r - r * 0.014, r * 0.014, 0, Math.PI * 2); main.fill();
       }
-      for (const L of PS.lights) {
+      // its soft light, laid over the top
+      for (const L of part.lights) {
         main.save();
         main.transform(L.m.a, L.m.b, L.m.c, L.m.d, L.m.e, L.m.f);
         main.globalCompositeOperation = "lighter";
-        ctx = main;
-        try { L.fn(); } finally { ctx = g; }
+        L.fn();
         main.restore();
       }
-      PS.lights.length = 0;
       main.restore();
-    };
-    PS = { g, i: -1, opts: {}, lights: [], binv: new DOMMatrix([DPR, 0, 0, DPR, hw * DPR, up * DPR]).inverse(), mark(op) { finish(); this.i++; this.opts = op; } };
-    ctx = g;
-    cutDepth++;
-    g.save();
-    try {
-      PS.mark({ z: 0.5 });
-      art(f, r, t, lw, ft, hpK, -r * 4);
-      finish();
-    } finally { g.restore(); ctx = main; cutDepth--; PS = null; }
+    }
   }
 
   D.foeCenter = function (look, feetY, scale) {
@@ -4001,6 +4107,7 @@
     return r;
   };
 
+  const toyHits = {};
   D.garden = function (t, dt, G) {
     D.paper.neon = false;
     D.paper.edge = "#fbf8f2";
@@ -4013,34 +4120,47 @@
     const [ex, ey] = par(9);
     sun.x = I.cx + I.rx * 0.2 + ex;
     sun.y = I.cy - I.ry - (portrait ? 120 : 96) * U + ey;
-    eclipse(sun.x, sun.y, (portrait ? 44 : 58) * U, t);
-    const [qx, qy] = par(12);
-    planet(W * (portrait ? 0.78 : 0.82) + qx, H * (portrait ? 0.14 : 0.2) + qy, Math.min(W, H) * (portrait ? 0.09 : 0.08), t);
-    const [f1x, f1y] = par(14), [f2x, f2y] = par(20);
-    farIsle(I.cx - I.rx * 0.2 + f1x, I.cy - I.ry * 1.45 + f1y, I.rx * 0.07, 1, t, 0, 2);
-    farIsle(I.cx + I.rx * 0.72 + f1x, I.cy - I.ry * 1.25 + f1y, I.rx * 0.1, 0.7, t, 1, 1);
-    fog(I.cy - I.ry * 1.2, I.ry * 0.5, 0.06, t, 0.006, 3);
-    farIsle(I.cx - I.rx * 0.86 + f2x, I.cy - I.ry * 0.95 + f2y, I.rx * 0.17, 0.35, t, 2, 0);
-    farIsle(I.cx + I.rx * 1.0 + f2x, I.cy - I.ry * 0.5 + f2y, I.rx * 0.13, 0.2, t, 3, 2);
-    fog(I.cy - I.ry * 0.8, I.ry * 0.45, 0.085, t, 0.01, 17);
-    fog(I.cy + I.ry * 2.3, I.ry * 0.7, 0.07, t, -0.008, 29, "#7a5ac8");
     const tentX = I.cx - I.rx * 0.38, tentY = I.cy - I.ry * 0.55;
     const tw = I.rx * 0.55, th = I.rx * 0.5;
-    island(t);
-    // haze lying on the far side of the island
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(I.cx, I.cy, I.rx, I.ry, 0, 0, Math.PI * 2); ctx.clip();
-    fog(I.cy - I.ry * 0.75, I.ry * 0.3, 0.1, t, 0.012, 41);
-    ctx.restore();
-    let peak;
-    castShadow(tentX, tentY, tw * 0.5, I.ry * 1.5, 0.5);
-    cutout(() => { peak = tent(tentX, tentY, tw, th, t); }, tentX, tentY, tw * 0.66, th * 1.4, 8 * U, { edge: 3.4, lift: 6 });
+    const sv = G && G.save;
+    cachedLayer("garden-sky", 8, () => {
+      eclipse(sun.x, sun.y, (portrait ? 44 : 58) * U, t);
+      const [qx, qy] = par(12);
+      planet(W * (portrait ? 0.78 : 0.82) + qx, H * (portrait ? 0.14 : 0.2) + qy, Math.min(W, H) * (portrait ? 0.09 : 0.08), t);
+      const [f1x, f1y] = par(14), [f2x, f2y] = par(20);
+      farIsle(I.cx - I.rx * 0.2 + f1x, I.cy - I.ry * 1.45 + f1y, I.rx * 0.07, 1, t, 0, 2);
+      farIsle(I.cx + I.rx * 0.72 + f1x, I.cy - I.ry * 1.25 + f1y, I.rx * 0.1, 0.7, t, 1, 1);
+      fog(I.cy - I.ry * 1.2, I.ry * 0.5, 0.06, t, 0.006, 3);
+      farIsle(I.cx - I.rx * 0.86 + f2x, I.cy - I.ry * 0.95 + f2y, I.rx * 0.17, 0.35, t, 2, 0);
+      farIsle(I.cx + I.rx * 1.0 + f2x, I.cy - I.ry * 0.5 + f2y, I.rx * 0.13, 0.2, t, 3, 2);
+      fog(I.cy - I.ry * 0.8, I.ry * 0.45, 0.085, t, 0.01, 17);
+      fog(I.cy + I.ry * 2.3, I.ry * 0.7, 0.07, t, -0.008, 29, "#7a5ac8");
+    });
+    // the island, with everything that lies flat on it: haze, the ring, the pond, and the shadows of things that stay put
+    cachedLayer("garden-ground", 10, () => {
+      island(t);
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(I.cx, I.cy, I.rx, I.ry, 0, 0, Math.PI * 2); ctx.clip();
+      fog(I.cy - I.ry * 0.75, I.ry * 0.3, 0.1, t, 0.012, 41);
+      ctx.restore();
+      castShadow(tentX, tentY, tw * 0.5, I.ry * 1.5, 0.5);
+      ring(I, t);
+      pond(I, t);
+      castShadow(I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 12 * U, 60 * U, 0.35);
+      if (sv && sv.tree) { const [x, y] = D.toScreen(JG.TREE.u, JG.TREE.v); castShadow(x, y, 14 * U, 150 * U, 0.42); gShadow(x, y, 80 * U); }
+      for (const id in (sv && sv.toys) || {}) {
+        const T = JG.TOYS[id];
+        if (!T || !sv.toys[id]) continue;
+        const [x, y] = D.toScreen(T.u, T.v);
+        castShadow(x, y, 16 * U, 70 * U, 0.34);
+        gShadow(x, y, 48 * U);
+      }
+    }, sv ? Object.keys(sv.toys || {}).filter((k) => sv.toys[k]).join() : "");
+    const peak = [tentX, tentY - th];      // where the string lights hang from
+    cutout(() => tent(tentX, tentY, tw, th, t), tentX, tentY, tw * 0.66, th * 1.4, 8 * U, { edge: 3.4, lift: 6, key: "tent", fps: 8 });
     lights(peak[0], peak[1], I.cx + I.rx * 0.92, I.cy - I.ry * 0.25, I.ry * 0.5, t, 1);
     lights(peak[0], peak[1], I.cx - I.rx * 0.96, I.cy - I.ry * 0.1, I.ry * 0.35, t, 3);
-    ring(I, t);
-    pond(I, t);
-    castShadow(I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 12 * U, 60 * U, 0.35);
-    cutout(() => tv(I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 14 * U, t), I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 28 * U, 40 * U, 8 * U, { edge: 2.2 });
+    cutout(() => tv(I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 14 * U, t), I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 28 * U, 40 * U, 8 * U, { edge: 2.2, key: "tv", fps: 10 });
     // things further back are drawn a little smaller
     const deep = (v) => 0.88 + 0.2 * clamp((v + 1) / 2, 0, 1);
     motes(t, false);
@@ -4061,7 +4181,7 @@
           const by = y - 70 * U - k * 60 * U, bx = x + Math.sin(t * 2) * 6 * U, sz = 15 * U * (1 + 0.08 * Math.sin(t * 6));
           ctx.strokeStyle = "rgba(239,230,210,0.8)"; ctx.lineWidth = 1.2 * U;
           ctx.beginPath(); ctx.moveTo(bx, by + sz); ctx.quadraticCurveTo(bx + 8 * U, by + sz + 22 * U, x, y - 34 * U); ctx.stroke();
-          cutout(() => heart(bx, by - sz * 0.2, sz, "#ff5fa8"), bx, by, sz * 2.4, sz * 2.4, sz * 2.4, { edge: 2 });
+          cutout(() => heart(bx, by - sz * 0.2, sz, "#ff5fa8"), bx, by, sz * 2.4, sz * 2.4, sz * 2.4, { edge: 2, key: "duet-heart", fps: 30 });
           glow(bx, by, sz * 3.2, "#ff5fa8", 0.25);
         } });
       }
@@ -4080,18 +4200,17 @@
       }
       if (s.tree) {
         const [x, y] = D.toScreen(JG.TREE.u, JG.TREE.v);
-        things.push({ y, f: () => { castShadow(x, y, 14 * U, 150 * U, 0.42); gShadow(x, y, 80 * U); cutout(() => snackTree(x, y, t, s.tree), x, y, 110 * U, 190 * U, 8 * U, { lift: 6 }); hits.push({ kind: "tree", x, y: y - 96 * U, r: 70 * U }); } });
+        things.push({ y, f: () => { cutout(() => snackTree(x, y, t, s.tree), x, y, 110 * U, 190 * U, 8 * U, { lift: 6, key: "tree", fps: s.tree.shake > 0 ? 30 : 6, sig: s.tree.fruits.length }); hits.push({ kind: "tree", x, y: y - 96 * U, r: 70 * U }); } });
       }
       for (const id in s.toys || {}) {
         const T = JG.TOYS[id];
         if (!T || !s.toys[id]) continue;
         const [x, y] = D.toScreen(T.u, T.v);
         things.push({ y, f: () => {
-          castShadow(x, y, 16 * U, 70 * U, 0.34);
-          gShadow(x, y, 48 * U);
-          let h;
-          cutout(() => { h = toyDraw(id, x, y, t, G.toyUse && G.t - (G.toyUse[id] || -9) < 0.4); }, x, y, 50 * U, 130 * U, 8 * U, { edge: 2.4 });
-          hits.push({ kind: "toy", id, ...h });
+          const used = !!(G.toyUse && G.t - (G.toyUse[id] || -9) < 0.4);
+          // the drawing also says where the toy can be tapped; keep that from the last time it was drawn
+          cutout(() => { toyHits[id] = toyDraw(id, x, y, t, used); }, x, y, 50 * U, 130 * U, 8 * U, { edge: 2.4, key: "toy:" + id, fps: used ? 24 : 5, sig: used ? 1 : 0 });
+          hits.push({ kind: "toy", id, ...(toyHits[id] || { x, y: y - 30 * U, r: 30 * U }) });
         } });
       }
       for (const it of s.ground || []) {
@@ -4135,7 +4254,7 @@
   };
 
   // helpers for stage.js, which draws the battle stage
-  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb, camStep, par, fog, farIsle, eclipse, sun };
+  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb, cachedLayer, camStep, par, fog, farIsle, eclipse, sun };
 
   D.clear = function () {
     D.particles.length = 0;

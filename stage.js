@@ -1480,10 +1480,15 @@
     c.save();
     if (shake > 0.3) c.translate((Math.random() - 0.5) * shake * U * 2, (Math.random() - 0.5) * shake * U * 2);
     shake *= Math.pow(0.002, dt);
-    if (B.act === 1) midway(st, B, P, hz);
-    else if (B.act === 2) mirrorHall(st, B, P, hz, pos, rt);
-    else below(st, B, P, hz);
-    depthLight(B, P, hz, st);
+    // the backdrop is painted a dozen times a second and copied every frame; the fight on top of it is live
+    X.cachedLayer("stage", 12, () => {
+      c = X.ctx();
+      if (B.act === 1) midway(st, B, P, hz);
+      else if (B.act === 2) mirrorHall(st, B, P, hz, pos, rt);
+      else below(st, B, P, hz);
+      depthLight(B, P, hz, st);
+    }, B.act + ":" + (B.foe && B.foe.id));
+    c = X.ctx();
     spots(B, P, ap, st);
     showBack(B, rt, P);
     fighters(B, pos, st, rt, true);
