@@ -80,6 +80,22 @@ The whole game is a paper theatre made from a photocopied zine:
 - **Puppet foes:** every foe is made of separate pieces of card (legs, body, head, arms, hat) pinned together. Each piece swings a little on its own pin, and they rattle loose when the foe is hit.
 - **Zine print:** titles are cut-out letters from different magazines, buttons and map stops are stickers, and the cards and sky are printed in dots.
 - **Blacklight:** the third act is lit by blacklight, so the cut edges glow green and pink.
+- **Depth:** the scenery is in layers that slide past each other as you move the pointer, or as the fighters move.
+  - A black sun hangs behind the garden and lights everything from the back, so things throw long shadows toward you.
+  - Far islands fade into haze, fog drifts across the back of the island, and fireflies float at different distances.
+  - Dark, out-of-focus shapes hang in the corners, close to the lens.
+  - On stage the background is in soft focus and the fight stands in a pool of light.
+
+## The music
+
+All of it is made in the browser, so there are no sound files. Each place has its own piece:
+
+- **Title and garden:** a slow, swung lullaby with dusty drums, a pad, a music box and a calliope.
+- **The map:** a drone, a heartbeat, a clock and a few bells.
+- **Act I:** circus pop-punk, with palm-muted guitar chords, off-beat organ and a lead tune.
+- **Act II:** half-time and glassy, with mirrored bells, a pulsing bass and a theremin.
+- **Act III:** slow and heavy, with a sludge riff, a choir and a calliope that has gone slightly flat.
+- **Ringmasters** get their act's piece faster and a step higher. The talent show has a lighter version of the Act I piece.
 
 ## Files
 
@@ -87,6 +103,7 @@ The whole game is a paper theatre made from a photocopied zine:
 - `data.js`: items, hats, cards, charms, foes, acts, talent show leagues, names and sideshow text.
 - `draw.js`: the garden, Jinxes, eggs and foes, drawn on the canvas.
 - `stage.js`: the battle stage: a backdrop for each act, the crowd, attack animations, impacts and Showstoppers.
-- `game.js`: garden sim, talent shows, duets, runs, battles, events, shops, music and sound effects, saving.
+- `music.js`: the music: a small step sequencer and the instruments it plays.
+- `game.js`: garden sim, talent shows, duets, runs, battles, events, shops, sound effects, saving.
 
 The look and the creatures are original. The genre (a pet-raising garden plus a roguelike deckbuilder) is borrowed from games we love.

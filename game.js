@@ -21,14 +21,9 @@
   let uid = 1;
 
   // =====================================================================
-  // Sound: a little dark-circus waltz with a fuzzy bass, plus sound effects
+  // Sound: the music lives in music.js; this sets up the output and plays sound effects
   // =====================================================================
-  const A = (JG.audio = { ctx: null, on: true, step: 0, nextT: 0 });
-  const MEL = [
-    [7, null, 3, null, 0, 2], [3, 2, 0, -1, 0, null], [8, null, 7, null, 3, 0], [2, null, -1, null, -5, null],
-    [0, 3, 7, null, 12, null], [8, 7, 5, null, 0, null], [-1, 2, 5, null, 2, -1], [0, null, null, null, null, null]
-  ];
-  const CH = [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-5, -1, 2], [0, 3, 7], [-7, -4, 0], [-5, -1, 2], [0, 3, 7]];
+  const A = (JG.audio = { ctx: null, on: true });
   const hz = (semi, base) => (base || 440) * Math.pow(2, semi / 12);
 
   A.init = function () {
@@ -36,8 +31,12 @@
     try { A.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     const c = A.ctx;
     A.master = c.createGain();
-    A.master.gain.value = 0.55;
-    A.master.connect(c.destination);
+    A.master.gain.value = 0.7;
+    // a limiter, so a loud chorus and a sound effect together don't crackle
+    const lim = c.createDynamicsCompressor();
+    lim.threshold.value = -14; lim.knee.value = 10; lim.ratio.value = 6; lim.attack.value = 0.004; lim.release.value = 0.18;
+    A.master.connect(lim);
+    lim.connect(c.destination);
     A.music = c.createGain();
     A.music.gain.value = A.on ? 0.8 : 0;
     A.music.connect(A.master);
@@ -54,22 +53,20 @@
     wet.gain.value = 0.35;
     A.delay.connect(wet);
     wet.connect(A.music);
-    A.fuzz = c.createWaveShaper();
-    const curve = new Float32Array(1024);
-    for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; curve[i] = Math.tanh(x * 6); }
-    A.fuzz.curve = curve;
-    const lp = c.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 700;
-    A.fuzz.connect(lp);
-    lp.connect(A.music);
     const len = c.sampleRate;
     A.noise = c.createBuffer(1, len, c.sampleRate);
     const d = A.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = rand() * 2 - 1;
-    A.nextT = c.currentTime + 0.1;
-    setInterval(schedule, 30);
+    JG.music.init(c, A.music, A.noise);
+    setInterval(() => JG.music.tick(musicScene()), 25);
   };
+  // which piece should be playing
+  function musicScene() {
+    if (G.mode === "battle" && G.B) return (G.B.kind === "boss" ? "boss" : "battle") + (G.B.act || 1);
+    if (G.mode === "map") return "map" + (G.run ? G.run.act : 1);
+    if (G.talent) return "talent";
+    return G.mode === "title" ? "title" : "garden";
+  }
   A.setOn = function (on) {
     A.on = on;
     if (!A.ctx) return;
@@ -113,34 +110,6 @@
     g.connect(dest || A.fx);
     s.start(t, rand() * 0.5);
     s.stop(t + dur + 0.05);
-  }
-  function schedule() {
-    const c = A.ctx;
-    if (!c || c.state !== "running") return;
-    const battle = G.mode === "battle";
-    const eighth = battle ? 0.155 : 0.2;
-    while (A.nextT < c.currentTime + 0.15) {
-      const t = A.nextT, bar = Math.floor(A.step / 6) % 8, e = A.step % 6;
-      const n = MEL[bar][e];
-      const quiet = G.mode === "title" ? 0.6 : 1;
-      if (n !== null) {
-        osc("square", hz(n), t, eighth * 1.4, 0.035 * quiet, A.music, { vib: 6, send: true });
-        osc("triangle", hz(n + 12), t, eighth * 1.2, 0.02 * quiet, A.music, { send: true });
-      }
-      const ch = CH[bar];
-      if (e === 0) {
-        osc("sawtooth", hz(ch[0] - 24, 220), t, eighth * 2.2, 0.22, A.fuzz);
-        for (const s of ch) osc("sine", hz(s + 12, 220), t, eighth * 7, 0.012, A.music, { a: 0.3, send: true });
-      }
-      if (e === 2 || e === 4) for (const s of ch) osc("triangle", hz(s, 220), t, eighth * 0.7, 0.025 * quiet, A.music);
-      if (battle) {
-        if (e === 0 || e === 3) osc("sine", 120, t, 0.18, 0.4, A.music, { to: 45 });
-        if (e === 2 || e === 5) noise(t, 0.12, 0.12, "bandpass", 1800, A.music);
-        noise(t, 0.03, 0.04, "highpass", 7000, A.music);
-      }
-      A.nextT += eighth;
-      A.step++;
-    }
   }
   function sfx(kind) {
     const c = A.ctx;

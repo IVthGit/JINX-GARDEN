@@ -65,27 +65,32 @@
     for (let i = 0; i < 110; i++) twinkles.push({ x: r(), y: r() * 0.75, s: 0.6 + r() * 1.6, ph: r() * 6.28, sp: 0.6 + r() * 2.2 });
   };
 
+  const BGM = 16;
   function buildBg() {
+    // built a little bigger than the screen, so it can slide for parallax without being stretched
     bg = document.createElement("canvas");
-    bg.width = Math.max(1, Math.round(W * DPR));
-    bg.height = Math.max(1, Math.round(H * DPR));
+    const m = BGM * U;
+    bg.width = Math.max(1, Math.round((W + m * 2) * DPR));
+    bg.height = Math.max(1, Math.round((H + m * 2) * DPR));
     const g = bg.getContext("2d");
-    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.setTransform(DPR, 0, 0, DPR, m * DPR, m * DPR);
+    g.fillStyle = "#04020c";
+    g.fillRect(-m, -m, W + m * 2, H + m * 2);
     const lin = g.createLinearGradient(0, 0, 0, H);
-    lin.addColorStop(0, "#0a0418");
-    lin.addColorStop(0.55, "#1c0a33");
-    lin.addColorStop(1, "#2a0d2e");
+    lin.addColorStop(0, "#04020c");
+    lin.addColorStop(0.5, "#0f0a28");
+    lin.addColorStop(1, "#190b26");
     g.fillStyle = lin;
-    g.fillRect(0, 0, W, H);
+    g.fillRect(-m, -m, W + m * 2, H + m * 2);
     const r = rng(1999);
-    const neb = ["#ff2e93", "#2fb7c9", "#8a3dff", "#a6d94a", "#ff8a3d"];
+    const neb = ["#7a2bd6", "#1f8fa3", "#4a2a9a", "#2f8f7a", "#a8306a"];
     g.globalCompositeOperation = "lighter";
     for (let i = 0; i < 14; i++) {
       const x = r() * W, y = r() * H * 0.8, rad = (0.15 + r() * 0.35) * Math.max(W, H);
       const c = neb[i % neb.length];
       const rg = g.createRadialGradient(x, y, 0, x, y, rad);
-      rg.addColorStop(0, rgb(c, 0.13 + r() * 0.07));
-      rg.addColorStop(0.5, rgb(c, 0.04));
+      rg.addColorStop(0, rgb(c, 0.1 + r() * 0.07));
+      rg.addColorStop(0.5, rgb(c, 0.035));
       rg.addColorStop(1, rgb(c, 0));
       g.fillStyle = rg;
       g.fillRect(0, 0, W, H);
@@ -105,8 +110,8 @@
       for (let xx = (Math.round(yy / st) % 2) * st * 0.5; xx < W; xx += st) {
         const k = Math.max(0, 1 - Math.hypot(xx - W * 0.1, yy - H * 0.95) / (Math.max(W, H) * 0.75));
         const k2 = Math.max(0, 1 - Math.hypot(xx - W * 0.95, yy - H * 0.05) / (Math.max(W, H) * 0.6));
-        if (k > 0.04) { g.fillStyle = "rgba(255,79,163,0.2)"; g.beginPath(); g.arc(xx, yy, k * 4.2, 0, Math.PI * 2); g.fill(); }
-        if (k2 > 0.04) { g.fillStyle = "rgba(47,183,201,0.2)"; g.beginPath(); g.arc(xx + st * 0.3, yy + st * 0.3, k2 * 3.6, 0, Math.PI * 2); g.fill(); }
+        if (k > 0.04) { g.fillStyle = "rgba(190,60,150,0.14)"; g.beginPath(); g.arc(xx, yy, k * 4.2, 0, Math.PI * 2); g.fill(); }
+        if (k2 > 0.04) { g.fillStyle = "rgba(47,183,201,0.14)"; g.beginPath(); g.arc(xx + st * 0.3, yy + st * 0.3, k2 * 3.6, 0, Math.PI * 2); g.fill(); }
       }
     }
     for (let i = 0; i < 700; i++) {
@@ -116,13 +121,30 @@
     }
   }
 
+  // Depth: every layer of scenery slides by a different amount as the view shifts. cam runs -1 to 1.
+  const cam = { x: 0, y: 0 };
+  function camStep(pointer, dt, t) {
+    const tx = (pointer ? clamp((pointer[0] / W) * 2 - 1, -1, 1) * 0.7 : 0) + Math.sin(t * 0.13) * 0.3;
+    const ty = (pointer ? clamp((pointer[1] / H) * 2 - 1, -1, 1) * 0.6 : 0) + Math.cos(t * 0.1) * 0.2;
+    const k = Math.min(1, (dt || 0.016) * 2.5);
+    cam.x += (tx - cam.x) * k;
+    cam.y += (ty - cam.y) * k;
+    return cam;
+  }
+  // how far a layer at this depth moves: far things barely, near things a lot, against the view
+  const par = (depth) => [-cam.x * depth * U, -cam.y * depth * 0.6 * U];
   function drawBg(t) {
-    ctx.drawImage(bg, 0, 0, W, H);
+    const m = BGM * U, [bx, by] = par(5), px = (v) => Math.round(v * DPR) / DPR;
+    ctx.drawImage(bg, px(-m + bx), px(-m + by), bg.width / DPR, bg.height / DPR);
+    const [sx, sy] = par(8);
     for (const s of twinkles) {
       const a = 0.35 + 0.65 * Math.abs(Math.sin(t * s.sp + s.ph));
-      sparkle(s.x * W, s.y * H, s.s * 2.2 * a, `rgba(255,240,255,${a})`);
+      sparkle(s.x * W + sx, s.y * H + sy, s.s * 2.2 * a, `rgba(235,240,255,${a})`);
     }
+    ctx.save();
+    ctx.translate(...par(34));
     hangers(t);
+    ctx.restore();
     // the occasional shooting star
     const ph = (t % 9) / 9;
     if (ph < 0.12) {
@@ -313,6 +335,182 @@
   }
 
   // ---------- planet with a circus-striped ring ----------
+  // ---- deep scenery: a black sun, far islands in haze, fog, fireflies, and dark shapes close to the lens ----
+  function eclipse(x, y, r, t) {
+    const pulse = 1 + 0.04 * Math.sin(t * 0.7);
+    const g = ctx.createRadialGradient(x, y, r * 0.9, x, y, r * 4.2 * pulse);
+    g.addColorStop(0, "rgba(190,225,255,0.5)");
+    g.addColorStop(0.18, "rgba(150,170,255,0.2)");
+    g.addColorStop(0.5, "rgba(120,90,220,0.07)");
+    g.addColorStop(1, "rgba(120,90,220,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r * 4.4, y - r * 4.4, r * 8.8, r * 8.8);
+    // streamers
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 9; i++) {
+      const a = i * 0.698 + Math.sin(t * 0.2 + i) * 0.05, len = r * (2.1 + 1.2 * hashN(i + 2)) * pulse;
+      const lg = ctx.createLinearGradient(0, 0, Math.cos(a) * len, Math.sin(a) * len);
+      lg.addColorStop(0.3, "rgba(200,225,255,0.16)");
+      lg.addColorStop(1, "rgba(200,225,255,0)");
+      ctx.fillStyle = lg;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a - 0.1) * r, Math.sin(a - 0.1) * r); ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len); ctx.lineTo(Math.cos(a + 0.1) * r, Math.sin(a + 0.1) * r);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = "#03010a";
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(240,248,255,0.95)";
+    ctx.lineWidth = 2.2 * U;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    // the bright bead where the light breaks round the edge
+    glow(x + r * 0.72, y - r * 0.7, r * 0.5, "#ffffff", 0.9);
+  }
+  // A far island: no outlines and little contrast, because there is a lot of air in the way.
+  function farIsle(x, y, w, k, t, i, kind) {
+    y += Math.sin(t * 0.3 + i * 2.1) * 4 * U;
+    const col = (a) => `rgba(${52 + k * 40 | 0},${42 + k * 38 | 0},${92 + k * 40 | 0},${a})`;
+    ctx.fillStyle = col(0.9);
+    ctx.beginPath();
+    ctx.moveTo(x - w, y);
+    for (let q = 1; q < 7; q++) ctx.lineTo(x - w + (q / 7) * w * 2, y + Math.sin((q / 7) * Math.PI) * w * (0.55 + hashN(q + i * 5) * 0.5));
+    ctx.lineTo(x + w, y);
+    ctx.ellipse(x, y, w, w * 0.2, 0, 0, Math.PI, true);
+    ctx.fill();
+    ctx.fillStyle = col(1);
+    ctx.beginPath(); ctx.ellipse(x, y, w, w * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+    // its far rim catches the black sun
+    ctx.strokeStyle = `rgba(200,215,255,${0.35 - k * 0.15})`;
+    ctx.lineWidth = 1.2 * U;
+    ctx.beginPath(); ctx.ellipse(x, y, w, w * 0.2, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+    ctx.fillStyle = col(1);
+    if (kind === 0) {
+      // a small tent with one lit doorway
+      ctx.beginPath(); ctx.moveTo(x - w * 0.34, y - w * 0.02); ctx.lineTo(x - w * 0.34, y - w * 0.3); ctx.quadraticCurveTo(x - w * 0.1, y - w * 0.4, x, y - w * 0.75); ctx.quadraticCurveTo(x + w * 0.1, y - w * 0.4, x + w * 0.34, y - w * 0.3); ctx.lineTo(x + w * 0.34, y - w * 0.02); ctx.fill();
+      ctx.fillStyle = `rgba(255,190,120,${0.5 + 0.2 * Math.sin(t * 2 + i)})`;
+      ctx.beginPath(); ctx.moveTo(x - w * 0.05, y - w * 0.02); ctx.quadraticCurveTo(x, y - w * 0.22, x + w * 0.05, y - w * 0.02); ctx.fill();
+    } else if (kind === 1) {
+      // a dead ferris wheel
+      ctx.strokeStyle = col(1);
+      ctx.lineWidth = 1.6 * U;
+      ctx.beginPath(); ctx.arc(x, y - w * 0.6, w * 0.45, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1 * U;
+      for (let q = 0; q < 6; q++) { const a = q * 1.047 + t * 0.03; ctx.beginPath(); ctx.moveTo(x, y - w * 0.6); ctx.lineTo(x + Math.cos(a) * w * 0.45, y - w * 0.6 + Math.sin(a) * w * 0.45); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(x - w * 0.2, y); ctx.lineTo(x, y - w * 0.6); ctx.lineTo(x + w * 0.2, y); ctx.stroke();
+    } else {
+      // bare trees
+      for (const dx of [-0.4, 0.1, 0.45]) { ctx.fillRect(x + dx * w - 1 * U, y - w * 0.45, 2 * U, w * 0.45); ctx.beginPath(); ctx.arc(x + dx * w, y - w * 0.5, w * 0.16, 0, Math.PI * 2); ctx.fill(); }
+    }
+    // a chain hanging off into the dark
+    ctx.strokeStyle = col(0.7);
+    ctx.lineWidth = 1 * U;
+    ctx.setLineDash([3 * U, 3 * U]);
+    ctx.beginPath(); ctx.moveTo(x + w * 0.5, y + w * 0.3); ctx.lineTo(x + w * 0.5 + Math.sin(t * 0.5 + i) * 4 * U, y + w * 1.6); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // fog: big soft blobs drifting sideways in a band
+  const fogBlobs = {};
+  function fog(y, h, a, t, speed, seed, tint) {
+    tint = tint || "#aab4e6";
+    // one soft blob per colour, drawn once and stretched: far cheaper than a fresh gradient for every puff
+    let blob = fogBlobs[tint];
+    if (!blob) {
+      blob = fogBlobs[tint] = document.createElement("canvas");
+      blob.width = blob.height = 96;
+      const bg2 = blob.getContext("2d"), gr = bg2.createRadialGradient(48, 48, 0, 48, 48, 48);
+      gr.addColorStop(0, rgb(tint, 1));
+      gr.addColorStop(0.5, rgb(tint, 0.42));
+      gr.addColorStop(1, rgb(tint, 0));
+      bg2.fillStyle = gr;
+      bg2.fillRect(0, 0, 96, 96);
+    }
+    ctx.save();
+    ctx.globalAlpha *= a;
+    for (let i = 0; i < 5; i++) {
+      const w = W * (0.35 + hashN(seed + i) * 0.3), x = ((hashN(seed + i * 3) * 1.6 + t * speed * (0.6 + hashN(seed + i * 7))) % 1.6 + 1.6) % 1.6 * W - 0.3 * W, yy = y + (hashN(seed + i * 11) - 0.5) * h;
+      ctx.drawImage(blob, x - w, yy - h, w * 2, h * 2);
+    }
+    ctx.restore();
+  }
+  // the long shadow a thing throws toward us, away from the black sun behind it
+  function castShadow(x, y, w, len, a) {
+    const dx = clamp((x - sun.x) / (W * 0.5), -1, 1) * len * 0.55, dy = len * 0.42;
+    const g = ctx.createLinearGradient(x, y, x + dx, y + dy);
+    g.addColorStop(0, `rgba(4,2,12,${a || 0.42})`);
+    g.addColorStop(1, "rgba(4,2,12,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x - w, y); ctx.lineTo(x + w, y); ctx.lineTo(x + dx + w * 1.7, y + dy); ctx.lineTo(x + dx - w * 1.7, y + dy);
+    ctx.fill();
+  }
+  const sun = { x: 0, y: 0 };
+  // fireflies at different depths: the near ones are bigger, softer and move more with the view
+  function motes(t, front) {
+    for (let i = 0; i < 30; i++) {
+      const z = 0.4 + hashN(i * 3 + 1) * 1.5;
+      if ((z > 1.25) !== front) continue;
+      const [px, py] = par(z * 26);
+      const x = ((hashN(i + 40) + t * 0.008 * (0.5 + hashN(i)) * (i % 2 ? 1 : -1)) % 1 + 1) % 1 * W + px, y = H * (0.25 + hashN(i * 7 + 2) * 0.6) + Math.sin(t * 0.6 + i) * 14 * U + py;
+      const a = (0.25 + 0.75 * Math.abs(Math.sin(t * 0.9 + i * 2.3))) * (front ? 0.4 : 0.75), r = 1.6 * U * z;
+      glow(x, y, r * 5, i % 3 ? "#d4ff7a" : "#bfe6ff", a * 0.5);
+      ctx.fillStyle = i % 3 ? `rgba(230,255,170,${a})` : `rgba(220,240,255,${a})`;
+      ctx.beginPath(); ctx.arc(x, y, r * (front ? 1.6 : 1), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // Out-of-focus shapes close to the lens, in the corners: they frame the scene and move the most.
+  let fgCv = null, fgKey = "";
+  const FGM = 36;
+  function foreground(t) {
+    const key = W + "x" + H + "x" + DPR;
+    if (fgKey !== key) {
+      fgKey = key;
+      fgCv = document.createElement("canvas");
+      const m = FGM * U;
+      fgCv.width = Math.ceil((W + m * 2) * DPR); fgCv.height = Math.ceil((H + m * 2) * DPR);
+      const g = fgCv.getContext("2d");
+      g.setTransform(DPR, 0, 0, DPR, m * DPR, m * DPR);
+      g.filter = `blur(${(3.5 * U).toFixed(1)}px)`;
+      const dark = "rgba(5,2,14,0.96)", rim = "rgba(120,130,200,0.35)";
+      // curtain swags hanging in from the top corners
+      for (const sd of [0, 1]) {
+        g.save();
+        if (sd) { g.translate(W, 0); g.scale(-1, 1); }
+        g.fillStyle = dark;
+        g.beginPath();
+        g.moveTo(-90, -90); g.lineTo(W * 0.3, -90);
+        g.bezierCurveTo(W * 0.2, H * 0.1, W * 0.1, H * 0.06, W * 0.07, H * 0.22);
+        g.bezierCurveTo(W * 0.05, H * 0.34, W * 0.02, H * 0.3, -90, H * 0.5);
+        g.fill();
+        g.strokeStyle = rim; g.lineWidth = 3 * U;
+        g.beginPath(); g.moveTo(W * 0.3, 0); g.bezierCurveTo(W * 0.2, H * 0.1, W * 0.1, H * 0.06, W * 0.07, H * 0.22); g.stroke();
+        g.restore();
+      }
+      // tall grass and a leaning lamp post, bottom left
+      g.fillStyle = dark;
+      for (let i = 0; i < 26; i++) {
+        const x = -60 + hashN(i) * W * 0.32, hh = H * (0.08 + hashN(i + 9) * 0.16), lean = (hashN(i + 4) - 0.4) * 50 * U;
+        g.beginPath(); g.moveTo(x - 7 * U, H + 90); g.quadraticCurveTo(x + lean * 0.3, H - hh * 0.6, x + lean, H - hh); g.quadraticCurveTo(x + lean * 0.5, H - hh * 0.5, x + 7 * U, H + 90); g.fill();
+      }
+      g.strokeStyle = dark; g.lineWidth = 9 * U; g.lineCap = "round";
+      g.beginPath(); g.moveTo(W * 0.035, H + 90); g.lineTo(W * 0.075, H * 0.62); g.stroke();
+      g.beginPath(); g.arc(W * 0.075, H * 0.6, 13 * U, 0, Math.PI * 2); g.fill();
+      // a rope of pennants sagging across the bottom right
+      g.lineWidth = 3 * U;
+      g.beginPath(); g.moveTo(W * 0.6, H + 90); g.quadraticCurveTo(W * 0.85, H * 0.86, W + 90, H * 0.7); g.stroke();
+      for (let i = 0; i < 7; i++) {
+        const k = i / 6, x = W * 0.64 + k * W * 0.34, y = H * (1.0 - 0.02) - Math.sin(k * 1.5) * H * 0.27 + (1 - k) * H * 0.03;
+        g.beginPath(); g.moveTo(x - 16 * U, y - 4 * U); g.lineTo(x + 16 * U, y - 10 * U); g.lineTo(x + 3 * U, y + 30 * U); g.fill();
+      }
+      g.filter = "none";
+    }
+    const m = FGM * U, [px, py] = par(46), sn = (v) => Math.round(v * DPR) / DPR;
+    ctx.drawImage(fgCv, sn(-m + px), sn(-m + py), fgCv.width / DPR, fgCv.height / DPR);
+    // the lamp is lit
+    glow(W * 0.075 + px, H * 0.6 + py, 70 * U, "#ffb36b", 0.2 + 0.05 * Math.sin(t * 5));
+  }
+
   function planet(x, y, r, t) {
     const tilt = -0.32;
     const ringSeg = (front) => {
@@ -582,17 +780,51 @@
         ctx.fill();
       }
     }
-    // the top surface
-    const tg = ctx.createRadialGradient(cx, cy - ry * 0.3, ry * 0.2, cx, cy, rx);
-    tg.addColorStop(0, "#3e6a58");
-    tg.addColorStop(0.6, "#28474a");
-    tg.addColorStop(1, "#1a2a3a");
+    // the island is a stack of card: each sheet a little smaller and darker than the one above
+    for (let i = 4; i >= 1; i--) {
+      const k = i / 4, yy = cy + i * 11 * U;
+      ctx.fillStyle = rgb(mix("#2a3f48", "#0d0a1c", k));
+      ctx.beginPath(); ctx.ellipse(cx, yy, rx * (1 - k * 0.07), ry * (1 - k * 0.05), 0, 0, Math.PI); ctx.lineTo(cx - rx, yy - 12 * U); ctx.lineTo(cx + rx, yy - 12 * U); ctx.fill();
+      ctx.strokeStyle = `rgba(251,248,242,${0.5 - k * 0.32})`;
+      ctx.lineWidth = 1.6 * U;
+      ctx.beginPath(); ctx.ellipse(cx, yy, rx * (1 - k * 0.07), ry * (1 - k * 0.05), 0, 0.04, Math.PI - 0.04); ctx.stroke();
+    }
+    // the top surface: lit from behind by the black sun, darker toward us
+    const tg = ctx.createLinearGradient(0, cy - ry, 0, cy + ry);
+    tg.addColorStop(0, "#3d6a66");
+    tg.addColorStop(0.35, "#25474a");
+    tg.addColorStop(1, "#111f2c");
     ctx.fillStyle = tg;
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.save();
+    ctx.clip();
+    // cold light falling across the far side, a pool of warm light from the tent door, green from the pond
+    const lg = ctx.createRadialGradient(sun.x, cy - ry * 0.9, 0, sun.x, cy - ry * 0.9, rx * 0.9);
+    lg.addColorStop(0, "rgba(170,205,255,0.26)");
+    lg.addColorStop(1, "rgba(170,205,255,0)");
+    ctx.fillStyle = lg;
+    ctx.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
+    const dx = cx - rx * 0.38, dy = cy - ry * 0.55;
+    ctx.save();
+    ctx.translate(dx, dy); ctx.scale(1, 0.42);
+    const wg = ctx.createRadialGradient(0, 0, 0, 0, ry * 0.5, rx * 0.34);
+    wg.addColorStop(0, `rgba(255,190,120,${0.4 + 0.06 * Math.sin(t * 3)})`);
+    wg.addColorStop(1, "rgba(255,190,120,0)");
+    ctx.fillStyle = wg;
+    ctx.fillRect(-rx * 0.4, -ry * 0.2, rx * 0.8, rx * 0.9);
+    ctx.restore();
+    const pg = ctx.createRadialGradient(cx + rx * 0.6, cy + ry * 0.36, 0, cx + rx * 0.6, cy + ry * 0.36, rx * 0.36);
+    pg.addColorStop(0, "rgba(182,255,92,0.2)");
+    pg.addColorStop(1, "rgba(182,255,92,0)");
+    ctx.fillStyle = pg;
+    ctx.fillRect(cx, cy - ry, rx, ry * 2);
+    ctx.restore();
     ctx.strokeStyle = "rgba(251,248,242,0.92)";
     ctx.lineWidth = 3.5 * U;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.stroke();
     // grass tufts
     ctx.strokeStyle = "rgba(166,217,74,0.35)";
@@ -600,12 +832,14 @@
     for (let i = 0; i < 90; i++) {
       const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 0.95;
       const x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d;
-      const sway = Math.sin(t * 1.5 + x * 0.05) * 2 * U;
+      const near = 0.55 + 0.9 * ((y - cy) / ry * 0.5 + 0.5), sway = Math.sin(t * 1.5 + x * 0.05) * 2 * U * near;
+      ctx.strokeStyle = `rgba(166,217,74,${0.14 + near * 0.22})`;
+      ctx.lineWidth = 1.2 * near;
       ctx.beginPath();
       ctx.moveTo(x, y);
-      ctx.lineTo(x - 2 * U + sway, y - 6 * U);
+      ctx.lineTo(x - 2 * U * near + sway, y - 6 * U * near);
       ctx.moveTo(x, y);
-      ctx.lineTo(x + 2 * U + sway, y - 7 * U);
+      ctx.lineTo(x + 2 * U * near + sway, y - 7 * U * near);
       ctx.stroke();
     }
     return I;
@@ -3995,22 +4229,46 @@
   D.garden = function (t, dt, G) {
     D.paper.neon = false;
     D.paper.edge = "#fbf8f2";
+    camStep(G && G.pointer, dt, t);
+    const portrait = H > W;
+    const I = D.island();
     drawBg(t);
     constellations(G && G.save && G.save.sky, t);
-    const portrait = H > W;
-    planet(W * (portrait ? 0.78 : 0.82), H * (portrait ? 0.14 : 0.2), Math.min(W, H) * (portrait ? 0.09 : 0.08), t);
-    const I = D.island();
+    // far to near: the black sun, the ringed planet, islands lost in haze, fog, then our island
+    const [ex, ey] = par(9);
+    sun.x = I.cx + I.rx * 0.2 + ex;
+    sun.y = I.cy - I.ry - (portrait ? 120 : 96) * U + ey;
+    eclipse(sun.x, sun.y, (portrait ? 44 : 58) * U, t);
+    const [qx, qy] = par(12);
+    planet(W * (portrait ? 0.78 : 0.82) + qx, H * (portrait ? 0.14 : 0.2) + qy, Math.min(W, H) * (portrait ? 0.09 : 0.08), t);
+    const [f1x, f1y] = par(14), [f2x, f2y] = par(20);
+    farIsle(I.cx - I.rx * 0.2 + f1x, I.cy - I.ry * 1.45 + f1y, I.rx * 0.07, 1, t, 0, 2);
+    farIsle(I.cx + I.rx * 0.72 + f1x, I.cy - I.ry * 1.25 + f1y, I.rx * 0.1, 0.7, t, 1, 1);
+    fog(I.cy - I.ry * 1.2, I.ry * 0.5, 0.06, t, 0.006, 3);
+    farIsle(I.cx - I.rx * 0.86 + f2x, I.cy - I.ry * 0.95 + f2y, I.rx * 0.17, 0.35, t, 2, 0);
+    farIsle(I.cx + I.rx * 1.0 + f2x, I.cy - I.ry * 0.5 + f2y, I.rx * 0.13, 0.2, t, 3, 2);
+    fog(I.cy - I.ry * 0.8, I.ry * 0.45, 0.085, t, 0.01, 17);
+    fog(I.cy + I.ry * 2.3, I.ry * 0.7, 0.07, t, -0.008, 29, "#7a5ac8");
     const tentX = I.cx - I.rx * 0.38, tentY = I.cy - I.ry * 0.55;
     const tw = I.rx * 0.55, th = I.rx * 0.5;
     island(t);
+    // haze lying on the far side of the island
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(I.cx, I.cy, I.rx, I.ry, 0, 0, Math.PI * 2); ctx.clip();
+    fog(I.cy - I.ry * 0.75, I.ry * 0.3, 0.1, t, 0.012, 41);
+    ctx.restore();
     let peak;
-    gShadow(tentX, tentY, tw * 0.75);
+    castShadow(tentX, tentY, tw * 0.5, I.ry * 1.5, 0.5);
     cutout(() => { peak = tent(tentX, tentY, tw, th, t); }, tentX, tentY, tw * 0.66, th * 1.4, 8 * U, { edge: 3.4, lift: 6 });
     lights(peak[0], peak[1], I.cx + I.rx * 0.92, I.cy - I.ry * 0.25, I.ry * 0.5, t, 1);
     lights(peak[0], peak[1], I.cx - I.rx * 0.96, I.cy - I.ry * 0.1, I.ry * 0.35, t, 3);
     ring(I, t);
     pond(I, t);
+    castShadow(I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 12 * U, 60 * U, 0.35);
     cutout(() => tv(I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 14 * U, t), I.cx - I.rx * 0.7, I.cy + I.ry * 0.28, 28 * U, 40 * U, 8 * U, { edge: 2.2 });
+    // things further back are drawn a little smaller
+    const deep = (v) => 0.88 + 0.2 * clamp((v + 1) / 2, 0, 1);
+    motes(t, false);
     const hits = [];
     if (G && G.save) {
       // everything that stands on the island, drawn back to front
@@ -4018,7 +4276,7 @@
       const show = G.talent;
       if (show) show.cast.forEach((c, i) => {
         const [x, y] = D.toScreen(c.u, c.v);
-        things.push({ y, f: () => { const h = D.performer(c, x, y, t, show.view(i)); if (c.me) hits.push({ kind: "jinx", j: c.j, ...h }); } });
+        things.push({ y, f: () => { castShadow(x, y, 15 * U, 80 * U, 0.3); const h = D.performer(c, x, y, t, show.view(i)); if (c.me) hits.push({ kind: "jinx", j: c.j, ...h }); } });
       });
       const duet = G.duet && G.duet.phase === "sing" ? G.duet : null;
       if (duet) {
@@ -4036,23 +4294,25 @@
         if (show && show.cast.some((c) => c.j === j)) continue;
         const [x, y] = D.toScreen(j.u, j.v);
         things.push({ y: j.held ? 1e9 : y, f: () => {
-          if (j.stage === "egg") hits.push({ kind: "jinx", j, ...D.drawEgg(j, x, y, t) });
+          if (j.stage === "egg") { castShadow(x, y, 9 * U, 40 * U, 0.3); hits.push({ kind: "jinx", j, ...D.drawEgg(j, x, y, t) }); }
           else {
             const lift = j.held ? 34 * U : j.hopT > 0 ? Math.sin((1 - j.hopT) * Math.PI) * 28 * U : 0;
-            hits.push({ kind: "jinx", j, ...D.drawJinx(j, x, y, { t, scale: 1.25, walk: j.moving || j.held, dir: j.face === undefined ? j.dir : j.face, selected: G.selected === j.id, happy: j.happyT > 0 && !j.held,
+            if (!j.held) castShadow(x, y, 15 * U * deep(j.v), 85 * U * deep(j.v), 0.32);
+            hits.push({ kind: "jinx", j, ...D.drawJinx(j, x, y, { t, scale: 1.25 * deep(j.v), walk: j.moving || j.held, dir: j.face === undefined ? j.dir : j.face, selected: G.selected === j.id, happy: j.happyT > 0 && !j.held,
               look: j.held ? [0, 1] : lookAt(G.pointer, x, y), hop: lift, spin: j.spinT > 0 ? (1 - j.spinT) * Math.PI * 2 : 0, sleep: j.sleep }) });
           }
         } });
       }
       if (s.tree) {
         const [x, y] = D.toScreen(JG.TREE.u, JG.TREE.v);
-        things.push({ y, f: () => { gShadow(x, y, 80 * U); cutout(() => snackTree(x, y, t, s.tree), x, y, 110 * U, 190 * U, 8 * U, { lift: 6 }); hits.push({ kind: "tree", x, y: y - 96 * U, r: 70 * U }); } });
+        things.push({ y, f: () => { castShadow(x, y, 14 * U, 150 * U, 0.42); gShadow(x, y, 80 * U); cutout(() => snackTree(x, y, t, s.tree), x, y, 110 * U, 190 * U, 8 * U, { lift: 6 }); hits.push({ kind: "tree", x, y: y - 96 * U, r: 70 * U }); } });
       }
       for (const id in s.toys || {}) {
         const T = JG.TOYS[id];
         if (!T || !s.toys[id]) continue;
         const [x, y] = D.toScreen(T.u, T.v);
         things.push({ y, f: () => {
+          castShadow(x, y, 16 * U, 70 * U, 0.34);
           gShadow(x, y, 48 * U);
           let h;
           cutout(() => { h = toyDraw(id, x, y, t, G.toyUse && G.t - (G.toyUse[id] || -9) < 0.4); }, x, y, 50 * U, 130 * U, 8 * U, { edge: 2.4 });
@@ -4065,22 +4325,33 @@
       }
       things.sort((a, b) => a.y - b.y).forEach((q) => q.f());
     }
+    motes(t, true);
     particlesStep(dt);
+    foreground(t);
     return hits;
   };
 
   D.mapBg = function (t, dt, act) {
     D.paper.neon = act === 3;
     D.paper.edge = "#fbf8f2";
+    camStep(JG.game && JG.game.pointer, dt, t);
     drawBg(t);
-    planet(W * 0.15, H * 0.82, Math.min(W, H) * 0.12, t);
+    const [ex, ey] = par(9), [qx, qy] = par(16);
+    eclipse(W * 0.82 + ex, H * 0.2 + ey, Math.min(W, H) * 0.07, t);
+    farIsle(W * 0.9 + qx, H * 0.62 + qy, Math.min(W, H) * 0.09, 0.5, t, 1, act === 1 ? 0 : act === 2 ? 1 : 2);
+    farIsle(W * 0.07 + qx, H * 0.4 + qy, Math.min(W, H) * 0.06, 0.9, t, 2, 2);
+    fog(H * 0.7, H * 0.2, 0.07, t, 0.008, 5);
+    planet(W * 0.15 + qx * 1.4, H * 0.82 + qy, Math.min(W, H) * 0.12, t);
     const tint = JG.ACTS[act - 1].tint;
     const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.8);
     g.addColorStop(0, rgb(tint, 0));
     g.addColorStop(1, rgb(tint, 0.28));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
+    motes(t, false);
+    motes(t, true);
     particlesStep(dt);
+    foreground(t);
   };
 
   D.stagePos = function () {
@@ -4089,7 +4360,7 @@
   };
 
   // helpers for stage.js, which draws the battle stage
-  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb };
+  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb, camStep, par, fog, farIsle, eclipse, sun };
 
   D.clear = function () {
     D.particles.length = 0;

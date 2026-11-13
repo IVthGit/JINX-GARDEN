@@ -340,6 +340,17 @@
     g.fillRect(0, hz - bh * 1.4, W, bh * 1.4);
     g.textAlign = "left";
     g.textBaseline = "alphabetic";
+    // soft focus on the back row: the fight is what's sharp
+    g.save();
+    g.beginPath(); g.rect(0, 0, W, hz + 3 * U); g.clip();
+    g.filter = `blur(${(1.4 * U).toFixed(1)}px)`;
+    g.drawImage(g.canvas, 0, 0, W, H);
+    g.restore();
+    const dim = g.createLinearGradient(0, hz - H * 0.3, 0, hz);
+    dim.addColorStop(0, "rgba(10,4,22,0.3)");
+    dim.addColorStop(1, "rgba(10,4,22,0.12)");
+    g.fillStyle = dim;
+    g.fillRect(0, 0, W, hz);
   }
   function ferris(x, y, R, st) {
     c.save();
@@ -410,19 +421,36 @@
   }
   function midway(st, B, P, hz) {
     X.drawBg(st);
+    c.save();
+    c.translate(...X.par(7));
+    X.eclipse(W * 0.84, H * 0.17, Math.min(W, H) * 0.05, st);
     X.planet(W * 0.1, H * 0.2, Math.min(W, H) * 0.045, st);
+    c.restore();
     const hg = c.createLinearGradient(0, hz - H * 0.4, 0, hz);
     hg.addColorStop(0, "rgba(255,120,90,0)");
     hg.addColorStop(1, "rgba(255,140,90,0.3)");
     c.fillStyle = hg;
     c.fillRect(0, hz - H * 0.4, W, H * 0.4);
+    // the far rides slide behind the booths as the view shifts, with a lot of night air in front of them
     const R = Math.min(H * 0.27, W * 0.2);
+    c.save();
+    c.translate(...X.par(13));
     ferris(W * 0.5, hz - R * 1.12, R, st);
     X.tent(W * 0.13, hz, Math.min(W * 0.3, H * 0.5), H * 0.34, st);
+    c.restore();
+    const air = c.createLinearGradient(0, 0, 0, hz);
+    air.addColorStop(0, "rgba(10,5,24,0.5)");
+    air.addColorStop(1, "rgba(40,16,40,0.3)");
+    c.fillStyle = air;
+    c.fillRect(0, 0, W, hz);
+    X.fog(hz - H * 0.1, H * 0.1, 0.1, st, 0.01, 7, "#d9a0a8");
     c.drawImage(layer("midway", (g) => buildMidway(g, hz)), 0, 0, W, H);
-    bunting(-10, H * 0.04, W * 0.55, H * 0.1, H * 0.09, st, 0);
-    bunting(W * 0.45, H * 0.1, W + 10, H * 0.03, H * 0.1, st, 2);
-    X.lights(0, H * 0.16, W, H * 0.14, H * 0.07, st, 5);
+    c.save();
+    c.translate(...X.par(30));
+    bunting(-60 * U, H * 0.04, W * 0.55, H * 0.1, H * 0.09, st, 0);
+    bunting(W * 0.45, H * 0.1, W + 60 * U, H * 0.03, H * 0.1, st, 2);
+    X.lights(-40 * U, H * 0.16, W + 40 * U, H * 0.14, H * 0.07, st, 5);
+    c.restore();
     // the ring the fight happens in
     const cx = (P.px + P.fx) / 2, cy = P.feet + 8 * U, rx = Math.min(W * 0.48, (P.fx - P.px) * 0.85), ry = Math.max(34 * U, rx * 0.19);
     c.fillStyle = "rgba(255,205,150,0.09)";
@@ -633,7 +661,15 @@
         c.fillRect(Math.random() * W, y + Math.random() * hh, 30 * U * Math.random(), 2);
       }
     }
+    // other wrecks, far off in the dark
+    c.save();
+    c.translate(...X.par(16));
+    X.farIsle(W * 0.12, H * 0.5, 44 * U, 0.55, st, 5, 1);
+    X.farIsle(W * 0.9, H * 0.4, 30 * U, 0.9, st, 6, 2);
+    c.restore();
+    X.fog(H * 0.56, H * 0.12, 0.08, st, 0.008, 19, "#7a5ac8");
     for (let i = 0; i < 11; i++) debris(i, st, "#8a3dff");
+    X.fog(P.feet + 110 * U, 70 * U, 0.1, st, -0.01, 23, "#8a3dff");
     // a floating platform to fight on
     const cx = (P.px + P.fx) / 2, cy = P.feet + 8 * U, rx = Math.min(W * 0.49, (P.fx - P.px) * 0.95), ry = Math.max(34 * U, rx * 0.17);
     X.glow(cx, cy + ry * 2, rx * 1.3, "#8a3dff", 0.22);
@@ -670,6 +706,18 @@
       c.fillStyle = X.rgb(cols[i % 4], on ? 1 : 0.3);
       c.beginPath(); c.arc(bx, by, 2.2 * U, 0, Math.PI * 2); c.fill();
     }
+  }
+
+  // Depth by light: the fight stands in a pool of light, and the stage falls away into the dark behind it
+  // and in front of it. A low mist lies along the back of the floor.
+  function depthLight(B, P, hz, st) {
+    const cx = (P.px + P.fx) / 2, cy = P.feet - 40 * U;
+    const vg = c.createRadialGradient(cx, cy, Math.min(W, H) * 0.3, cx, cy, Math.max(W, H) * 0.78);
+    vg.addColorStop(0, "rgba(4,2,12,0)");
+    vg.addColorStop(1, "rgba(4,2,12,0.66)");
+    c.fillStyle = vg;
+    c.fillRect(0, 0, W, H);
+    X.fog(hz + 4 * U, 22 * U, 0.11, st, 0.012, 11 + B.act, ["#e6b8a8", "#8fd9e6", "#a88ae6"][B.act - 1]);
   }
 
   // ---------- lights ----------
@@ -1426,12 +1474,15 @@
     if (!frozen) stageT += dt;
     const st = stageT, ap = (B.applause || 0) / 100;
     const pos = fighterPos(B, P, rt);
+    // the view leans toward whoever is moving
+    X.camStep([W / 2 + (pos.px + pos.fx - P.px - P.fx) * 1.6, H / 2], dt, st);
     c.save();
     if (shake > 0.3) c.translate((Math.random() - 0.5) * shake * U * 2, (Math.random() - 0.5) * shake * U * 2);
     shake *= Math.pow(0.002, dt);
     if (B.act === 1) midway(st, B, P, hz);
     else if (B.act === 2) mirrorHall(st, B, P, hz, pos, rt);
     else below(st, B, P, hz);
+    depthLight(B, P, hz, st);
     spots(B, P, ap, st);
     showBack(B, rt, P);
     fighters(B, pos, st, rt, true);
@@ -1440,7 +1491,13 @@
     drawImpacts(B, rt);
     theatre(B);
     showFront(B, rt, st, P);
+    // the crowd is the nearest thing to the lens, so it moves the most
+    c.save();
+    c.translate(W / 2 + X.par(40)[0], H);
+    c.scale(1.07, 1.07);
+    c.translate(-W / 2, -H);
     crowd(B, st, rt, ap);
+    c.restore();
     drawThrows(B, rt);
     if (ap >= 0.6 && Math.random() < dt * (ap - 0.5) * 30) {
       D.particles.push({ x: Math.random() * W, y: -10, vx: 0, vy: 20 * U, life: 1, kind: "confetti", color: pick(["#ff4fa3", "#ffd23f", "#8fe9ff", "#a6d94a"]), s: (3 + Math.random() * 3) * U, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 10 });
