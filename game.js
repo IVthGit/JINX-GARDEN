@@ -384,11 +384,16 @@
       box.addEventListener("keydown", (e) => { if (e.key === "Enter") finishRename(); });
     }
   }
+  const partList = (j) => [["head", j.head], ["piece", j.piece], ["body", j.body]].map(([slot, id]) => JG.PARTS[slot][id]).filter(Boolean);
+  const partsText = (j) => partList(j).map((P) => `${P.name}: ${P.desc}`).join(" ");
+  function partsHtml(j) {
+    return `<div class="parts">${partList(j).map((P) => `<p><b>${esc(P.name)}</b> <small>${esc(P.kind)}</small><br>${esc(P.desc)}</p>`).join("")}</div>`;
+  }
   function ringHtml(j) {
     const T = JG.TRAITS[j.trait], F = JG.FORMS[leanForm(j)];
     const imp = j.love >= 70 ? "often" : j.love >= 35 ? "now and then" : "rarely";
     const mood = j.mood < 35 ? " Mood is low, so they might phone it in." : "";
-    return `<div class="ring"><p><b>${T ? esc(T.name) : ""}.</b> ${T ? esc(T.desc) : ""}</p>
+    return `${partsHtml(j)}<div class="ring"><p><b>${T ? esc(T.name) : ""}.</b> ${T ? esc(T.desc) : ""}</p>
       <p><b style="color:${F.color}">${F.name} in the ring.</b> ${esc(F.desc)} Showstopper: ${esc(F.show)}.</p>
       <p class="note">With this much Love they improvise ${imp}.${mood}${(j.learned || []).length ? " Learned at college: " + j.learned.map((id) => esc(JG.CARDS[id].name)).join(", ") + "." : ""}</p></div>`;
   }
@@ -770,7 +775,7 @@
       ? others.map((o) => { const w = mine || why(o); return `<div class="shoprow"><div>${esc(o.name)}<small>${kindName(o)} \u00B7 ${formName(o)}${w && !mine ? " · " + w : ""}</small></div><span class="have"></span><button class="btn small" data-act="sing" data-id="${o.id}" ${w || !have || full ? "disabled" : ""}>Sing</button></div>`; }).join("")
       : `<p class="note">There's no other grown Jinx in the garden yet. A child grows up after 3 shows.</p>`;
     modal(`<p class="eyebrow">Duet</p><h2>Who sings with ${esc(j.name)}?</h2>
-      <p>Two grown Jinxes who share a <b>Heart Balloon</b> sing a duet in the ring, and an egg appears. The egg takes its head, its headpiece and its body each from one of them, so two different kinds can leave something new. It also takes its colour, its lean, a trait and its aptitude grades from both, and now and then a grade comes out a step better.</p>
+      <p>Two grown Jinxes who share a <b>Heart Balloon</b> sing a duet in the ring, and an egg appears. The egg takes its head, its headpiece and its body each from one of them, so two different kinds can leave something new. Each part brings its own trick to a fight, so the mix matters. The egg also takes its colour, its lean, a trait and its aptitude grades from both, and now and then a grade comes out a step better.</p>
       <p class="tag">Heart Balloons: <b>${have}</b>${have ? "" : " · the Concession stand sells them"}${full ? " · the garden is full (6 at most)" : ""}${mine ? " · " + esc(j.name) + " " + mine : ""}</p>
       <div class="shoplist">${rows}</div>
       <button class="btn ghost" data-act="close">Not now</button>`, {
@@ -1171,6 +1176,7 @@
         <li>Toys from the Concession stand train a stat a little at a time. Clown College teaches a Jinx a trick it brings on every run.</li>
         <li>Food raises stats. Cotton Comets and Angel Floss lean a Jinx toward Stardust; Sludge Pops and Black Hole Gum lean it toward Sludge.</li>
         <li>There are three kinds of Jinx: Umbra, Hollow and Lantern. Each is a head, a headpiece and a body. None of them has a mouth: watch the eyes, and a Lantern's chest light, to see how one feels.</li>
+        <li>Each part does something in a fight. Heads: Full moon, Poker face, Foresight. Headpieces: Scorch, Bells, Updraft. Bodies: Shroud, Ragged, Drift. Tap a Jinx to read what its three do.</li>
         <li>After 3 shows a child grows up, and how it leans decides its colours and details.</li>
         <li>On a run, the cards you play train the matching stat: attacks train Juggle, guards Tumble, ether Glow, and taking hits trains Grit.</li>
         <li>Card order matters. Many cards have a bonus for being played first, played after two others, or played right after a certain kind of card. A card glows when its bonus is live.</li>
@@ -1389,6 +1395,7 @@
     let d = base + bonuses(j).atk + (B ? B.p.st.hype || 0 : 0);
     if (B && B.p.st.dazed) d *= 0.75;
     if (B && B.foe.st.pied) d *= 1.5;
+    if (B && B.fullMoon && type === "atk") d *= 2;
     d *= typeMult(B, type);
     return Math.max(0, Math.floor(d));
   }
@@ -1488,6 +1495,8 @@
   function improviseChance(j) { return clamp(runLove() / 250, 0.04, 0.4) + (j.trait === "showoff" ? 0.1 : 0); }
   function flubChance() { const m = runMood(); return m < 15 ? 0.25 : m < 35 ? 0.12 : 0; }
 
+  // does the Jinx in this fight have this part? JG.TUNE.noParts switches the abilities off for play-tests
+  const has = (B, slot, id) => !JG.TUNE.noParts && B && B.jinx[slot] === id;
   function startBattle(foeId, kind) {
     const r = G.run, j = runJinx(), def = JG.FOES[foeId];
     const hp = Math.round((def.hp[0] + ((rand() * (def.hp[1] - def.hp[0] + 1)) | 0)) * JG.TUNE.hp[r.act - 1]);
@@ -1497,7 +1506,7 @@
       p: { block: 0, st: {}, energy: 3 },
       draw: shuffle(r.deck.map((id) => ({ id, u: uid++ }))), hand: [], disc: [], exh: [],
       turn: 0, busy: false, over: null, anim: {},
-      applause: r.charms.includes("rose") ? 25 : 0, res: 0, wild: null, lastType: null, lastCard: null, played: 0, tookDmg: 0
+      applause: (r.charms.includes("rose") ? 25 : 0) + (!JG.TUNE.noParts && j.piece === "hood" ? 10 : 0), moon: 0, fullMoon: false, res: 0, wild: null, lastType: null, lastCard: null, played: 0, tookDmg: 0
     });
     if (r.charms.includes("nose")) B.p.st.hype = 1;
     if (r.charms.includes("kazoo")) B.foe.st.dazed = 1;
@@ -1567,6 +1576,12 @@
     B.types = [];
     B.p.block = first && r.charms.includes("bell") ? 6 : 0;
     B.p.energy = 3 + (first && r.charms.includes("glowstick") ? 1 : 0) + (B.hatTrick ? 1 : 0);
+    B.poker = false;
+    if (has(B, "head", "disc") && !B.fullMoon) {
+      B.moon++;
+      if (B.moon >= 4) { B.fullMoon = true; D.float(scr("p").x, scr("p").y - 120, "Full moon!", "#eaf4ff", true); sfx("buff"); }
+    }
+    if (has(B, "body", "night")) { B.p.block += 1 + B.act; D.float(scr("p").x - 40, scr("p").y - 30, `\u25C6 ${1 + B.act} Shroud`, "#bfe0ff"); }
     if (B.hatTrick) { D.float(scr("p").x, scr("p").y - 60, "Hat Trick: +1 energy", "#ffd23f"); B.hatTrick = false; }
     if (B.p.st.gunk) {
       const g = B.p.st.gunk;
@@ -1580,6 +1595,7 @@
       D.float(pp.x, pp.y - 30, `◆ ${B.res * 3} Starlight`, "#8fe9ff");
     }
     let n = 5 + (r.charms.includes("shoes") ? 1 : 0) - B.hand.length;   // a held card takes the place of a draw
+    if (has(B, "piece", "ribbons") && B.turn % 2 === 1) { n++; D.float(scr("p").x, scr("p").y - 105, "Updraft: +1 card", "#d9d0f8"); }
     if (j.trait === "daydream" && rand() < 0.2) { n++; D.float(scr("p").x, scr("p").y - 90, "Daydream: +1 card", "#c9b8ff"); }
     drawCards(n);
     if (j.trait === "daydream" && !first && B.hand.length > 2 && rand() < 0.1) {
@@ -1605,7 +1621,8 @@
     if (st.counter) out.push(`<span class="st st-counter" title="Counter: every hit on it this turn hurts you for ${st.counter}. Guard, Sludge and Tricks are safe.">↩ Counter ${st.counter}</span>`);
     return out.join("");
   }
-  function resHtml(B) {
+  function resHtml(B) { return (has(B, "head", "disc") ? `<span class="st st-res moon${B.fullMoon ? " full" : ""}" title="${esc(JG.PARTS.head.disc.desc)}">\u263E ${B.fullMoon ? "Full moon: first Attack \u00D72" : "Moon " + B.moon + "/4"}</span>` : "") + formHtml(B); }
+  function formHtml(B) {
     if (B.form === "sludge") return `<span class="st st-res sludge" title="${esc(JG.FORMS.sludge.desc)}">☣ Corruption ${B.res}${B.res >= 6 ? " · hits add Gunk" : ""}</span>`;
     if (B.form === "stardust") return `<span class="st st-res stardust" title="${esc(JG.FORMS.stardust.desc)}">☾ Starlight ${B.res}/5</span>`;
     if (B.form === "pierrot") return `<span class="st st-res pierrot" title="${esc(JG.FORMS.pierrot.desc)}">☾ Holds 2 · held cards cost 1 less</span>`;
@@ -1639,13 +1656,13 @@
     $("#youHp").innerHTML = `${bar(r.hp, r.maxHp, "#ff5fa8")}<b>${r.hp}/${r.maxHp}</b>`;
     $("#youSt").innerHTML = resHtml(B) + statusHtml(B.p.st, B.p.block);
     $("#youName").textContent = j.name;
-    $("#youTag").textContent = `${T ? T.name : "Performing"} · ${F.name}`;
-    $("#youTag").title = T ? T.desc : "";
+    $("#youTag").textContent = `${kindName(j)} · ${T ? T.name : "Performing"} · ${F.name}`;
+    $("#youTag").title = (T ? T.desc + " " : "") + partsText(j);
     $("#foeHp").innerHTML = `${bar(B.foe.hp, B.foe.maxHp, "#a6d94a")}<b>${Math.max(0, B.foe.hp)}/${B.foe.maxHp}</b>`;
     $("#foeSt").innerHTML = statusHtml(B.foe.st, B.foe.block);
     const fl = B.foe.charge && B.foe.flinchNeed
       ? `<span class="flinch" title="Deal this much damage in one turn and it loses the big hit"><b>Make it flinch:</b> ${Math.min(B.turnDmg || 0, B.foe.flinchNeed)}/${B.foe.flinchNeed} damage this turn<span class="fbar"><i style="width:${Math.min(100, ((B.turnDmg || 0) / B.foe.flinchNeed) * 100)}%"></i></span></span>` : "";
-    $("#intent").innerHTML = B.over ? "" : B.foe.stunned ? `<span class="in in-heal">Stunned: it loses its turn</span>` : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}${fl}`;
+    $("#intent").innerHTML = B.over ? "" : B.foe.stunned ? `<span class="in in-heal">Stunned: it loses its turn</span>` : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}${fl}` + (has(B, "head", "bulb") ? `<span class="then" title="${esc(JG.PARTS.head.bulb.desc)}"><span class="in-label">Then:</span>${intentHtml(B.foe.def.moves[(B.foe.mi + 1) % B.foe.def.moves.length])}</span>` : "");
     const d = B.foe.def;
     $("#foeTraits").innerHTML = (d.weak ? `<span class="weak">Weak to ${TYPE_NAME[d.weak]}</span>` : "") + (d.resist ? `<span class="resist">Shrugs off ${TYPE_NAME[d.resist]}</span>` : "");
     const types = B.types || [];
@@ -1742,7 +1759,7 @@
       D.float(pp.x, pp.y - 95, `${j.name} phones it in…`, "#9a8fb0");
     } else {
       const variety = B.lastType && B.lastType !== c.type;
-      addApplause(3 + (variety ? 3 : 0) + (j.trait === "showoff" ? 2 : 0));
+      addApplause(3 + (variety ? 3 : 0) + (j.trait === "showoff" ? 2 : 0) + (has(B, "piece", "hood") ? 1 : 0));
     }
     if (wild) D.float(pp.x, pp.y - 95, "Wild! Twice!", "#ff5fa8", true);
     if (combo && combo.on && !half) { D.float(pp.x, pp.y - 125, "Combo!", "#ffd23f"); addApplause(4); sfx("coin"); }
@@ -1765,6 +1782,7 @@
       if (!(await applyFx(fx, CARD_STYLE[card.id], c.type))) return;
       if (rep === 0 && wild) await sleep(200);
     }
+    if (B.fullMoon && c.type === "atk") { B.fullMoon = false; B.moon = 0; }   // the moon is spent
     B.busy = false;
     renderBattle();
   }
@@ -1869,16 +1887,17 @@
     }
     // a foe in a counter stance hits back
     if (!isGunk && !quiet && f.st.counter && !B.over) {
-      D.float(fp.x, fp.y - 80, "Counter!", "#ff8a3d");
-      hurtPlayer(f.st.counter);
+      if (has(B, "head", "mask") && !B.poker) { B.poker = true; D.float(scr("p").x, scr("p").y - 60, "Poker face", "#efe6d2"); }
+      else { D.float(fp.x, fp.y - 80, "Counter!", "#ff8a3d"); hurtPlayer(f.st.counter); }
     }
   }
   function hurtPlayer(n, unblockable) {
     const B = G.B, r = G.run, pp = scr("p");
     let dmg = n;
     if (!unblockable) {
-      const dodge = Math.min(0.15, B.jinx.stats.tumble.lv * 0.004);
+      const dodge = Math.min(0.15, B.jinx.stats.tumble.lv * 0.004) + (has(B, "body", "wisp") ? 0.08 : 0);
       if (rand() < dodge) { D.float(pp.x, pp.y - 40, "Dodged!", "#ffd23f"); sfx("dodge"); addApplause(5); return; }
+      if (has(B, "body", "tatter")) dmg = Math.max(0, dmg - 1);
       if (B.p.block) { const ab = Math.min(B.p.block, dmg); B.p.block -= ab; dmg -= ab; if (ab) D.float(pp.x - 30, pp.y - 20, `◆${ab}`, "#ffd23f"); }
     }
     r.hp -= dmg;
@@ -2043,7 +2062,12 @@
     if (m.blk) { f.block += m.blk; D.float(fp.x, fp.y - 30, `◆ ${m.blk}`, "#ffd23f"); sfx("block"); D.fx.guard("f"); }
     if (m.heal) { const h = Math.min(f.maxHp - f.hp, m.heal); f.hp += h; D.float(fp.x, fp.y - 60, `+${h}`, "#8fe9ff"); sfx("heal"); D.fx.heal("f"); }
     if (m.hype) { f.st.hype = (f.st.hype || 0) + m.hype; D.float(fp.x, fp.y - 80, `+${m.hype} Hype`, "#ff8a3d"); sfx("buff"); }
-    if (m.heckle) { D.fx.heckle(B); addApplause(-m.heckle, `Boo! -${m.heckle} Applause`); sfx("debuff"); }
+    if (m.heckle) {
+      D.fx.heckle(B);
+      if (has(B, "head", "mask")) D.float(scr("p").x, scr("p").y - 115, "Poker face: the heckle bounces off", "#efe6d2");
+      else addApplause(-m.heckle, `Boo! -${m.heckle} Applause`);
+      sfx("debuff");
+    }
     renderBattle();
     if (m.atk) {
       for (let h = 0; h < (m.n || 1); h++) {
@@ -2051,6 +2075,7 @@
         await D.fx.attack(f.def.atk || "punch", "f", B);
         hurtPlayer(foeHitValue(m.atk));
         if (B.over) return;
+        if (has(B, "piece", "corona")) { D.float(fp.x, fp.y - 70, "Scorched", "#bfe0ff"); hurtFoe(1 + B.act, false, true); if (B.over) return; }
       }
       f.charge = false;
       f.flinchNeed = 0;

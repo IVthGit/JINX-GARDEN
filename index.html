@@ -603,6 +603,14 @@ h2 { text-shadow: -2px -1px 0 rgba(143,233,255,0.75), 2.5px 2px 0 var(--pink), 5
 body[data-show] #hud, body[data-show] #panel { display: none !important; }
 .chip.on { border-style: solid; border-color: var(--gold); color: var(--gold); }
 .chip:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- what each part of a Jinx does ---------- */
+.parts { display: grid; gap: 6px; padding: 8px 10px; border: 1.5px dashed rgba(191,224,255,0.45); background: rgba(13,6,24,0.5); }
+.parts p { font-size: 0.82rem; line-height: 1.3; max-width: none; }
+.parts b { color: var(--ether); }
+.st.moon { border-color: #bfe0ff; color: #eaf4ff; }
+.st.moon.full { background: #eaf4ff; color: var(--ink); }
+.then { opacity: 0.62; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 </style>
 
 <div id="app">

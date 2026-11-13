@@ -25,6 +25,7 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
 - **Duets:** two grown Jinxes with 40 Love each can share a **Heart Balloon** from the Concession stand. Tap one, then Duet, and pick who sings with it.
   - They sing in the ring and leave an egg. The garden holds 6.
   - The egg takes its head, its headpiece and its body each from one parent or the other. Two different kinds can leave something new, such as a hooded Umbra or a Lantern that walks. There are 27 mixes.
+  - Each part brings its own trick to a fight, so a duet is also how you build a fighter: a hooded Umbra has Full moon and Bells together.
   - It also takes its colour, its lean, a trait and its aptitude grades from both of them. Now and then a grade comes out a step better.
   - Each singer needs 2 more shows before the next duet.
 - **Aptitude:** the letter beside each stat, E up to S, is how fast that Jinx learns it. It is set at birth. An egg left by a loved Jinx often has better grades.
@@ -41,6 +42,19 @@ Open `circus/index.html` in Chrome or Edge, or serve the folder (for example `np
   - A mystery egg from the Concession stand can be any of the three. The egg you start with is a Hollow or a Lantern.
   - None of them has a mouth. The eyes show the mood: curved when happy, dim and low when sad, closed when asleep, wide when startled. A Lantern's chest light burns brighter or dimmer too.
   - A child's eyes shine in its own colour.
+- **What the parts do in a fight:** every Jinx has three of these, one from its head, one from its headpiece and one from its body. Tap a Jinx to read its three.
+  - Heads:
+    - **Full moon** (Umbra's head): its moons wax each turn. On the fourth turn they are full, and the first Attack card that turn hits twice as hard.
+    - **Poker face** (Hollow's mask): heckles do nothing, and the first Counter each turn doesn't hit back.
+    - **Foresight** (Lantern's head): you are shown the foe's move after next as well.
+  - Headpieces:
+    - **Scorch** (corona): every time a foe hits it, the foe is burned for 2, rising to 4 in Act III.
+    - **Bells** (hood): starts each fight with 10 Applause, and every card earns 1 more.
+    - **Updraft** (ribbons): draws 1 extra card every other turn.
+  - Bodies:
+    - **Shroud** (Umbra's cloak): starts every turn with 2 Block, rising to 4 in Act III.
+    - **Ragged** (Hollow's cloak): takes 1 less from every hit.
+    - **Drift** (Lantern's body): dodges 8% more often.
 - **Growing up:** after 3 shows a child becomes an adult, and its lean changes its colours and details:
   - **Stardust** turns it pale and gold, with a halo or a ring like a planet's.
   - **Sludge** stains it green, and it drips.

@@ -219,6 +219,25 @@ JG.HATS = {
 };
 JG.SHOP_HATS = ["bow", "cone", "bucket", "pot", "antenna"];
 
+// What each part of a Jinx does in a fight. A Jinx has one head, one headpiece and one body, so three of these.
+JG.PARTS = {
+  head: {
+    disc: { kind: "Umbra's head", name: "Full moon", desc: "Its moons wax a little each turn. On the fourth turn they are full, and the first Attack card that turn hits twice as hard." },
+    mask: { kind: "Hollow's mask", name: "Poker face", desc: "Heckles do nothing to it, and the first Counter each turn doesn't hit back." },
+    bulb: { kind: "Lantern's head", name: "Foresight", desc: "It sees one move further ahead: you are shown what the foe will do after its next move." }
+  },
+  piece: {
+    corona: { kind: "Corona", name: "Scorch", desc: "Every time a foe hits it, the foe is burned for 2 (3 in Act II, 4 in Act III)." },
+    hood: { kind: "Hood", name: "Bells", desc: "The crowd likes the bells: it starts each fight with 10 Applause, and every card earns 1 more." },
+    ribbons: { kind: "Ribbons", name: "Updraft", desc: "Draws 1 extra card every other turn, starting with the first." }
+  },
+  body: {
+    night: { kind: "Umbra's cloak", name: "Shroud", desc: "Starts every turn with 2 Block (3 in Act II, 4 in Act III)." },
+    tatter: { kind: "Hollow's cloak", name: "Ragged", desc: "Hits slip through the holes: it takes 1 less from every hit." },
+    wisp: { kind: "Lantern's body", name: "Drift", desc: "It floats, so it dodges more often: 8% on top of what Tumble gives." }
+  }
+};
+
 // Talent shows in the garden ring. lv is about how good the rivals are; speed is how fast the cheer marker moves.
 JG.LEAGUES = [
   { id: "open",  name: "Open Mic",     lv: 3,  prize: 30,  hat: "propeller", speed: 0.85, blurb: "Anyone with a hat and a dream." },

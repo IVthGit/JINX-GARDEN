@@ -1531,7 +1531,7 @@
     const lean = o.hurt ? -0.16 : walk ? 0.06 : 0;
     const squash = o.hurt ? 0.1 : walk ? Math.cos(ph * 2) * 0.03 : sit ? 0 : -beat * 0.015;
     const blink = (t + sd * 3) % 4.3 < 0.13;
-    const mood = sit ? "asleep" : o.hurt ? "startled" : o.happy ? "happy" : sad ? "sad" : blink ? "asleep" : null;
+    const mood = sit ? "asleep" : o.hurt || o.wide ? "startled" : o.happy ? "happy" : sad ? "sad" : blink ? "asleep" : null;
 
     // shadow
     const sh = ctx.createRadialGradient(x, y, 0, x, y, u * 1.1);

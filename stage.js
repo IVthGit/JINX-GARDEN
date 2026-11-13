@@ -780,7 +780,7 @@
     const neon = B.act === 3;
     if (B.jinx) {
       if (main) stick(pos.px, pos.py - pos.pHop - 8 * U);
-      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, flat: !main, edgeColor: neon ? "#b6ff5c" : undefined, hop: pos.pHop, twirl: show && show.form === "pierrot" && rt - show.t0 > 0.3 && rt - show.t0 < 1.5 ? (rt - show.t0 - 0.3) * 15 : 0, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
+      pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, flat: !main, wide: !!B.fullMoon, edgeColor: neon ? "#b6ff5c" : undefined, hop: pos.pHop, twirl: show && show.form === "pierrot" && rt - show.t0 > 0.3 && rt - show.t0 < 1.5 ? (rt - show.t0 - 0.3) * 15 : 0, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
     }
     if (B.foe && !(B.over === "win" && rt - a.fDie > 0.8)) {
       c.save();
