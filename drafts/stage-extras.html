@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage extras drafts</title>
+<style>
+  :root { --bg: #0d0716; --panel: #1a1029; --ink: #efe6d2; --dim: #a99cc0; --hot: #ff4fa3; --gold: #ffd23f; --line: #3a2a5c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 "Segoe UI", system-ui, sans-serif; padding: 24px 16px 60px; }
+  main { max-width: 1500px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: 0.04em; text-transform: uppercase; }
+  h2 { font-size: 14px; margin: 34px 0 10px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; border-top: 1px solid var(--line); padding-top: 14px; }
+  p { margin: 0 0 8px; color: var(--dim); max-width: 78ch; }
+  .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .opt { background: var(--panel); border: 1px solid var(--line); padding: 12px; }
+  .opt h3 { margin: 0 0 2px; font-size: 18px; }
+  .opt h3 b { color: var(--hot); margin-right: 6px; }
+  .opt p { font-size: 13.5px; min-height: 3.9em; }
+  img { display: block; width: 100%; height: auto; border: 1px solid #000; }
+  .props { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  figure { margin: 0; }
+  figcaption { font-size: 12px; color: var(--dim); text-align: center; padding-top: 3px; }
+  .phone img { max-width: 250px; margin: 0 auto; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } .opt p { min-height: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Props and the understudy on stage</h1>
+  <p>Three looks, each shown in the real fight. Pick one, or mix them: the understudy from one and the props from another works too. These are drafts; nothing here is in the game yet.</p>
+
+  <h2>The whole screen, Act I</h2>
+  <div class="cols">
+    <div class="opt"><h3><b>A</b>On sticks</h3><p>Paper puppets on their own lollipop sticks, like the fighters. The understudy stands a step behind your lead; the prop stands behind the foe.</p><img src="stage-extras/whole-sticks.png" alt="Look A, whole screen"></div>
+    <div class="opt"><h3><b>B</b>From the rigging</h3><p>Everything hangs from ropes. The understudy watches from a swing; props are flown in on a batten and sway above the floor.</p><img src="stage-extras/whole-rigging.png" alt="Look B, whole screen"></div>
+    <div class="opt"><h3><b>C</b>Shadows</h3><p>Dark shapes waiting upstage, with one lit detail each. The understudy is a silhouette until cued; the prop is near black with a single glow.</p><img src="stage-extras/whole-shadows.png" alt="Look C, whole screen"></div>
+  </div>
+
+  <h2>The understudy</h2>
+  <p>The yellow bulbs above it are the cues it has left this fight.</p>
+  <div class="cols">
+    <div class="opt"><img src="stage-extras/under-sticks.png" alt="Look A, understudy"></div>
+    <div class="opt"><img src="stage-extras/under-rigging.png" alt="Look B, understudy"></div>
+    <div class="opt"><img src="stage-extras/under-shadows.png" alt="Look C, understudy"></div>
+  </div>
+
+  <h2>The four props</h2>
+  <p>The dashed yellow ring (on the Amp stack here) shows what you are aiming at.</p>
+  <div class="cols">
+    <div class="opt"><div class="props">
+      <figure><img src="stage-extras/prop-sticks-plant.png" alt=""><figcaption>Plant in the crowd</figcaption></figure>
+      <figure><img src="stage-extras/prop-sticks-amp.png" alt=""><figcaption>Amp stack</figcaption></figure>
+      <figure><img src="stage-extras/prop-sticks-net.png" alt=""><figcaption>Safety net</figcaption></figure>
+      <figure><img src="stage-extras/prop-sticks-cannon.png" alt=""><figcaption>Confetti cannon</figcaption></figure>
+    </div></div>
+    <div class="opt"><div class="props">
+      <figure><img src="stage-extras/prop-rigging-plant.png" alt=""><figcaption>Plant in the crowd</figcaption></figure>
+      <figure><img src="stage-extras/prop-rigging-amp.png" alt=""><figcaption>Amp stack</figcaption></figure>
+      <figure><img src="stage-extras/prop-rigging-net.png" alt=""><figcaption>Safety net</figcaption></figure>
+      <figure><img src="stage-extras/prop-rigging-cannon.png" alt=""><figcaption>Confetti cannon</figcaption></figure>
+    </div></div>
+    <div class="opt"><div class="props">
+      <figure><img src="stage-extras/prop-shadows-plant.png" alt=""><figcaption>Plant in the crowd</figcaption></figure>
+      <figure><img src="stage-extras/prop-shadows-amp.png" alt=""><figcaption>Amp stack</figcaption></figure>
+      <figure><img src="stage-extras/prop-shadows-net.png" alt=""><figcaption>Safety net</figcaption></figure>
+      <figure><img src="stage-extras/prop-shadows-cannon.png" alt=""><figcaption>Confetti cannon</figcaption></figure>
+    </div></div>
+  </div>
+
+  <h2>Act III, under blacklight</h2>
+  <div class="cols">
+    <div class="opt"><img src="stage-extras/act3-sticks.png" alt="Look A in Act III"></div>
+    <div class="opt"><img src="stage-extras/act3-rigging.png" alt="Look B in Act III"></div>
+    <div class="opt"><img src="stage-extras/act3-shadows.png" alt="Look C in Act III"></div>
+  </div>
+
+  <h2>On a phone</h2>
+  <div class="cols phone">
+    <div class="opt"><img src="stage-extras/phone-sticks.png" alt="Look A on a phone"></div>
+    <div class="opt"><img src="stage-extras/phone-rigging.png" alt="Look B on a phone"></div>
+    <div class="opt"><img src="stage-extras/phone-shadows.png" alt="Look C on a phone"></div>
+  </div>
+</main>
+</body>
+</html>

@@ -54,7 +54,7 @@ Added in November 2026 because fights felt easy, samey and detached from the gar
 - **Props** (`JG.PROPS`, `makeProp`, `hurtProp`, `propTurn`): `B.prop` is a second target, chosen with `B.target`.
 - **Understudy** (`G.run.uid`, `cue`): picked in `confirmRun`. `G.run.underOut` is set once it has taken the fall.
 - **Snacks** (`snackFx`, `eatSnack`), **polished cards** (the `id + "+"` entries made at the bottom of the card table) and five rule-changing charms.
-- These were built with the fight screen's existing chips and labels only. The props and the understudy have no drawing on the stage yet: offer a draft sheet for how they should look.
+- **On stage:** the user chose the "from the rigging" look from a draft sheet. The understudy sits on a swing behind the lead with a bulb for each cue left (`understudy` in `stage.js`); a prop hangs from ropes between the two fighters (`prop` in `stage.js`, art in `PROP_ART` and `D.stageProp` in `draw.js`). It hangs in the middle because beside the foe the name plate covered it. `B.under`, `B.underOut` and `B.cueMax` are what the stage reads; `B.anim.cue`, `B.anim.fall` and `B.anim.propHurt` time the reactions.
 
 ### Speed
 

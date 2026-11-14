@@ -84,11 +84,11 @@ Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve
   - Give them what they want for 12 Applause and 2 Tix. Three in a row earns an **Encore**: 1 extra energy next turn.
   - Ignore them and you lose 6 Applause.
 - **Second acts:** at half health a foe changes. A Heckler gets angry and gains Hype. A Headliner or a Ringmaster drops its routine for a new, nastier one, so what you learned about it in the first half no longer holds.
-- **Props:** some foes bring something else on stage. Every Headliner has one, a Ringmaster brings one out for its second act, and Hecklers in Acts II and III sometimes do.
+- **Props:** some foes bring something else on stage, hung from ropes between you and the foe. A dashed yellow ring on the floor shows when you are aiming at it. Every Headliner has one, a Ringmaster brings one out for its second act, and Hecklers in Acts II and III sometimes do.
   - A **Plant in the crowd** boos away 6 Applause a turn. An **Amp stack** makes the foe's hits land 3 harder. A **Safety net** heals the foe 5 a turn. A **Confetti cannon** goes off when its fuse runs out.
   - Tap the prop under the foe's name (or press T) to aim at it. Only damage touches a prop, and it never hits back, so it is a safe target while the foe is in a counter stance.
   - Breaking one earns 10 Applause.
-- **Understudy:** when you start a run, pick a second hatched Jinx to wait in the wings.
+- **Understudy:** when you start a run, pick a second hatched Jinx to wait in the wings. It watches from a swing behind your Jinx, and the yellow bulbs above it are the cues it has left.
   - **Cue** it (key C) once a fight, or twice if its Love is 40 or more. It is free. What it does depends on its best stat: Juggle throws a quick hit that can't be countered, Tumble gives Block, Glow heals, and Grit wipes off Dazed, Pied and Gunk.
   - Once a run, if your Jinx would faint, the understudy **takes the fall** instead: your Jinx gets back up on a quarter of its health, and the understudy is out for the rest of the run and comes home sore.
   - It learns a little from watching (about a third of the practice) and grows fonder of you.

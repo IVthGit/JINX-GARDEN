@@ -774,10 +774,62 @@
       fy: P.feet - fd * H * 0.16 - k(a.fCast, 0.25) * 12 * U
     };
   }
+  // a rope running up out of sight
+  function rope(x0, y0, x1, y1) {
+    c.strokeStyle = INK; c.lineWidth = 4 * U;
+    c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    c.strokeStyle = "#b9a37a"; c.lineWidth = 2 * U; c.setLineDash([5 * U, 3 * U]);
+    c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    c.setLineDash([]);
+  }
+  // The understudy watches from a swing behind the lead. The bulbs over it are the cues it has left.
+  function understudy(B, st, rt, neon) {
+    const P = D.stagePos(), a = B.anim, sc = P.portrait ? 1.1 : 1.25, half = 1.75 * 27 * U * sc;
+    const cueK = a.cue && rt - a.cue < 0.8 ? Math.sin(((rt - a.cue) / 0.8) * Math.PI) : 0;
+    const fall = a.fall && rt - a.fall < 0.5 ? Math.sin((rt - a.fall) * 70) * 8 * U * (1 - (rt - a.fall) / 0.5) : 0;
+    const sw = reduced ? 0 : Math.sin(st * 1.2) * 12 * U + cueK * 26 * U;
+    // on a narrow screen it tucks in so it stays on the stage and below the name plate
+    const x = Math.max(P.px - 168 * U, half + 10 * U) + sw + fall, y = P.feet - (P.portrait ? 150 : 168) * U - Math.abs(sw) * 0.2 - cueK * 14 * U;
+    rope(x - 44 * U - sw * 0.7, 0, x - 40 * U, y);
+    rope(x + 44 * U - sw * 0.7, 0, x + 40 * U, y);
+    c.fillStyle = INK; c.fillRect(x - 50 * U, y - 2 * U, 100 * U, 9 * U);
+    c.fillStyle = "#d9b77a"; c.fillRect(x - 48 * U, y, 96 * U, 5 * U);
+    const r = D.drawJinx(B.under, x, y - 2 * U, { t: st, dir: 1, scale: sc, edgeColor: neon ? "#b6ff5c" : undefined, happy: cueK > 0 || B.over === "win", hurt: !!fall, sleep: B.underOut && !fall });
+    if (B.underOut) return;
+    for (let i = 0; i < (B.cueMax || 0); i++) {
+      const bx = r.x + (i - (B.cueMax - 1) / 2) * 15 * U, by = r.topY - 2 * U, on = i < B.cues;
+      c.fillStyle = INK; c.beginPath(); c.arc(bx, by, 6 * U, 0, 7); c.fill();
+      c.fillStyle = on ? "#ffd23f" : "#3a2f4a"; c.beginPath(); c.arc(bx, by, 4 * U, 0, 7); c.fill();
+      if (on) X.glow(bx, by, 16 * U, "#ffd23f", 0.6);
+    }
+  }
+  // A prop is flown in and hangs just off the floor. The dashed ring under it shows it is aimed at.
+  function prop(B, st, rt, neon) {
+    const P = D.stagePos(), p = B.prop, a = B.anim, s = (P.portrait ? 0.8 : 1.12) * U;
+    const hk = a.propHurt && rt - a.propHurt < 0.4 ? 1 - (rt - a.propHurt) / 0.4 : 0;
+    // it hangs between the two fighters, upstage of both: beside the foe it was lost under the name plate
+    const x = (P.px + P.fx) / 2 + (P.portrait ? 14 : 24) * U + Math.sin(rt * 80) * 7 * U * hk * hk;
+    const y = P.feet - (P.portrait ? 96 : 84) * U + (reduced ? 0 : Math.sin(st * 1.1) * 4 * U);
+    const rot = (reduced ? 0 : Math.sin(st * 1.1 + 1) * 0.06) + hk * 0.16;
+    c.fillStyle = "rgba(5,2,12,0.35)";
+    c.beginPath(); c.ellipse(x, P.feet - 8 * U, 46 * s, 9 * s, 0, 0, 7); c.fill();
+    rope(x - 40 * s, 0, x - 34 * s + rot * 150 * s, y - 100 * s);
+    rope(x + 40 * s, 0, x + 34 * s + rot * 150 * s, y - 100 * s);
+    D.stageProp(p.id, x, y, s, rot, st, { fuse: p.def.fuse ? p.fuse : 0, edgeColor: neon ? "#8fe9ff" : undefined, quick: hk > 0 });
+    if (B.target === "prop") {
+      c.save();
+      c.strokeStyle = "#ffd23f"; c.lineWidth = 2.5; c.setLineDash([6, 6]); c.lineDashOffset = -st * 20;
+      c.beginPath(); c.ellipse(x, P.feet - 8 * U, 62 * s, 14 * s, 0, 0, 7); c.stroke();
+      c.restore();
+    }
+    return { x, y: y - 60 * s, r: 40 * s };
+  }
   function fighters(B, pos, st, rt, main) {
     const a = B.anim;
-    let pr = null, fr = null;
+    let pr = null, fr = null, qr = null;
     const neon = B.act === 3;
+    if (main && B.under) understudy(B, st, rt, neon);
+    if (main && B.prop && !B.over) qr = prop(B, st, rt, neon);
     if (B.jinx) {
       if (main) stick(pos.px, pos.py - pos.pHop - 8 * U);
       pr = D.drawJinx(B.jinx, pos.px, pos.py, { t: st, dir: 1, scale: SCALE, flat: !main, wide: !!B.fullMoon, edgeColor: neon ? "#b6ff5c" : undefined, hop: pos.pHop, twirl: show && show.form === "pierrot" && rt - show.t0 > 0.3 && rt - show.t0 < 1.5 ? (rt - show.t0 - 0.3) * 15 : 0, hurt: a.pHurt && rt - a.pHurt < 0.4, happy: B.over === "win" || (a.show && rt - a.show < 2.2), sleep: B.over === "lose" });
@@ -800,7 +852,7 @@
       fr = D.drawFoe(B.foe, pos.fx, pos.fy, st, { scale: FOE_SCALE, flat: !main, edgeColor: neon ? "#ff4fa3" : undefined, tint: main ? JG.ACTS[B.act - 1].tint : null, hurtK: hk, hurt: main && a.fHurt && rt - a.fHurt < 0.12 });
       c.restore();
     }
-    if (main) B.screen = { p: pr, f: B.over === "win" ? null : fr };
+    if (main) B.screen = { p: pr, f: B.over === "win" ? null : fr, prop: qr };
   }
 
   // What each fighter is carrying around: shields, flames, goo, stars.

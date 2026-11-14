@@ -3760,8 +3760,131 @@
     return { x, y, r };
   };
 
+  // ---------- props on the fight stage ----------
+  // Each is drawn about 110 tall with (0, 0) at the middle of its base.
+  const PROP_ART = {
+    // someone in a long coat and a big hat, holding up a BOO sign
+    plant(g, t, K) {
+      g.beginPath(); g.moveTo(-30, 0); g.lineTo(-20, -66); g.lineTo(20, -66); g.lineTo(32, 0); g.closePath();
+      K.paint("#4a3a5e");
+      g.beginPath(); g.moveTo(0, -66); g.lineTo(-3, -6); g.stroke();
+      for (let k = 0; k < 3; k++) K.disc(4, -52 + k * 16, 2.2, "#e8b923", 1.5);
+      g.beginPath(); g.moveTo(-20, -66); g.lineTo(0, -52); g.lineTo(20, -66);
+      K.paint("#2b2038");
+      K.disc(0, -78, 14, "#efe6d2");
+      // the hat hides everything but the eyes
+      g.beginPath(); g.ellipse(0, -86, 30, 7, -0.08, 0, 7);
+      K.paint("#231a30");
+      g.beginPath(); g.moveTo(-15, -88); g.lineTo(-12, -108); g.lineTo(13, -110); g.lineTo(15, -89); g.closePath();
+      K.paint("#231a30");
+      g.fillStyle = "#8f2238"; g.fillRect(-14, -94, 28, 5);
+      g.fillStyle = FINK; g.fillRect(-8, -80, 5, 3); g.fillRect(3, -80, 5, 3);
+      g.strokeStyle = FINK; g.lineWidth = 6; g.beginPath(); g.moveTo(26, -44); g.lineTo(36, -118); g.stroke();
+      g.strokeStyle = "#d9b77a"; g.lineWidth = 3; g.beginPath(); g.moveTo(26, -44); g.lineTo(36, -118); g.stroke();
+      K.disc(26, -46, 6, "#efe6d2", 2.5);
+      g.save(); g.translate(38, -134); g.rotate(0.1 + Math.sin(t * 5) * 0.06);
+      K.box(-30, -17, 60, 34, "#efe6d2");
+      g.font = '900 24px "Bungee", "Arial Black", sans-serif'; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillStyle = "#8f2238"; g.fillText("BOO", 0, 2);
+      g.restore();
+    },
+    // two speaker cabinets and a head, a little crooked
+    amp(g, t, K) {
+      const cab = (x, y, w, h) => {
+        K.box(x, y, w, h, "#231a30");
+        g.fillStyle = "#3a2d4c"; g.fillRect(x + 5, y + 5, w - 10, h - 10);
+        for (let k = 0; k < 2; k++) {
+          const cx = x + (w / 2) * (k + 0.5), cy = y + h / 2, r = Math.min(w / 2, h) * 0.36 * (1 + Math.sin(t * 14 + k) * 0.05);
+          K.disc(cx, cy, r, "#16101f", 2.5);
+          g.strokeStyle = "#8c7fa6"; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, r * 0.62, 0, 7); g.stroke();
+          K.disc(cx, cy, r * 0.26, "#5b4d73", 1.5);
+        }
+      };
+      cab(-40, -54, 80, 54);
+      g.save(); g.translate(2, -54); g.rotate(-0.03);
+      cab(-34, -46, 68, 46);
+      K.box(-30, -64, 60, 18, "#8f2238");
+      for (let k = 0; k < 4; k++) K.disc(-20 + k * 11, -55, 3, "#efe6d2", 1.5);
+      K.disc(22, -55, 3.5, "#ffb347", 1.5);
+      glow(22, -55, 16, "#ffb347", 0.8);
+      g.restore();
+      // sound coming off it, toward your side
+      g.strokeStyle = "#efe6d2"; g.lineWidth = 3;
+      for (let k = 0; k < 3; k++) { const q = (t * 0.9 + k / 3) % 1; g.globalAlpha = (1 - q) * 0.8; g.beginPath(); g.arc(-44, -62, 14 + q * 30, Math.PI * 0.75, Math.PI * 1.25); g.stroke(); }
+      g.globalAlpha = 1;
+    },
+    // two striped poles and a sagging net
+    net(g, t, K) {
+      const sag = 30 + Math.sin(t * 2.2) * 3, top = -84;
+      const yAt = (k, row) => top + row * 9 + Math.sin(k * Math.PI) * (sag - row * 2);
+      const strand = (row) => { g.beginPath(); for (let i = 0; i <= 12; i++) { const k = i / 12, x = -44 + k * 88; i ? g.lineTo(x, yAt(k, row)) : g.moveTo(x, yAt(k, row)); } g.stroke(); };
+      g.strokeStyle = FINK; g.lineWidth = 5; strand(0); strand(3);
+      g.strokeStyle = "#efe6d2"; g.lineWidth = 2;
+      for (let row = 0; row < 4; row++) strand(row);
+      for (let i = 0; i <= 12; i++) { const k = i / 12, x = -44 + k * 88; g.beginPath(); g.moveTo(x, yAt(k, 0)); g.lineTo(x + (i % 2 ? 3 : -3), yAt(k, 3)); g.stroke(); }
+      for (const x of [-46, 46]) {
+        g.fillStyle = FINK; g.fillRect(x - 6, -96, 12, 96);
+        for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? "#8f2238" : "#efe6d2"; g.fillRect(x - 3.5, -94 + k * 11.6, 7, 11.6); }
+        K.disc(x, -98, 6, "#e8b923", 2.5);
+        g.beginPath(); g.moveTo(x - 14, 0); g.lineTo(x + 14, 0); g.strokeStyle = FINK; g.lineWidth = 7; g.stroke();
+      }
+      // a plaster cross: it mends
+      g.beginPath(); g.rect(-4, -122, 8, 22); g.rect(-11, -115, 22, 8);
+      K.paint("#a6d94a", 2.5);
+    },
+    // a circus cannon aimed at your side of the stage, fuse burning
+    cannon(g, t, K, fuse) {
+      g.save(); g.translate(8, -40); g.rotate(-0.42);
+      g.beginPath(); g.moveTo(34, -20); g.lineTo(-58, -16); g.lineTo(-58, 16); g.lineTo(34, 20); g.quadraticCurveTo(52, 0, 34, -20); g.closePath();
+      K.paint("#8f2238");
+      for (const x of [-34, -6, 20]) K.box(x, -19, 7, 38, "#e8b923");
+      K.box(-66, -21, 10, 42, "#e8b923");
+      g.fillStyle = "#16101f"; g.beginPath(); g.ellipse(-66, 0, 4, 15, 0, 0, 7); g.fill();
+      g.strokeStyle = "#efe6d2"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(38, -12); g.quadraticCurveTo(54, -30, 48, -44); g.stroke();
+      const fl = 5 + Math.sin(t * 30) * 2;
+      g.fillStyle = "#ffd23f"; g.beginPath();
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + t * 6, r = k % 2 ? fl * 0.45 : fl * 1.5; g.lineTo(48 + Math.cos(a) * r, -44 + Math.sin(a) * r); }
+      g.closePath(); g.fill();
+      glow(48, -44, 22, "#ffd23f", 0.9);
+      g.restore();
+      // the carriage
+      g.beginPath(); g.moveTo(-26, -6); g.lineTo(-8, -40); g.lineTo(26, -40); g.lineTo(40, -6); g.closePath();
+      K.paint("#4a3a5e");
+      K.disc(10, -18, 19, "#231a30");
+      g.strokeStyle = "#e8b923"; g.lineWidth = 2.5;
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; g.beginPath(); g.moveTo(10 - Math.cos(a) * 16, -18 - Math.sin(a) * 16); g.lineTo(10 + Math.cos(a) * 16, -18 + Math.sin(a) * 16); g.stroke(); }
+      K.disc(10, -18, 5, "#e8b923", 2);
+      // how many turns are left
+      if (fuse) {
+        g.font = '900 22px "Bungee", "Arial Black", sans-serif'; g.textAlign = "center"; g.textBaseline = "middle";
+        g.lineWidth = 5; g.strokeStyle = FINK; g.strokeText(fuse, 44, -96);
+        g.fillStyle = "#ffd23f"; g.fillText(fuse, 44, -96);
+      }
+    }
+  };
+  // A prop is flown in: it hangs from a batten (the ropes above are drawn by the stage). s is its size,
+  // rot its sway. o.fuse is the number on a cannon.
+  D.stageProp = function (id, x, y, s, rot, t, o) {
+    o = o || {};
+    cutout(() => {
+      const g = ctx;
+      const K = {
+        paint(c, lw) { g.fillStyle = c; g.fill(); g.strokeStyle = FINK; g.lineWidth = lw || 3; g.stroke(); },
+        box(bx, by, w, h, c) { g.beginPath(); g.rect(bx, by, w, h); K.paint(c); },
+        disc(cx, cy, r, c, lw) { g.beginPath(); g.arc(cx, cy, r, 0, 7); K.paint(c, lw); }
+      };
+      g.save();
+      g.translate(x, y); g.rotate(rot); g.scale(s, s);
+      g.lineJoin = "round"; g.lineCap = "round";
+      K.box(-52, -150, 104, 9, "#d9b77a");
+      g.lineWidth = 2; g.beginPath(); g.moveTo(-34, -141); g.lineTo(-30, -104); g.moveTo(34, -141); g.lineTo(30, -104); g.stroke();
+      (PROP_ART[id] || PROP_ART.amp)(g, t, K, o.fuse);
+      g.restore();
+    }, x, y, 86 * s, 168 * s, 10 * s, { key: "prop", sig: id + ":" + (o.fuse || 0), edgeColor: o.edgeColor, fps: o.quick ? 60 : 12 });
+  };
+
   // ---------- particles and floating numbers ----------
-  const CONFETTI = ["#ff4fa3", "#ffd23f", "#8fe9ff", "#a6d94a", "#c9b8ff", "#efe6d2"];
+  const CONFETTI =["#ff4fa3", "#ffd23f", "#8fe9ff", "#a6d94a", "#c9b8ff", "#efe6d2"];
   D.burst = function (x, y, kind, n, color) {
     for (let i = 0; i < (n || 8); i++) {
       const a = Math.random() * Math.PI * 2, sp = (40 + Math.random() * (kind === "confetti" ? 260 : 120)) * U;

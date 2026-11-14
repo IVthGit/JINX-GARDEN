@@ -1512,6 +1512,8 @@
   }
   JG.leanForm = leanForm;
   const scr = (k) => (G.B && G.B.screen && G.B.screen[k]) || { x: 0, y: 0 };
+  // where the prop hangs, or beside the foe if the stage has not drawn it yet
+  const propAt = () => (G.B && G.B.screen && G.B.screen.prop) || { x: scr("f").x + 80, y: scr("f").y };
   const runLove = () => (G.run.loveStart === undefined ? runJinx().love : G.run.loveStart);
   const runMood = () => (G.run.moodStart === undefined ? runJinx().mood : G.run.moodStart);
   function improviseChance(j) { return clamp(runLove() / 250, 0.04, 0.4) + (j.trait === "showoff" ? 0.1 : 0); }
@@ -1540,6 +1542,10 @@
     if (propId) B.prop = makeProp(propId, r.act);
     const u = understudy();
     B.cues = u ? 1 + (u.love >= 40 ? 1 : 0) + (r.charms.includes("script") ? 1 : 0) : 0;
+    // what the stage draws: the understudy stays on its swing, asleep, after it has taken the fall
+    B.under = r.uid ? jinxById(r.uid) : null;
+    B.underOut = !!r.underOut;
+    B.cueMax = B.cues;
     setMode("battle");
     renderRunbar();
     $("#foeName").textContent = def.name;
@@ -1555,16 +1561,17 @@
   const propBoom = (B) => Math.round(B.prop.def.boom * JG.TUNE.dmg[B.act - 1]);
   // Only damage touches a prop. It never hits back, so it is a safe target while the foe is in a counter stance.
   function hurtProp(n) {
-    const B = G.B, p = B.prop, fp = scr("f"), hammer = G.run.charms.includes("hammer");
+    const B = G.B, p = B.prop, pa = propAt(), hammer = G.run.charms.includes("hammer");
     if (hammer) n *= 2;
     p.hp -= n;
-    D.float(fp.x + 80, fp.y + 10, `-${n}`, "#ffffff");
+    B.anim.propHurt = G.t;
+    D.float(pa.x, pa.y + 10, `-${n}`, "#ffffff");
     sfx("hit");
     if (p.hp <= 0) {
       B.prop = null;
       B.target = "foe";
-      D.float(fp.x + 80, fp.y - 25, `${p.def.name} breaks!`, "#ffd23f", true);
-      D.burst(fp.x + 80, fp.y, "confetti", 18, "multi");
+      D.float(pa.x, pa.y - 25, `${p.def.name} breaks!`, "#ffd23f", true);
+      D.burst(pa.x, pa.y, "confetti", 18, "multi");
       addApplause(10);
       D.fx.cheer(B, 3);
       sfx("win");
@@ -1574,7 +1581,7 @@
   }
   // What a prop does on the foe's turn, for as long as it stands.
   async function propTurn(B) {
-    const p = B.prop, d = p.def, f = B.foe, fp = scr("f"), pp = scr("p");
+    const p = B.prop, d = p.def, f = B.foe, fp = scr("f"), pp = scr("p"), pa = propAt();
     if (d.boo) {
       if (has(B, "head", "mask")) D.float(pp.x, pp.y - 115, "Poker face: the boos bounce off", "#efe6d2");
       else addApplause(-d.boo, `Boo from the cheap seats! -${d.boo} Applause`);
@@ -1586,10 +1593,10 @@
         const n = propBoom(B);
         B.prop = null;
         B.target = "foe";
-        D.float(fp.x + 80, fp.y - 25, "Bang!", "#ff5fa8", true);
+        D.float(pa.x, pa.y - 25, "Bang!", "#ff5fa8", true);
         D.burst(pp.x, pp.y - 20, "confetti", 30, "multi");
         hurtPlayer(n);
-      } else D.float(fp.x + 80, fp.y - 25, `Fuse: ${p.fuse}`, "#ffd23f");
+      } else D.float(pa.x, pa.y - 25, `Fuse: ${p.fuse}`, "#ffd23f");
     }
     renderBattle();
     await sleep(250);
@@ -2112,6 +2119,8 @@
         // once a run the understudy takes the fall, and is out for the rest of it
         const u = understudy();
         r.underOut = true;
+        B.underOut = true;
+        B.anim.fall = G.t;
         B.cues = 0;
         r.hp = Math.max(1, Math.round(r.maxHp * 0.25));
         D.float(pp.x, pp.y - 80, `${u.name} takes the fall!`, "#8fe9ff", true);
@@ -2160,6 +2169,7 @@
     if (!B || B.busy || B.over || !u || !B.cues) return;
     B.busy = true;
     B.cues--;
+    B.anim.cue = G.t;
     const bo = bonuses(u), pp = scr("p"), best = D.jinxLook(u).best;
     D.float(pp.x - 50, pp.y - 135, `${u.name} runs on!`, "#8fe9ff", true);
     sfx("honk");

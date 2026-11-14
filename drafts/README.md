@@ -3,6 +3,19 @@
 Work that has been shown to the user but not chosen, kept here so it is not lost. Nothing in this folder is
 loaded by the game.
 
+## Props and the understudy on stage (November 2026)
+
+The fights gained props and an understudy with no drawing on the stage. The user was shown three looks and
+chose "rigging" for both, which is now built into `stage.js` and `draw.js`. The other two are kept here.
+
+- `stage-extras.js`: three looks (`JG.draw.extras.set = "sticks" | "rigging" | "shadows"`), drawn by wrapping
+  `drawJinx` and `drawFoe` so they sit in the fighters' layer.
+- `stage-extras-shots.cjs`: takes the pictures from the real game into `stage-extras/` (18 MB, not kept in git: run it to remake them).
+- `stage-extras.html`: the sheet. Open it in a browser.
+
+Seen while making it: on a phone the name plates hide anything hung high (the "rigging" look), and the
+"shadows" understudy dims with `ctx.filter`, which iPhones do not support, so it would need another way.
+
 ## Foe revisions (November 2026)
 
 The user asked for revisions to the enemies, was shown a sheet with every foe three ways (as it is now,
