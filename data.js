@@ -75,6 +75,18 @@ JG.CARDS = {
   haloburst: { name: "Halo Burst", cost: 2, type: "eth", rarity: 3, fx: { dmg: 10, heal: 6 }, after: ["eth", { dmg: 8 }] },
   ringmaster:{ name: "Steal the Show", cost: 1, type: "trick", rarity: 3, fx: { hype: 3, selfdmg: 4 }, exhaust: true }
 };
+// A polished card ("Pie Toss+") is made from each card: bigger numbers, or 1 cheaper when it has none to grow.
+// The Fortune tent polishes one. They are never offered as rewards or sold.
+for (const id of Object.keys(JG.CARDS)) {
+  const c = JG.CARDS[id], fx = Object.assign({}, c.fx);
+  let cost = c.cost, grown = false;
+  for (const k of ["dmg", "block", "heal", "gunk"]) if (fx[k]) { fx[k] += Math.max(k === "dmg" || k === "block" ? 2 : 1, Math.round(fx[k] * 0.3)); grown = true; }
+  if (!grown) {
+    if (cost > 0) cost--;
+    else { const k = ["hype", "draw", "energy"].find((k) => fx[k]); if (k) fx[k]++; }
+  }
+  JG.CARDS[id + "+"] = Object.assign({}, c, { name: c.name + "+", cost, fx, polished: true });
+}
 JG.TYPE_INFO = {
   atk:   { label: "Attack", color: "#ff5fa8", glyph: "✶", stat: "juggle" },
   blk:   { label: "Guard", color: "#ffd23f", glyph: "◆", stat: "tumble" },
@@ -95,12 +107,20 @@ JG.CHARMS = {
   lantern:  { name: "Paper Lantern", desc: "Naps in the Fortune Tent heal twice as much.", glyph: "☸", color: "#ffb36b" },
   patch:    { name: "Iron-On Patch", desc: "The first time you'd faint, you get back up with 1 health.", glyph: "✖", color: "#ff5fa8" },
   glowstick:{ name: "Glow Stick", desc: "1 extra energy on the first turn of every fight.", glyph: "∕", color: "#b6ff5c" },
-  rose:     { name: "Thrown Rose", desc: "Start every fight with 25 Applause.", glyph: "✿", color: "#ff3b4a" }
+  rose:     { name: "Thrown Rose", desc: "Start every fight with 25 Applause.", glyph: "✿", color: "#ff3b4a" },
+  // these five change a rule instead of a number
+  shill:    { name: "Planted Fan", desc: "Crowd requests pay double, and missing one costs double.", glyph: "☺", color: "#ffd23f" },
+  metronome:{ name: "Broken Metronome", desc: "The third card you play each turn costs 0.", glyph: "△", color: "#c9b8ff" },
+  sleeve:   { name: "Spare Sleeve", desc: "Hold 1 more card each turn.", glyph: "♣", color: "#cfe3ff" },
+  script:   { name: "Dog-Eared Script", desc: "Your understudy answers 1 more cue each fight.", glyph: "❡", color: "#e9d3a4", needs: "understudy" },
+  hammer:   { name: "Glass Hammer", desc: "Hits on props deal double, and breaking one gives 1 energy.", glyph: "⚒", color: "#8fe9ff" }
 };
 
 // Foes. moves cycle in order: atk with n hits, blk, heal, hype, dazed, pied, gunk, heckle, and two that ask for an answer:
 //   charge with flinch: it winds up a big hit. Deal that much damage in one turn and it flinches and loses the hit.
 //   counter: until its next turn, every hit on it hurts you back.
+// Second act: at half health a foe changes. A Headliner or Ringmaster swaps to the routine in act2; a Heckler just gets angry (Hype).
+// prop: something else on stage to aim at (JG.PROPS). prop is there from the start, prop2 arrives with the second act.
 // weak and resist name a card type (atk, eth or gunk): 50% more or 50% less from those cards.
 // atk picks the attack animation in stage.js. body and size place the drawing from draw.js.
 JG.FOES = {
@@ -113,9 +133,11 @@ JG.FOES = {
   tearer:   { name: "Ticket Tearer", atk: "tickets", hp: [30, 34], weak: "eth", body: "wide", size: 1,
               moves: [{ blk: 8, heckle: 10 }, { atk: 10 }, { atk: 6, pied: 1 }] },
   strongman:{ name: "The Strongman Who Cries", atk: "smash", hp: [58, 62], elite: true, weak: "eth", body: "tall", size: 1.25,
-              moves: [{ atk: 9 }, { charge: 1, flinch: 16, blk: 6 }, { atk: 15 }, { hype: 2, blk: 8 }, { atk: 6, n: 2 }] },
+              moves: [{ atk: 9 }, { charge: 1, flinch: 16, blk: 6 }, { atk: 15 }, { hype: 2, blk: 8 }, { atk: 6, n: 2 }],
+              prop: "cannon", act2: { say: "He stops crying.", moves: [{ atk: 7, n: 2 }, { charge: 1, flinch: 18, hype: 1 }, { atk: 18 }, { blk: 10, heckle: 10 }] } },
   calliope: { name: "Calliope Wraith", atk: "notes", hp: [105, 105], boss: true, weak: "gunk", resist: "eth", body: "wisp", size: 1.4,
-              moves: [{ dazed: 2, blk: 10, heckle: 20 }, { atk: 11 }, { atk: 4, n: 3 }, { charge: 1, flinch: 20 }, { atk: 16 }, { heal: 10, hype: 2 }] },
+              moves: [{ dazed: 2, blk: 10, heckle: 20 }, { atk: 11 }, { atk: 4, n: 3 }, { charge: 1, flinch: 20 }, { atk: 16 }, { heal: 10, hype: 2 }],
+              prop2: "amp", act2: { say: "Every pipe at once.", moves: [{ atk: 5, n: 3 }, { charge: 1, flinch: 22, blk: 8 }, { atk: 18 }, { dazed: 2, heal: 8, heckle: 20 }, { atk: 12, hype: 1 }] } },
 
   seal:     { name: "Grease Seal", atk: "dive", hp: [40, 44], weak: "atk", resist: "gunk", body: "blob", size: 1.05,
               moves: [{ gunk: 3, atk: 6 }, { atk: 11 }, { blk: 10, hype: 1 }] },
@@ -126,9 +148,11 @@ JG.FOES = {
   double:   { name: "Funhouse Double", atk: "punch", hp: [46, 50], body: "round", size: 1,
               moves: [{ atk: 9, pied: 2 }, { counter: 5 }, { atk: 14 }, { blk: 12, heckle: 15 }] },
   shadow:   { name: "Ringleader's Shadow", atk: "dark", hp: [92, 96], elite: true, weak: "eth", resist: "atk", body: "wisp", size: 1.3,
-              moves: [{ atk: 15 }, { dazed: 2, pied: 2, heckle: 20 }, { atk: 6, n: 3 }, { hype: 2, blk: 10 }] },
+              moves: [{ atk: 15 }, { dazed: 2, pied: 2, heckle: 20 }, { atk: 6, n: 3 }, { hype: 2, blk: 10 }],
+              prop: "plant", act2: { say: "It comes off the wall.", moves: [{ atk: 7, n: 3 }, { counter: 6, hype: 2 }, { atk: 17, pied: 1 }, { dazed: 2, blk: 12, heckle: 20 }] } },
   mirrorrm: { name: "The Mirror Ringmaster", atk: "glass", hp: [175, 175], boss: true, resist: "eth", body: "tall", size: 1.5,
-              moves: [{ atk: 9, n: 2 }, { counter: 6, blk: 14, hype: 1 }, { charge: 1, flinch: 26 }, { atk: 19 }, { pied: 2, dazed: 2, gunk: 4, heckle: 20 }] },
+              moves: [{ atk: 9, n: 2 }, { counter: 6, blk: 14, hype: 1 }, { charge: 1, flinch: 26 }, { atk: 19 }, { pied: 2, dazed: 2, gunk: 4, heckle: 20 }],
+              prop2: "plant", act2: { say: "The mirror cracks, and there are more of him.", moves: [{ atk: 10, n: 2, pied: 1 }, { charge: 1, flinch: 28, blk: 10 }, { atk: 21 }, { counter: 7, hype: 2 }, { atk: 7, n: 3 }, { dazed: 2, gunk: 4, heckle: 20 }] } },
 
   comet:    { name: "Comet Clown", atk: "fireball", hp: [58, 64], weak: "gunk", body: "round", size: 1.05,
               moves: [{ atk: 8, n: 2 }, { charge: 1, flinch: 22, blk: 10 }, { atk: 20 }] },
@@ -137,10 +161,21 @@ JG.FOES = {
   angel:    { name: "Static Angel", atk: "beam", hp: [58, 62], weak: "gunk", resist: "eth", body: "wisp", size: 1.1,
               moves: [{ heal: 10, blk: 8 }, { atk: 7, n: 3 }, { counter: 6 }, { atk: 18 }] },
   trapeze:  { name: "The Last Trapeze", atk: "dive", hp: [138, 142], elite: true, weak: "atk", body: "tall", size: 1.3,
-              moves: [{ atk: 10, n: 2 }, { blk: 14, hype: 2 }, { charge: 1, flinch: 28 }, { atk: 22 }, { dazed: 2, gunk: 4 }] },
+              moves: [{ atk: 10, n: 2 }, { blk: 14, hype: 2 }, { charge: 1, flinch: 28 }, { atk: 22 }, { dazed: 2, gunk: 4 }],
+              prop: "net", act2: { say: "She lets go of the bar.", moves: [{ atk: 8, n: 3 }, { charge: 1, flinch: 30, blk: 10 }, { atk: 24 }, { hype: 2, dazed: 2 }, { atk: 12, n: 2, gunk: 3 }] } },
   mother:   { name: "Mother Static", atk: "static", hp: [280, 280], boss: true, body: "tv", size: 1.6,
-              moves: [{ atk: 11, n: 2 }, { gunk: 5, dazed: 2, heckle: 25 }, { counter: 7, blk: 20, hype: 2 }, { charge: 1, flinch: 34 }, { atk: 24 }, { heal: 20, pied: 2 }] }
+              moves: [{ atk: 11, n: 2 }, { gunk: 5, dazed: 2, heckle: 25 }, { counter: 7, blk: 20, hype: 2 }, { charge: 1, flinch: 34 }, { atk: 24 }, { heal: 20, pied: 2 }],
+              prop2: "cannon", act2: { say: "Every channel at once.", moves: [{ atk: 9, n: 3 }, { charge: 1, flinch: 36, blk: 14 }, { atk: 26 }, { counter: 8, hype: 2, heckle: 25 }, { atk: 13, n: 2, gunk: 4 }, { heal: 16, pied: 2, dazed: 2 }] } }
 };
+// Props. Only damage touches them; their trouble lasts until they are broken. hp is scaled per act like a foe's.
+JG.PROPS = {
+  plant:  { name: "Plant in the crowd", glyph: "☹", hp: 9, boo: 6, desc: "Boos every turn: 6 less Applause." },
+  amp:    { name: "Amp stack", glyph: "♫", hp: 12, amp: 3, desc: "The foe's hits land 3 harder." },
+  net:    { name: "Safety net", glyph: "#", hp: 11, mend: 5, desc: "The foe heals 5 every turn." },
+  cannon: { name: "Confetti cannon", glyph: "✺", hp: 13, fuse: 3, boom: 8, desc: "Goes off when the fuse runs out." }
+};
+// which props a Heckler may bring in Acts II and III
+JG.HECKLER_PROPS = ["plant", "amp", "net"];
 for (const k in JG.FOES) JG.FOES[k].look = { body: JG.FOES[k].body, size: JG.FOES[k].size };
 
 JG.ACTS = [

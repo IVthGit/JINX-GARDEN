@@ -68,7 +68,7 @@ Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve
 ## A run
 
 - **The acts:** three acts, The Midway, The Hall of Warped Mirrors and The Big Top Below. Each one ends with a Ringmaster.
-- **The map:** pick a path through Hecklers (fights), Headliners (hard fights that drop a charm), Sideshows (events), Snack stands (shops) and Fortune tents (rest, or train a stat for good).
+- **The map:** pick a path through Hecklers (fights), Headliners (hard fights that drop a charm), Sideshows (events), Snack stands (shops) and Fortune tents (rest, train a stat for good, or polish a trick).
 - **Each act has its own stage:** a midway with booths and a ferris wheel, a hall of mirrors that reflects the fight, and an upside-down big top over a floating platform.
 - **Fights** are turn based with a deck of tricks. You get 3 energy and draw 5 cards each turn, and the foe shows what it will do next.
   - **Order matters:** many cards have a bonus for being the first card of the turn, for coming after two others, or for following a certain kind of card. A card glows when its bonus is live.
@@ -80,6 +80,21 @@ Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve
   - **Stats boost cards:** Juggle adds to attacks, Tumble to Block (and gives a small chance to dodge), Glow to heals and Gunk, and Grit to health.
   - **Statuses:** Hype adds damage. Dazed deals 25% less. Pied takes 50% more. Gunk loses health every turn.
 - **Applause:** the crowd's meter fills a little for every card (more for switching card types), and more for combos, Hat Tricks, hits of 15 or more, making a foe flinch, dodging, and getting through a foe's turn unhurt. It drains by the damage you take, when a foe Heckles, and when you end a turn without playing anything. When it's full, the **Showstopper** button appears (key S).
+- **Crowd requests:** every turn the crowd calls for something, shown above the Applause meter: open with a certain kind of card, finish on one, play 3 cards, land a combo, deal a set amount of damage, or play no Attacks at all.
+  - Give them what they want for 12 Applause and 2 Tix. Three in a row earns an **Encore**: 1 extra energy next turn.
+  - Ignore them and you lose 6 Applause.
+- **Second acts:** at half health a foe changes. A Heckler gets angry and gains Hype. A Headliner or a Ringmaster drops its routine for a new, nastier one, so what you learned about it in the first half no longer holds.
+- **Props:** some foes bring something else on stage. Every Headliner has one, a Ringmaster brings one out for its second act, and Hecklers in Acts II and III sometimes do.
+  - A **Plant in the crowd** boos away 6 Applause a turn. An **Amp stack** makes the foe's hits land 3 harder. A **Safety net** heals the foe 5 a turn. A **Confetti cannon** goes off when its fuse runs out.
+  - Tap the prop under the foe's name (or press T) to aim at it. Only damage touches a prop, and it never hits back, so it is a safe target while the foe is in a counter stance.
+  - Breaking one earns 10 Applause.
+- **Understudy:** when you start a run, pick a second hatched Jinx to wait in the wings.
+  - **Cue** it (key C) once a fight, or twice if its Love is 40 or more. It is free. What it does depends on its best stat: Juggle throws a quick hit that can't be countered, Tumble gives Block, Glow heals, and Grit wipes off Dazed, Pied and Gunk.
+  - Once a run, if your Jinx would faint, the understudy **takes the fall** instead: your Jinx gets back up on a quarter of its health, and the understudy is out for the rest of the run and comes home sore.
+  - It learns a little from watching (about a third of the practice) and grows fonder of you.
+- **Snacks:** once a fight you can eat one thing from the bag, for free. A Springberry gives Block, a Cotton Comet heals, a Juggle Plum gives Hype, a Sludge Pop shakes off Gunk, Dazed and Pied, a Burned CD wins 20 Applause, and the rare ones do more. A snack eaten in a fight doesn't come home.
+- **Polished tricks:** at a Fortune tent you can rehearse one card instead of resting. It gets a + on its name and bigger numbers, or costs 1 less if it has no numbers to grow.
+- **Lucky charms:** most charms give a small edge. Five change a rule: the Planted Fan doubles what crowd requests pay and cost, the Broken Metronome makes the third card each turn free, the Spare Sleeve holds 1 more card, the Dog-Eared Script gives 1 more cue a fight, and the Glass Hammer doubles hits on props and gives 1 energy for breaking one.
 - **A mind of its own:**
   - Between your turn and the foe's, a Jinx may **improvise** a free move. The chance grows with its Love when the run started.
   - A Jinx whose Mood was low at the start sometimes **phones it in**, and a card works at half strength.
@@ -93,7 +108,7 @@ Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve
 - **Strange eggs:** a Headliner or a Ringmaster sometimes leaves an egg behind. It comes home with you and hatches into a Hollow or a Lantern. If the garden is full it is sold for 40 Tix.
 - **Winning** all three acts brings home everything in the bag, the Tix and 1.5 times the training.
 - **Fainting** keeps half the Tix, one thing from the bag and 0.6 times the training, and the Jinx comes home sad.
-- **Keys:** 1 to 9 play cards, E ends the turn.
+- **Keys:** 1 to 9 play cards, Shift+1 to 9 hold one, S is the Showstopper, T switches aim, C cues the understudy, E ends the turn.
 
 ## The look
 

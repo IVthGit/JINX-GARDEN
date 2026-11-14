@@ -50,7 +50,7 @@ const { chromium } = require('playwright');
     // keep the card that answers what the foe does the turn after next
     function hold(B) {
       if (!B.hand.length) return;
-      const moves = B.foe.def.moves, m2 = moves[(B.foe.mi + 1) % moves.length], bo = dbg.bonuses(B.jinx);
+      const moves = B.foe.moves, m2 = moves[(B.foe.mi + 1) % moves.length], bo = dbg.bonuses(B.jinx);
       let best = -1, bv = 0;
       B.hand.forEach((c, i) => {
         const fx = JG.CARDS[c.id].fx;

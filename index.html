@@ -610,6 +610,22 @@ body[data-show] #hud, body[data-show] #panel { display: none !important; }
 .parts b { color: var(--ether); }
 .st.moon { border-color: #bfe0ff; color: #eaf4ff; }
 .st.moon.full { background: #eaf4ff; color: var(--ink); }
+/* crowd requests, props and the understudy */
+#crowdReq { display: grid; gap: 2px; justify-items: end; text-align: right; max-width: 230px; min-height: 2.2em; }
+#crowdReq .rq { font-family: var(--marker); font-size: 0.95rem; line-height: 1.1; color: var(--bone); }
+#crowdReq .rq.met { color: var(--gold); }
+#crowdReq .rq.miss { color: var(--bone-dim); text-decoration: line-through; }
+#prop { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; align-items: center; pointer-events: auto; }
+#prop .propdesc { flex-basis: 100%; font-size: 0.72rem; color: var(--bone-dim); }
+.acts { display: flex; flex-wrap: wrap; gap: 5px; pointer-events: auto; }
+.acts:empty, #prop:empty, #crowdReq:empty { display: none; }
+@media (max-width: 640px) {
+  #prop .chip, .acts .chip { font-size: 0.68rem; padding: 2px 8px; }
+  #prop .in-label { display: none; }
+  #prop .propdesc { font-size: 0.62rem; line-height: 1.2; }
+  #crowdReq { max-width: 170px; }
+  #crowdReq .rq { font-size: 0.8rem; }
+}
 .then { opacity: 0.62; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 </style>
 
@@ -664,6 +680,7 @@ body[data-show] #hud, body[data-show] #panel { display: none !important; }
         <span class="pn" id="youName"></span>
         <div class="hpline" id="youHp"></div>
         <div class="sts" id="youSt"></div>
+        <div class="acts" id="youActs"></div>
       </div>
       <div class="plate foe">
         <span class="ptag" id="battleTitle">Heckler</span>
@@ -672,6 +689,7 @@ body[data-show] #hud, body[data-show] #panel { display: none !important; }
         <div class="traits" id="foeTraits"></div>
         <div class="sts" id="foeSt"></div>
         <div id="intent"></div>
+        <div id="prop"></div>
       </div>
     </div>
     <div class="tray">
@@ -682,13 +700,14 @@ body[data-show] #hud, body[data-show] #panel { display: none !important; }
       </div>
       <div id="hand"></div>
       <div class="right-tray">
+        <div id="crowdReq" aria-live="polite"></div>
         <div id="applause" title="Applause fills as you play a mix of cards, land big hits and avoid damage. Hits, hecklers and doing nothing drain it. When it's full, use your Showstopper.">
           <span class="ap-label">Applause <span id="applauseNum">0</span></span>
           <span class="ap-bar"><i></i></span>
         </div>
         <button class="btn showstop" id="showstop" hidden>Showstopper</button>
         <button class="btn" id="endTurn">End turn</button>
-        <span class="keys">Keys: 1&ndash;9 play, Shift+1&ndash;9 hold, S showstopper, E ends turn</span>
+        <span class="keys">Keys: 1&ndash;9 play, Shift+1&ndash;9 hold, S showstopper, T aim, C cue, E ends turn</span>
       </div>
     </div>
   </section>

@@ -45,6 +45,17 @@ Plain JavaScript on a 2D canvas, on `window.JG`. `index.html` loads the scripts 
 - Add a marker when you add a part. Give flickering or far-ranging parts a fixed `box`.
 - Behind each foe is a burst of torn paper strips (`tornBurst`), which the user picked because it really looks torn.
 
+### Fights
+
+Added in November 2026 because fights felt easy, samey and detached from the garden. All of it is in `game.js`, with content in `data.js`.
+
+- **Crowd requests** (`newRequest`, `reqState`, `settleRequest`): one per turn, settled when the turn ends.
+- **Second acts** (`nextMove`): at half health a foe with `act2` in `JG.FOES` swaps its routine; others gain Hype. A foe's live routine is `B.foe.moves`, not `def.moves`.
+- **Props** (`JG.PROPS`, `makeProp`, `hurtProp`, `propTurn`): `B.prop` is a second target, chosen with `B.target`.
+- **Understudy** (`G.run.uid`, `cue`): picked in `confirmRun`. `G.run.underOut` is set once it has taken the fall.
+- **Snacks** (`snackFx`, `eatSnack`), **polished cards** (the `id + "+"` entries made at the bottom of the card table) and five rule-changing charms.
+- These were built with the fight screen's existing chips and labels only. The props and the understudy have no drawing on the stage yet: offer a draft sheet for how they should look.
+
 ### Speed
 
 Nearly all of a frame's cost is copying between canvases, so little is drawn fresh each frame.
@@ -83,7 +94,8 @@ Found in an audit in November 2026 and not fixed yet. Offer them; don't fix them
 - The Ringleader's Shadow looks washed out: its see-through body lets the white paper edge show.
 - The title screen's text still describes the older, cuter game.
 - The side panel rebuilds every 2 seconds and can swallow a tap.
-- The fight screen is crowded on a phone.
+- The fight screen is crowded on a phone, more so now that a prop and the understudy's buttons sit on the name plates.
+- The balance bots don't use crowd requests, props, the understudy, snacks or polishing, so they now underrate what a player can do.
 - Balance has drifted easier, and the Sludge lean is the weakest. Bot results at level 25: no abilities 3/12 wins, Umbra 6/12, Lantern 7/12, Hollow 12/18. The bot ignores Foresight, and mixes are unmeasured.
 - Most of the 27 mixes across the leans haven't been looked at by eye.
 - Parallax and screen shake ignore the reduced-motion setting.

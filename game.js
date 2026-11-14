@@ -1132,7 +1132,7 @@
     const j = jinxById(G.selected), s = G.save;
     if (!j || j.stage === "egg") { toast("Tap a Jinx first to pick who goes to class."); return; }
     const r = D.rng(1000 + s.records.runs * 7 + s.records.hatched);
-    const pool = Object.keys(JG.CARDS).filter((id) => [1, 2].includes(JG.CARDS[id].rarity) && !JG.CARDS[id].exhaust);
+    const pool = Object.keys(JG.CARDS).filter((id) => [1, 2].includes(JG.CARDS[id].rarity) && !JG.CARDS[id].exhaust && !JG.CARDS[id].polished);
     const offers = [];
     while (offers.length < 3) { const id = pool[(r() * pool.length) | 0]; if (!offers.includes(id)) offers.push(id); }
     const knows = (j.learned || []).map((id) => JG.CARDS[id].name);
@@ -1197,15 +1197,26 @@
       <button class="btn" data-act="close">Back</button>`, { close: closeModal });
   }
 
-  function confirmRun(j) {
+  // What an understudy does when it is cued, by its best stat.
+  const CUE_TEXT = { juggle: "throws a quick hit that can't be countered", tumble: "shields you with Block", glow: "heals you", grit: "wipes off Dazed, Pied and Gunk" };
+  function confirmRun(j, pickUid) {
     if (j.belly < 15) { toast(`${j.name} is too hungry to perform. Feed them first.`); return; }
     const deck = starterDeck(j);
+    // a second hatched Jinx can wait in the wings; the one that loves you most is offered first
+    const others = G.save.jinxes.filter((x) => x.stage !== "egg" && x.id !== j.id).sort((a, b) => b.love - a.love);
+    const uid = pickUid === undefined ? (others[0] ? others[0].id : null) : pickUid;
+    const u = others.find((x) => x.id === uid);
+    const wings = others.length ? `<h3>Understudy</h3>
+      <div class="row wrap">${others.map((x) => `<button class="chip${x.id === uid ? " on" : ""}" data-act="under" data-id="${x.id}" aria-pressed="${x.id === uid}">${esc(x.name)}</button>`).join("")}<button class="chip${u ? "" : " on"}" data-act="under" data-id="" aria-pressed="${!u}">Nobody</button></div>
+      <p class="note">${u ? `${esc(u.name)} waits in the wings. Cue them ${u.love >= 40 ? "twice" : "once"} a fight and ${esc(u.name)} ${CUE_TEXT[D.jinxLook(u).best]}. Once a run they take a fall for ${esc(j.name)}. They share a little of the practice.` : `${esc(j.name)} goes on alone.`}</p>` : "";
     modal(`<h2>Showtime for ${esc(j.name)}?</h2>
       <p>Three acts of the cosmic circus: <b>${JG.ACTS.map((a) => a.name).join("</b>, <b>")}</b>. Each act ends with a Ringmaster.</p>
       ${ringHtml(j)}
       <p class="note">Health ${maxHpFor(j, []) + (j.trait === "glutton" && j.belly >= 70 ? 6 : 0)}. Starting deck of ${deck.length}: ${deckSummary(deck)}.</p>
+      ${wings}
       <div class="row"><button class="btn big" data-act="go">Raise the curtain</button><button class="btn ghost" data-act="close">Not yet</button></div>`,
-      { close: closeModal, go: () => { closeModal(); startRun(j); } });
+      { close: closeModal, go: () => { closeModal(); startRun(j, u ? u.id : null); },
+        under: (b) => { const x = others.find((o) => String(o.id) === b.dataset.id); confirmRun(j, x ? x.id : null); } });
   }
 
   // =====================================================================
@@ -1227,10 +1238,10 @@
     deck.forEach((id) => (c[id] = (c[id] || 0) + 1));
     return Object.keys(c).map((id) => `${c[id]} ${JG.CARDS[id].name}`).join(", ");
   }
-  function startRun(j) {
+  function startRun(j, uid) {
     A.init();
     G.selected = null;
-    const run = { jid: j.id, act: 1, floor: -1, at: -1, map: genMap(1), deck: starterDeck(j), charms: [], tix: 0, loot: [], xp: { juggle: 0, tumble: 0, glow: 0, grit: 0 }, patchUsed: false, seen: [], foesSeen: [] };
+    const run = { jid: j.id, uid: uid || null, act: 1, floor: -1, at: -1, map: genMap(1), deck: starterDeck(j), charms: [], tix: 0, loot: [], xp: { juggle: 0, tumble: 0, glow: 0, grit: 0 }, patchUsed: false, seen: [], foesSeen: [] };
     run.maxHp = maxHpFor(j, run.charms) + (j.trait === "glutton" && j.belly >= 70 ? 6 : 0);
     run.hp = run.maxHp;
     run.loveStart = j.love;
@@ -1468,7 +1479,7 @@
   }
   function rewardCards(kind) {
     const j = runJinx();
-    const pool = Object.keys(JG.CARDS).filter((id) => JG.CARDS[id].rarity > 0);
+    const pool = Object.keys(JG.CARDS).filter((id) => JG.CARDS[id].rarity > 0 && !JG.CARDS[id].polished);
     const weight = (id) => {
       const c = JG.CARDS[id];
       let w = [0, 6, 3, 1][c.rarity] * (kind === "boss" && c.rarity === 3 ? 6 : 1) * (kind === "elite" && c.rarity >= 2 ? 2 : 1);
@@ -1493,9 +1504,10 @@
   // Applause (the crowd), the Jinx's own will (love, mood and trait), and a mechanic per lean (form).
   function leanForm(j) { return j.align <= -0.33 ? "sludge" : j.align >= 0.33 ? "stardust" : (j.moon || 0) >= 0.33 ? "pierrot" : "harlequin"; }
   // A Pierrot may hold two cards, and a card it held costs 1 less.
-  const maxHold = (B) => (B.form === "pierrot" ? 2 : 1);
+  const maxHold = (B) => (B.form === "pierrot" ? 2 : 1) + (G.run && G.run.charms.includes("sleeve") ? 1 : 0);
   function costOf(card, B) {
     const c = JG.CARDS[card.id].cost;
+    if (B && B.played === 2 && G.run && G.run.charms.includes("metronome")) return 0;
     return B && B.form === "pierrot" && (B.kept || []).includes(card.u) ? Math.max(0, c - 1) : c;
   }
   JG.leanForm = leanForm;
@@ -1520,13 +1532,138 @@
     });
     if (r.charms.includes("nose")) B.p.st.hype = 1;
     if (r.charms.includes("kazoo")) B.foe.st.dazed = 1;
+    B.foe.moves = def.moves;   // its routine; a Headliner or Ringmaster swaps it in the second act
     B.foe.intent = def.moves[0];
+    // something else on stage to aim at: Headliners bring one, and so do some Hecklers after Act I
+    B.target = "foe";
+    const propId = def.prop || (kind === "fight" && r.act > 1 && rand() < 0.35 ? pick(JG.HECKLER_PROPS) : null);
+    if (propId) B.prop = makeProp(propId, r.act);
+    const u = understudy();
+    B.cues = u ? 1 + (u.love >= 40 ? 1 : 0) + (r.charms.includes("script") ? 1 : 0) : 0;
     setMode("battle");
     renderRunbar();
     $("#foeName").textContent = def.name;
     $("#battleTitle").textContent = kind === "boss" ? "Ringmaster" : kind === "elite" ? "Headliner" : "Heckler";
     startTurn(true);
   }
+  // The second Jinx waiting in the wings, while it can still help.
+  const understudy = () => (G.run && G.run.uid && !G.run.underOut ? jinxById(G.run.uid) : null);
+  function makeProp(id, act) {
+    const def = JG.PROPS[id], hp = Math.round(def.hp * JG.TUNE.hp[act - 1]);
+    return { id, def, hp, maxHp: hp, fuse: def.fuse || 0 };
+  }
+  const propBoom = (B) => Math.round(B.prop.def.boom * JG.TUNE.dmg[B.act - 1]);
+  // Only damage touches a prop. It never hits back, so it is a safe target while the foe is in a counter stance.
+  function hurtProp(n) {
+    const B = G.B, p = B.prop, fp = scr("f"), hammer = G.run.charms.includes("hammer");
+    if (hammer) n *= 2;
+    p.hp -= n;
+    D.float(fp.x + 80, fp.y + 10, `-${n}`, "#ffffff");
+    sfx("hit");
+    if (p.hp <= 0) {
+      B.prop = null;
+      B.target = "foe";
+      D.float(fp.x + 80, fp.y - 25, `${p.def.name} breaks!`, "#ffd23f", true);
+      D.burst(fp.x + 80, fp.y, "confetti", 18, "multi");
+      addApplause(10);
+      D.fx.cheer(B, 3);
+      sfx("win");
+      if (hammer) { B.p.energy++; D.float(scr("p").x, scr("p").y - 60, "Glass Hammer: +1 energy", "#8fe9ff"); }
+    }
+    renderBattle();
+  }
+  // What a prop does on the foe's turn, for as long as it stands.
+  async function propTurn(B) {
+    const p = B.prop, d = p.def, f = B.foe, fp = scr("f"), pp = scr("p");
+    if (d.boo) {
+      if (has(B, "head", "mask")) D.float(pp.x, pp.y - 115, "Poker face: the boos bounce off", "#efe6d2");
+      else addApplause(-d.boo, `Boo from the cheap seats! -${d.boo} Applause`);
+    }
+    if (d.mend && f.hp < f.maxHp) { const h = Math.min(f.maxHp - f.hp, d.mend); f.hp += h; D.float(fp.x, fp.y - 60, `+${h} ${d.name}`, "#8fe9ff"); sfx("heal"); }
+    if (d.fuse) {
+      p.fuse--;
+      if (p.fuse <= 0) {
+        const n = propBoom(B);
+        B.prop = null;
+        B.target = "foe";
+        D.float(fp.x + 80, fp.y - 25, "Bang!", "#ff5fa8", true);
+        D.burst(pp.x, pp.y - 20, "confetti", 30, "multi");
+        hurtPlayer(n);
+      } else D.float(fp.x + 80, fp.y - 25, `Fuse: ${p.fuse}`, "#ffd23f");
+    }
+    renderBattle();
+    await sleep(250);
+  }
+  // The foe lines up its next move. At half health it starts its second act instead:
+  // a Headliner or Ringmaster changes its whole routine, and a Heckler gets angry.
+  function nextMove(B) {
+    const f = B.foe, fp = scr("f");
+    if (!f.act2 && f.hp <= f.maxHp / 2) {
+      f.act2 = true;
+      const a = f.def.act2;
+      D.float(fp.x, fp.y - 130, "Second act!", "#ff5fa8", true);
+      sfx("debuff");
+      if (a) { f.moves = a.moves; f.mi = 0; toast(`${f.def.name}: ${a.say}`); }
+      else {
+        const h = B.act >= 3 ? 2 : 1;
+        f.st.hype = (f.st.hype || 0) + h;
+        D.float(fp.x, fp.y - 80, `Angry! +${h} Hype`, "#ff8a3d");
+        f.mi = (f.mi + 1) % f.moves.length;
+      }
+      f.charge = false;
+      f.flinchNeed = 0;
+      if (f.def.prop2 && !B.prop) { B.prop = makeProp(f.def.prop2, B.act); D.float(fp.x + 80, fp.y - 25, `${B.prop.def.name}!`, "#ffd23f", true); }
+    } else f.mi = (f.mi + 1) % f.moves.length;
+    f.intent = f.moves[f.mi];
+  }
+
+  // ---- crowd requests ----
+  // Every turn the crowd calls for something. Giving it to them pays Applause and a couple of Tix;
+  // three in a row earns an encore (1 extra energy). Ignoring them costs a little Applause.
+  const REQ_TYPE = { atk: "an Attack", blk: "a Guard", eth: "an Ether card", gunk: "a Sludge card", trick: "a Trick" };
+  function newRequest(B) {
+    const types = [...new Set(B.hand.map((c) => JG.CARDS[c.id].type))];
+    const opts = [];
+    for (const t of types) {
+      opts.push({ k: "open", t, text: `Open with ${REQ_TYPE[t]}` });
+      opts.push({ k: "close", t, text: `Finish on ${REQ_TYPE[t]}` });
+    }
+    if (B.hand.length >= 3) opts.push({ k: "many", text: "Play 3 cards or more" }, { k: "many", text: "Play 3 cards or more" });
+    if (B.hand.some((c) => comboOf(JG.CARDS[c.id], null))) opts.push({ k: "combo", text: "Land a combo" }, { k: "combo", text: "Land a combo" });
+    if (!B.foe.st.counter) { const n = Math.round(9 * JG.TUNE.hp[B.act - 1]); opts.push({ k: "big", n, text: `Deal ${n} damage this turn` }, { k: "big", n, text: `Deal ${n} damage this turn` }); }
+    if (B.hand.filter((c) => JG.CARDS[c.id].type !== "atk").length >= 2) opts.push({ k: "hush", text: "No Attacks this turn" });
+    const fresh = opts.filter((o) => !B.req || o.k !== B.req.k);   // not the same kind twice running
+    B.req = (fresh.length ? pick(fresh) : opts.length ? pick(opts) : null) || null;
+  }
+  // true: they have it. false: it can't happen any more. null: still open. final: the turn is over.
+  function reqState(B, final) {
+    const q = B.req;
+    if (!q) return null;
+    if (q.k === "open") return B.played ? B.firstType === q.t : final ? false : null;
+    if (q.k === "close") return final ? B.turnLast === q.t : null;
+    if (q.k === "many") return B.played >= 3 ? true : final ? false : null;
+    if (q.k === "combo") return B.comboHit ? true : final ? false : null;
+    if (q.k === "big") return (B.turnDmg || 0) >= q.n ? true : final ? false : null;
+    if (q.k === "hush") return B.atkPlayed ? false : final ? B.played > 0 : null;
+    return null;
+  }
+  function settleRequest(B) {
+    if (!B.req || B.over) return;
+    const ok = reqState(B, true), k = G.run.charms.includes("shill") ? 2 : 1, pp = scr("p");
+    if (ok) {
+      addApplause(12 * k, "The crowd gets what it wants!");
+      G.run.tix += 2;
+      D.fx.cheer(B, 3);
+      sfx("coin");
+      B.reqStreak = (B.reqStreak || 0) + 1;
+      if (B.reqStreak >= 3) { B.reqStreak = 0; B.encore = true; D.float(pp.x, pp.y - 150, "Encore! +1 energy next turn", "#ffd23f", true); }
+    } else {
+      addApplause(-6 * k, "Not what they asked for…");
+      B.reqStreak = 0;
+    }
+    B.req = null;
+  }
+
   function shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) { const k = (rand() * (i + 1)) | 0; [a[i], a[k]] = [a[k], a[i]]; }
     return a;
@@ -1585,8 +1722,13 @@
     B.turnDmg = 0;
     B.types = [];
     B.p.block = first && r.charms.includes("bell") ? 6 : 0;
-    B.p.energy = 3 + (first && r.charms.includes("glowstick") ? 1 : 0) + (B.hatTrick ? 1 : 0);
+    B.p.energy = 3 + (first && r.charms.includes("glowstick") ? 1 : 0) + (B.hatTrick ? 1 : 0) + (B.encore ? 1 : 0);
+    B.encore = false;
     B.poker = false;
+    B.firstType = null;
+    B.turnLast = null;
+    B.atkPlayed = 0;
+    B.comboHit = false;
     if (has(B, "head", "disc") && !B.fullMoon) {
       B.moon++;
       if (B.moon >= 4) { B.fullMoon = true; D.float(scr("p").x, scr("p").y - 120, "Full moon!", "#eaf4ff", true); sfx("buff"); }
@@ -1613,6 +1755,7 @@
       D.float(scr("p").x, scr("p").y - 90, "Forgot a card…", "#9a8fb0");
     }
     B.wild = B.form === "harlequin" && B.hand.length ? pick(B.hand).u : null;
+    newRequest(B);
     B.busy = false;
     renderBattle();
     const hd = $("#hand");
@@ -1640,7 +1783,7 @@
   }
   function foeHitValue(base) {
     const B = G.B;
-    let d = Math.round(base * JG.TUNE.dmg[B.act - 1]) + (B.foe.st.hype || 0);
+    let d = Math.round(base * JG.TUNE.dmg[B.act - 1]) + (B.foe.st.hype || 0) + (B.prop && B.prop.def.amp ? B.prop.def.amp : 0);
     if (B.foe.st.dazed) d *= 0.75;
     if (B.p.st.pied) d *= 1.5;
     return Math.floor(d);
@@ -1672,7 +1815,21 @@
     $("#foeSt").innerHTML = statusHtml(B.foe.st, B.foe.block);
     const fl = B.foe.charge && B.foe.flinchNeed
       ? `<span class="flinch" title="Deal this much damage in one turn and it loses the big hit"><b>Make it flinch:</b> ${Math.min(B.turnDmg || 0, B.foe.flinchNeed)}/${B.foe.flinchNeed} damage this turn<span class="fbar"><i style="width:${Math.min(100, ((B.turnDmg || 0) / B.foe.flinchNeed) * 100)}%"></i></span></span>` : "";
-    $("#intent").innerHTML = B.over ? "" : B.foe.stunned ? `<span class="in in-heal">Stunned: it loses its turn</span>` : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}${fl}` + (has(B, "head", "bulb") ? `<span class="then" title="${esc(JG.PARTS.head.bulb.desc)}"><span class="in-label">Then:</span>${intentHtml(B.foe.def.moves[(B.foe.mi + 1) % B.foe.def.moves.length])}</span>` : "");
+    $("#intent").innerHTML = B.over ? "" : B.foe.stunned ? `<span class="in in-heal">Stunned: it loses its turn</span>` : `<span class="in-label">Next:</span>${intentHtml(B.foe.intent)}${fl}` + (has(B, "head", "bulb") ? `<span class="then" title="${esc(JG.PARTS.head.bulb.desc)}"><span class="in-label">Then:</span>${intentHtml(B.foe.moves[(B.foe.mi + 1) % B.foe.moves.length])}</span>` : "");
+    // what the crowd is calling for this turn
+    const rq = B.req, rs = reqState(B, false);
+    $("#crowdReq").innerHTML = rq && !B.over ? `<span class="in-label">The crowd wants</span><b class="rq${rs === true ? " met" : rs === false ? " miss" : ""}">${rs === true ? "✓ " : rs === false ? "✗ " : ""}${rq.text}${rq.k === "big" && rs !== true ? ` (${B.turnDmg || 0}/${rq.n})` : ""}</b>` : "";
+    // a prop to aim at
+    const P = B.prop;
+    $("#prop").innerHTML = P && !B.over ? `<span class="in-label">Aim at</span>
+      <button class="chip${B.target === "foe" ? " on" : ""}" data-aim="foe" aria-pressed="${B.target === "foe"}">${esc(B.foe.def.name)}</button>
+      <button class="chip${B.target === "prop" ? " on" : ""}" data-aim="prop" aria-pressed="${B.target === "prop"}">${P.def.glyph} ${P.def.name} ${P.hp}/${P.maxHp}</button>
+      <small class="propdesc">${P.def.desc}${P.def.fuse ? ` ${P.fuse} turn${P.fuse === 1 ? "" : "s"} left, then ${propBoom(B)} damage.` : ""} Only damage touches it.</small>` : "";
+    // the understudy's cue and a snack from the bag
+    const u = r.uid ? jinxById(r.uid) : null, snacks = r.loot.filter((id) => snackFx(id)).length;
+    $("#youActs").innerHTML = (u ? (r.underOut ? `<span class="in-label">${esc(u.name)} is out cold</span>`
+      : `<button class="chip" data-do="cue" ${B.busy || B.over || !B.cues ? "disabled" : ""}>Cue ${esc(u.name)} · ${B.cues} left</button>`) : "")
+      + (snacks ? `<button class="chip" data-do="snack" ${B.busy || B.over || B.snacked ? "disabled" : ""}>${B.snacked ? "Snack eaten" : "Snack · " + snacks + " in the bag"}</button>` : "");
     const d = B.foe.def;
     $("#foeTraits").innerHTML = (d.weak ? `<span class="weak">Weak to ${TYPE_NAME[d.weak]}</span>` : "") + (d.resist ? `<span class="resist">Shrugs off ${TYPE_NAME[d.resist]}</span>` : "");
     const types = B.types || [];
@@ -1721,10 +1878,25 @@
   }
   $("#endTurn").addEventListener("click", () => endTurn());
   $("#showstop").addEventListener("click", () => showstopper());
+  function aimAt(k) {
+    const B = G.B;
+    if (!B || B.over || !B.prop) return;
+    B.target = k || (B.target === "prop" ? "foe" : "prop");
+    sfx("card");
+    renderBattle();
+  }
+  $("#prop").addEventListener("click", (e) => { const b = e.target.closest("[data-aim]"); if (b) aimAt(b.dataset.aim); });
+  $("#youActs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-do]");
+    if (!b || b.disabled) return;
+    if (b.dataset.do === "cue") cue(); else openSnack();
+  });
   addEventListener("keydown", (e) => {
     if (G.mode !== "battle" || !G.B || G.B.busy || G.B.over || !$("#modal").hidden) return;
     if (e.key === "e" || e.key === "E") endTurn();
     if (e.key === "s" || e.key === "S") showstopper();
+    if (e.key === "t" || e.key === "T") aimAt();
+    if (e.key === "c" || e.key === "C") cue();
     const dg = /^Digit([1-9])$/.exec(e.code || "");
     if (dg && e.shiftKey) { toggleHold(+dg[1] - 1); return; }
     const n = parseInt(e.key, 10);
@@ -1763,6 +1935,10 @@
     }
     if (c.type === "gunk") gainRunXp("glow", 1);
     B.played++;
+    if (B.played === 1) B.firstType = c.type;
+    B.turnLast = c.type;
+    if (c.type === "atk") B.atkPlayed++;
+    if (combo && combo.on && !half) B.comboHit = true;
     const pp = scr("p");
     if (half) {
       addApplause(1);
@@ -1789,7 +1965,7 @@
     if (B.form === "stardust" && c.type === "eth") gainRes(1);
     const fx = half ? scaleFx(fx0, 0.5) : fx0;
     for (let rep = 0; rep < (wild ? 2 : 1); rep++) {
-      if (!(await applyFx(fx, CARD_STYLE[card.id], c.type))) return;
+      if (!(await applyFx(fx, CARD_STYLE[card.id.replace("+", "")], c.type))) return;
       if (rep === 0 && wild) await sleep(200);
     }
     if (B.fullMoon && c.type === "atk") { B.fullMoon = false; B.moon = 0; }   // the moon is spent
@@ -1816,16 +1992,18 @@
       const hit = () => (fx.dmg ? dmgValue(fx.dmg, B, type) : blockHitValue(B, fx.blockScale, type));
       const m = typeMult(B, type);
       if (m !== 1) D.float(fp.x, fp.y - 95, m > 1 ? "Weak spot!" : "Shrugged off", m > 1 ? "#ffd23f" : "#9a8fb0");
+      // damage goes where you are aiming: the foe, or a prop while one stands
+      const strike = (n) => (B.target === "prop" && B.prop ? hurtProp(n) : hurtFoe(n));
       for (let h = 0; h < hits; h++) {
         await D.fx.attack(style || "punch", "p", B);
-        hurtFoe(hit());
+        strike(hit());
         if (B.over) return false;
         sludgeTouch();
         await sleep(hits > 1 ? 90 : 120);
       }
       if (fx.piedHit && B.foe.st.pied) {
         await D.fx.attack(style || "punch", "p", B);
-        hurtFoe(hit());
+        strike(hit());
         if (B.over) return false;
         sludgeTouch();
       }
@@ -1930,6 +2108,14 @@
         r.hp = 1;
         D.float(pp.x, pp.y - 80, "Iron-On Patch!", "#ff5fa8", true);
         sfx("buff");
+      } else if (understudy()) {
+        // once a run the understudy takes the fall, and is out for the rest of it
+        const u = understudy();
+        r.underOut = true;
+        B.cues = 0;
+        r.hp = Math.max(1, Math.round(r.maxHp * 0.25));
+        D.float(pp.x, pp.y - 80, `${u.name} takes the fall!`, "#8fe9ff", true);
+        sfx("buff");
       } else {
         r.hp = 0;
         loseBattle();
@@ -1966,6 +2152,70 @@
       if (B.foe.st.counter && (fx.dmg || fx.blockHit)) fx = { block: 5 };
       await applyFx(fx);
     }
+  }
+
+  // Call the understudy on. It is free, and what it does depends on its best stat.
+  async function cue() {
+    const B = G.B, r = G.run, u = understudy();
+    if (!B || B.busy || B.over || !u || !B.cues) return;
+    B.busy = true;
+    B.cues--;
+    const bo = bonuses(u), pp = scr("p"), best = D.jinxLook(u).best;
+    D.float(pp.x - 50, pp.y - 135, `${u.name} runs on!`, "#8fe9ff", true);
+    sfx("honk");
+    addApplause(4);
+    renderBattle();
+    await sleep(350);
+    if (best === "juggle") {
+      await D.fx.attack("stars", "p", B);
+      const n = 7 + bo.atk * 2;
+      if (B.target === "prop" && B.prop) hurtProp(n); else hurtFoe(n, false, true);   // too quick to be countered
+      if (B.over) return;
+    } else if (best === "tumble") await applyFx({ block: 7 + bo.blk });
+    else if (best === "glow") await applyFx({ heal: 5 + bo.heal * 2 });
+    else {
+      delete B.p.st.dazed; delete B.p.st.pied; delete B.p.st.gunk;
+      D.float(pp.x, pp.y - 60, "Wiped down: Dazed, Pied and Gunk gone", "#a6d94a");
+      await applyFx({ block: 4 });
+    }
+    B.busy = false;
+    renderBattle();
+  }
+  // What a snack from the bag does if it is eaten in a fight instead of taken home.
+  function snackFx(id) {
+    const it = JG.ITEMS[id], xp = it.xp || {}, ks = Object.keys(xp);
+    if (ks.length > 1) return { text: "Heal 4 and Block 4", fx: { heal: 4, block: 4 } };
+    if (!ks.length) return it.mood ? { text: "+20 Applause", applause: 20 } : null;
+    const big = xp[ks[0]] >= 20;
+    return {
+      juggle: { text: `+${big ? 2 : 1} Hype`, fx: { hype: big ? 2 : 1 } },
+      tumble: { text: `Block ${big ? 15 : 8}`, fx: { block: big ? 15 : 8 } },
+      glow: { text: `Heal ${big ? 12 : 6}`, fx: { heal: big ? 12 : 6 } },
+      grit: { text: `Shake off Gunk, Dazed and Pied, and heal ${big ? 8 : 3}`, clear: true, fx: { heal: big ? 8 : 3 } }
+    }[ks[0]];
+  }
+  function openSnack() {
+    const B = G.B, r = G.run;
+    if (!B || B.busy || B.over || B.snacked) return;
+    const ids = [...new Set(r.loot)].filter((id) => snackFx(id));
+    if (!ids.length) return;
+    modal(`<h2>A snack from the bag</h2><p class="tag">One snack each fight, and it's free to eat. But a snack eaten here doesn't come home.</p>
+      <div class="choices">${ids.map((id) => `<button class="btn choice" data-act="eat" data-id="${id}">${itemChip(id, r.loot.filter((x) => x === id).length)} ${snackFx(id).text}</button>`).join("")}</div>
+      <button class="btn ghost" data-act="close">Save them</button>`, { close: closeModal, eat: (b) => { closeModal(); eatSnack(b.dataset.id); } });
+  }
+  async function eatSnack(id) {
+    const B = G.B, r = G.run, s = snackFx(id), i = r.loot.indexOf(id), pp = scr("p");
+    if (!B || B.busy || B.over || B.snacked || !s || i < 0) return;
+    B.busy = true;
+    B.snacked = true;
+    r.loot.splice(i, 1);
+    D.float(pp.x, pp.y - 120, `${B.jinx.name} eats the ${JG.ITEMS[id].name}`, JG.ITEMS[id].color, true);
+    sfx("eat");
+    if (s.applause) addApplause(s.applause);
+    if (s.clear) { delete B.p.st.dazed; delete B.p.st.pied; delete B.p.st.gunk; }
+    if (s.fx) await applyFx(s.fx);
+    B.busy = false;
+    renderBattle();
   }
 
   async function showstopper() {
@@ -2029,6 +2279,7 @@
     if (!B || B.busy || B.over) return;
     B.busy = true;
     if (!B.played) addApplause(-10, "The crowd yawns…");
+    settleRequest(B);
     const holds = B.holds || [];
     const kept = B.hand.filter((c) => holds.includes(c.u));
     B.disc.push(...B.hand.filter((c) => !holds.includes(c.u)));
@@ -2053,15 +2304,16 @@
       if (B.over) return;
       await sleep(350);
     }
+    if (B.prop) { await propTurn(B); if (B.over) return; }
     if (f.stunned) {
       // it flinched: the big hit is lost, and it starts its routine over after it
       f.stunned = false;
       D.float(fp.x, fp.y - 60, "Stunned", "#c9b8ff");
-      const moves = f.def.moves;
+      const moves = f.moves;
       let k = f.mi;
       for (let i = 0; i < moves.length && !moves[k].atk; i++) k = (k + 1) % moves.length;
-      f.mi = (k + 1) % moves.length;
-      f.intent = moves[f.mi];
+      f.mi = k;
+      nextMove(B);
       for (const q of ["dazed", "pied"]) if (f.st[q]) f.st[q]--;
       if (B.p.st.pied) B.p.st.pied--;
       await sleep(500);
@@ -2100,8 +2352,7 @@
     if (m.pied) { B.p.st.pied = (B.p.st.pied || 0) + m.pied; D.float(pp.x, pp.y - 75, `Pied +${m.pied}`, "#efe6d2"); sfx("debuff"); }
     if (m.gunk) { await D.fx.attack("goo", "f", B); B.p.st.gunk = (B.p.st.gunk || 0) + m.gunk; D.float(pp.x, pp.y - 90, `Gunk +${m.gunk}`, "#a6d94a"); sfx("gunk"); }
     for (const k of ["dazed", "pied"]) if (f.st[k]) f.st[k]--;
-    f.mi = (f.mi + 1) % f.def.moves.length;
-    f.intent = f.def.moves[f.mi];
+    nextMove(B);
     await sleep(300);
     startTurn(false);
   }
@@ -2186,7 +2437,7 @@
     }, { wide: true });
   }
   function randomCharm() {
-    const left = Object.keys(JG.CHARMS).filter((c) => !G.run.charms.includes(c));
+    const left = Object.keys(JG.CHARMS).filter((c) => !G.run.charms.includes(c) && (JG.CHARMS[c].needs !== "understudy" || G.run.uid));
     return left.length ? pick(left) : null;
   }
   function addCharm(c) {
@@ -2293,10 +2544,20 @@
       <p>The tent smells like incense and burnt fuses. A crystal ball shows ${esc(j.name)} doing something heroic, then something embarrassing.</p>
       <div class="choices">
         <button class="btn choice" data-act="nap">Nap on the cushions: heal ${Math.min(nap, r.maxHp - r.hp)}</button>
+        <button class="btn choice" data-act="polish">Rehearse: polish one trick, so it hits harder or costs less</button>
       </div>
       <h3>Or practice: one stat goes up for good</h3>
       <div class="row wrap">${stats}</div>`, {
       nap: () => { r.hp = Math.min(r.maxHp, r.hp + nap); sfx("heal"); closeModal(); nodeDone(); },
+      polish: () => showDeck((i) => {
+        const id = r.deck[i], up = JG.CARDS[id + "+"];
+        if (!up) { toast("That one is already polished."); return; }
+        r.deck[i] = id + "+";
+        sfx("buff");
+        closeModal();
+        toast(`${JG.CARDS[id].name} is now ${up.name}.`);
+        nodeDone();
+      }, "Polish which trick?", runRest),
       train: (b) => {
         const s = b.dataset.s;
         // a whole level whatever the aptitude grade, keeping the progress it already had
@@ -2322,6 +2583,16 @@
       const ups = addXp(j, st, n);
       return { st, n, ups };
     });
+    // the understudy watched from the wings: it picks up some of the practice, and the two grow closer
+    const u = r.uid ? jinxById(r.uid) : null;
+    let wings = "";
+    if (u) {
+      let ups = 0;
+      for (const st of JG.STATS) ups += addXp(u, st, Math.round(r.xp[st] * mult * 0.3));
+      u.love = clamp(u.love + 4, 0, 100);
+      if (r.underOut) u.mood = clamp(u.mood - 20, 0, 100);
+      wings = `<p class="note">${esc(u.name)} watched from the wings and picked up some of the practice${ups ? ` (${ups} level${ups > 1 ? "s" : ""})` : ""}.${r.underOut ? ` Taking that fall has left them sore.` : ""}</p>`;
+    }
     let loot = r.loot.slice();
     let lost = 0;
     if (!won && loot.length > 1) { const keep = pick(loot); lost = loot.length - 1; loot = [keep]; }
@@ -2357,7 +2628,7 @@
     modal(`<p class="eyebrow">${won ? "Standing ovation" : "Curtain falls"}</p>
       <h2>${won ? `${esc(j.name)} conquered the Big Top Below!` : `${esc(j.name)} fainted in Act ${["I", "II", "III"][r.act - 1]}`}</h2>
       <p>${won ? "The whole cosmos is clapping. Every snack in the bag comes home, plus a 60 Tix bonus." + (topper ? " A Ringmaster dropped a Tiny Topper on the way out: it's in the hat box." : "") : `They wobble home sad and a bit sticky.${lost ? ` ${lost} thing${lost > 1 ? "s" : ""} fell out of the bag on the way.` : ""}`}</p>
-      <div class="cols"><div><h3>What they learned</h3><ul class="loot">${gl}</ul></div>
+      ${wings}<div class="cols"><div><h3>What they learned</h3><ul class="loot">${gl}</ul></div>
       <div><h3>Brought home</h3><ul class="loot"><li><span class="glyph" style="color:#ffd23f">✂</span><b>${tix}</b> Tix</li>${lootHtml}${eggsHome ? `<li><span class="glyph" style="color:#bfe0ff">\u2B2E</span>${eggsHome > 1 ? eggsHome + " strange eggs" : "A strange egg"}, now in the garden</li>` : ""}${eggsSold ? `<li><small>The garden was full, so ${eggsSold > 1 ? eggsSold + " strange eggs were" : "a strange egg was"} sold for 40 Tix each.</small></li>` : ""}</ul></div></div>
       <button class="btn big" data-act="home">Back to the garden</button>`, {
       home: () => {
@@ -2490,5 +2761,5 @@
   setMode("title");
   requestAnimationFrame(frame);
   // test hook for automated checks
-  JG.debug = { kindName, makeJinx, makeEgg, openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, runRest, effFx, dmgValue, blockHitValue, foeHitValue, bonuses, typeMult, gunkValue };
+  JG.debug = { kindName, makeJinx, makeEgg, openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, runRest, cue, eatSnack, snackFx, aimAt, newRequest, reqState, settleRequest, effFx, dmgValue, blockHitValue, foeHitValue, bonuses, typeMult, gunkValue };
 })();
