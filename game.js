@@ -1399,6 +1399,16 @@
     d *= typeMult(B, type);
     return Math.max(0, Math.floor(d));
   }
+  // Damage from a card that hits with your Block. Juggle and Hype don't add to it, but everything that
+  // multiplies an Attack does, so the Full moon it spends is not wasted.
+  function blockHitValue(B, scale, type) {
+    let d = B.p.block * (scale || 1);
+    if (B.p.st.dazed) d *= 0.75;
+    if (B.foe.st.pied) d *= 1.5;
+    if (B.fullMoon && type === "atk") d *= 2;
+    d *= typeMult(B, type);
+    return Math.max(0, Math.floor(d));
+  }
   // Which order bonus a card has, and whether it is live right now.
   function comboOf(c, B) {
     let label = null, fx = null, on = false;
@@ -1431,7 +1441,7 @@
     const p = [];
     if (fx.selfdmg) p.push(`Lose ${fx.selfdmg} health.`);
     if (fx.dmg) p.push(`Deal ${dmgValue(fx.dmg, B, c.type)}${fx.hits > 1 ? ` ×${fx.hits}` : ""}.`);
-    if (fx.blockHit) p.push(`Deal damage equal to your Block${B ? ` (${B.p.block})` : ""}.`);
+    if (fx.blockHit) p.push(`Deal damage equal to your Block${B ? ` (${blockHitValue(B, fx.blockScale, c.type)})` : ""}.`);
     if (fx.piedHit) p.push(`If the foe is Pied, hit again.`);
     if (fx.block) p.push(`Block ${fx.block + bo.blk}.`);
     if (fx.heal) p.push(`Heal ${fx.heal + bo.heal}.`);
@@ -1803,7 +1813,7 @@
     renderBattle();
     if (fx.dmg || fx.blockHit) {
       const hits = fx.hits || 1;
-      const hit = () => (fx.dmg ? dmgValue(fx.dmg, B, type) : Math.floor(B.p.block * (fx.blockScale || 1) * typeMult(B, type)));
+      const hit = () => (fx.dmg ? dmgValue(fx.dmg, B, type) : blockHitValue(B, fx.blockScale, type));
       const m = typeMult(B, type);
       if (m !== 1) D.float(fp.x, fp.y - 95, m > 1 ? "Weak spot!" : "Shrugged off", m > 1 ? "#ffd23f" : "#9a8fb0");
       for (let h = 0; h < hits; h++) {
@@ -2026,7 +2036,8 @@
     B.kept = kept.map((c) => c.u);
     B.holds = [];
     B.wild = null;
-    for (const k of ["dazed", "pied"]) if (B.p.st[k]) B.p.st[k]--;
+    // Dazed weakens your cards, so it counts down with your turn. Pied waits for the foe's turn (below).
+    if (B.p.st.dazed) B.p.st.dazed--;
     renderBattle();
     await sleep(300);
     await jinxActsAlone();
@@ -2052,6 +2063,7 @@
       f.mi = (k + 1) % moves.length;
       f.intent = moves[f.mi];
       for (const q of ["dazed", "pied"]) if (f.st[q]) f.st[q]--;
+      if (B.p.st.pied) B.p.st.pied--;
       await sleep(500);
       startTurn(false);
       return;
@@ -2081,6 +2093,9 @@
       f.flinchNeed = 0;
     }
     const pp = scr("p");
+    // Pied makes the foe's hits hurt more, so it counts down after the foe has swung, and before any new
+    // pie lands: a pie thrown this turn is still there for the next hit.
+    if (B.p.st.pied) B.p.st.pied--;
     if (m.dazed) { B.p.st.dazed = (B.p.st.dazed || 0) + m.dazed; D.float(pp.x, pp.y - 60, `Dazed +${m.dazed}`, "#c9b8ff"); sfx("debuff"); }
     if (m.pied) { B.p.st.pied = (B.p.st.pied || 0) + m.pied; D.float(pp.x, pp.y - 75, `Pied +${m.pied}`, "#efe6d2"); sfx("debuff"); }
     if (m.gunk) { await D.fx.attack("goo", "f", B); B.p.st.gunk = (B.p.st.gunk || 0) + m.gunk; D.float(pp.x, pp.y - 90, `Gunk +${m.gunk}`, "#a6d94a"); sfx("gunk"); }
@@ -2284,7 +2299,8 @@
       nap: () => { r.hp = Math.min(r.maxHp, r.hp + nap); sfx("heal"); closeModal(); nodeDone(); },
       train: (b) => {
         const s = b.dataset.s;
-        addXp(j, s, need(j.stats[s].lv));
+        // a whole level whatever the aptitude grade, keeping the progress it already had
+        if (j.stats[s].lv < 99) j.stats[s].lv++;
         if (s === "grit") { r.maxHp += 2; r.hp += 2; }
         sfx("buff");
         closeModal();
@@ -2474,5 +2490,5 @@
   setMode("title");
   requestAnimationFrame(frame);
   // test hook for automated checks
-  JG.debug = { kindName, makeJinx, makeEgg, openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, effFx, dmgValue, foeHitValue, bonuses, typeMult, gunkValue };
+  JG.debug = { kindName, makeJinx, makeEgg, openTalent, talentShow, cheer, startDuet, grantHat, toggleHold, G, startBattle, endRun, enterMap, hatchEgg, persist, playCard, endTurn, showstopper, runRest, effFx, dmgValue, blockHitValue, foeHitValue, bonuses, typeMult, gunkValue };
 })();

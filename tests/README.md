@@ -28,6 +28,7 @@ In Windows PowerShell, set a setting first and then run the check: `$env:PHONE =
 | `kinds` | Picture sheets of the three kinds: every hat on every head, and every pose. |
 | `kinds-save` | An old save becoming Umbras, and what duets pass on. |
 | `abilities` | The nine part abilities, one kind at a time, in a real fight. |
+| `rules` | Fight and run rules checked against exact numbers: a foe's pie, Mosh Pit, the Fortune tent. Fails if one is wrong. |
 | `stage` | Screenshots of fights in each act: idle, an attack in flight, the hit, a Showstopper, the foe's turn. PLAN=<json> picks the fights. |
 | `defeat` | A foe being beaten, frame by frame. |
 | `foes` | Close-ups of every foe, to check that parts line up. |
