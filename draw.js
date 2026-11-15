@@ -361,6 +361,53 @@
     }
     ctx.drawImage(L.cv, 0, 0, W, H);
   }
+  // Scenery that frames the view (curtains in the corners, the toy theatre's wings and ledge) is a
+  // screen-sized picture that is mostly hole. Copying the hole costs as much as copying paint, so the
+  // picture is looked over once for the blocks that have anything in them, and only those are copied.
+  const CELL = 24;
+  function paintedBlocks(cv) {
+    const w = cv.width, h = cv.height, cols = Math.ceil(w / CELL), rows = Math.ceil(h / CELL);
+    let px;
+    try { px = cv.getContext("2d").getImageData(0, 0, w, h).data; } catch (e) { return [[0, 0, w, h]]; }
+    const out = [];
+    let open = [];      // blocks still growing downward, from the row above
+    for (let r = 0; r < rows; r++) {
+      const y0 = r * CELL, y1 = Math.min(h, y0 + CELL), runs = [];
+      let start = -1;
+      for (let q = 0; q <= cols; q++) {
+        let any = false;
+        if (q < cols) {
+          const x0 = q * CELL, x1 = Math.min(w, x0 + CELL);
+          for (let y = y0; y < y1 && !any; y++) for (let i = (y * w + x0) * 4 + 3, e = (y * w + x1) * 4; i < e; i += 4) if (px[i]) { any = true; break; }
+        }
+        if (any && start < 0) start = q;
+        if (!any && start >= 0) { runs.push([start * CELL, Math.min(w, q * CELL)]); start = -1; }
+      }
+      // a run the same width as the one above it joins it: fewer, taller blocks
+      const next = [];
+      for (const [x0, x1] of runs) {
+        const up = open.find((b) => b[0] === x0 && b[0] + b[2] === x1);
+        if (up) { up[3] = y1 - up[1]; next.push(up); } else { const b = [x0, y0, x1 - x0, y1 - y0]; out.push(b); next.push(b); }
+      }
+      open = next;
+    }
+    return out;
+  }
+  // like g.drawImage(cv, x, y, w, h), leaving out the empty parts. Blocks meet on whole pixels of the
+  // screen, so no seam shows between them.
+  function pasteSparse(g, cv, x, y, w, h) {
+    const m = g.getTransform();
+    if (m.b || m.c) { g.drawImage(cv, x, y, w, h); return; }
+    const blocks = cv.blocks || (cv.blocks = paintedBlocks(cv));
+    const kx = (m.a * w) / cv.width, ky = (m.d * h) / cv.height, X = m.a * x + m.e, Y = m.d * y + m.f;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    for (const b of blocks) {
+      const x0 = Math.round(X + b[0] * kx), y0 = Math.round(Y + b[1] * ky), x1 = Math.round(X + (b[0] + b[2]) * kx), y1 = Math.round(Y + (b[1] + b[3]) * ky);
+      g.drawImage(cv, b[0], b[1], b[2], b[3], x0, y0, x1 - x0, y1 - y0);
+    }
+    g.restore();
+  }
   // run fn so that what it draws lands on the light sheet (when a cut-out is being made)
   function lightLayer(fn) {
     if (PS) {
@@ -585,7 +632,7 @@
       g.filter = "none";
     }
     const m = FGM * U, [px, py] = par(46), sn = (v) => Math.round(v * DPR) / DPR;
-    ctx.drawImage(fgCv, sn(-m + px), sn(-m + py), fgCv.width / DPR, fgCv.height / DPR);
+    pasteSparse(ctx, fgCv, sn(-m + px), sn(-m + py), fgCv.width / DPR, fgCv.height / DPR);
     // the lamp is lit
     glow(W * 0.075 + px, H * 0.6 + py, 70 * U, "#ffb36b", 0.2 + 0.05 * Math.sin(t * 5));
   }
@@ -4246,7 +4293,9 @@
     const tentX = I.cx - I.rx * 0.38, tentY = I.cy - I.ry * 0.55;
     const tw = I.rx * 0.55, th = I.rx * 0.5;
     const sv = G && G.save;
-    cachedLayer("garden-sky", 8, () => {
+    // One layer holds the far sky and the island: nothing is drawn between them, and every layer is a
+    // whole screen of copying each frame.
+    cachedLayer("garden-scene", 10, () => {
       eclipse(sun.x, sun.y, (portrait ? 44 : 58) * U, t);
       const [qx, qy] = par(12);
       planet(W * (portrait ? 0.78 : 0.82) + qx, H * (portrait ? 0.14 : 0.2) + qy, Math.min(W, H) * (portrait ? 0.09 : 0.08), t);
@@ -4258,9 +4307,7 @@
       farIsle(I.cx + I.rx * 1.0 + f2x, I.cy - I.ry * 0.5 + f2y, I.rx * 0.13, 0.2, t, 3, 2);
       fog(I.cy - I.ry * 0.8, I.ry * 0.45, 0.085, t, 0.01, 17);
       fog(I.cy + I.ry * 2.3, I.ry * 0.7, 0.07, t, -0.008, 29, "#7a5ac8");
-    });
-    // the island, with everything that lies flat on it: haze, the ring, the pond, and the shadows of things that stay put
-    cachedLayer("garden-ground", 10, () => {
+      // the island, with everything that lies flat on it: haze, the ring, the pond, and the shadows of things that stay put
       island(t);
       ctx.save();
       ctx.beginPath(); ctx.ellipse(I.cx, I.cy, I.rx, I.ry, 0, 0, Math.PI * 2); ctx.clip();
@@ -4377,7 +4424,7 @@
   };
 
   // helpers for stage.js, which draws the battle stage
-  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb, cachedLayer, camStep, par, fog, farIsle, eclipse, sun };
+  D._ = { ctx: () => ctx, glow, sparkle, heart, drawBg, particlesStep, planet, tent, lights, rng, mix, rgb, cachedLayer, pasteSparse, camStep, par, fog, farIsle, eclipse, sun };
 
   D.clear = function () {
     D.particles.length = 0;

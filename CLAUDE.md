@@ -63,7 +63,10 @@ Nearly all of a frame's cost is copying between canvases, so little is drawn fre
 - A cut-out with a `key` keeps its finished sticker and remakes it about 12 times a second, or when its `sig` changes (`cutout` in `draw.js`).
 - Foes keep a sticker for each part; only the parts' swing is live (`puppet`).
 - The garden's sky and ground and each stage backdrop are `cachedLayer`s. Fog bands are painted small and stretched.
+- The garden's far sky and island share one layer (`garden-scene`): every separate layer is a whole screen of copying each frame.
+- Screen-sized pictures that are mostly hole (the garden's corner framing, the toy theatre's wings and ledge) go through `pasteSparse`, which copies only the blocks with paint in them.
 - When adding something that must change at once, put it in the `sig`. When adding scenery, put it in a layer.
+- Frame timings on the laptop swing by half from one run to the next, so compare by pixels copied per frame at a pretend 60 fps instead. A sweep in November 2026 took the garden from 6.5 to 4.6 million and fights from about 4.0 to 3.4.
 - Measured in headless Chromium only: the phone-size garden went from 35 to 57 fps and Act III from 20 to 42. Real devices are unmeasured.
 
 ### Music

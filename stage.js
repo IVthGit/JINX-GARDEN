@@ -221,7 +221,8 @@
   }
   function theatre(B) {
     const y0 = Math.round((B.crowdY || H * 0.8) - 30 * U);
-    c.drawImage(layer("set" + B.act + ":" + y0, (g) => buildTheatre(g, B.act, y0)), 0, 0, W, H);
+    // only the wings and the ledge are copied, not the hole between them
+    X.pasteSparse(c, layer("set" + B.act + ":" + y0, (g) => buildTheatre(g, B.act, y0)), 0, 0, W, H);
   }
   // a lollipop stick holding a puppet up from below
   function stick(x, top) {
