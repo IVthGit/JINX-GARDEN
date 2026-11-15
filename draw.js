@@ -123,7 +123,9 @@
 
   // Depth: every layer of scenery slides by a different amount as the view shifts. cam runs -1 to 1.
   const cam = { x: 0, y: 0 };
+  const calm = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   function camStep(pointer, dt, t) {
+    if (calm) return cam;      // asked for less motion: the view stays put
     const tx = (pointer ? clamp((pointer[0] / W) * 2 - 1, -1, 1) * 0.7 : 0) + Math.sin(t * 0.13) * 0.3;
     const ty = (pointer ? clamp((pointer[1] / H) * 2 - 1, -1, 1) * 0.6 : 0) + Math.cos(t * 0.1) * 0.2;
     const k = Math.min(1, (dt || 0.016) * 2.5);
@@ -1699,7 +1701,7 @@
     const tall = u * 4.4, wide = o.spin ? tall : u * 1.75;
     // poses tick at 12 a second like stop motion; anything that turns or spins is redrawn every frame
     const quick = o.spin || o.twirl || o.hurt || Math.abs(dir) < 0.97;
-    cutout(drawBody, x, y, wide, tall, o.spin ? tall : u * 0.65, { dy: -lift, flat: o.flat, edgeColor: o.edgeColor, edge: Math.max(2.2, 2.6 * (o.scale || 1)),
+    cutout(drawBody, x, y, wide, tall, o.spin ? tall : u * 0.65, { dy: -lift, flat: o.flat, edgeColor: o.edgeColor, edge: Math.round(Math.max(2.2, 2.6 * (o.scale || 1)) * 5) / 5,      // in steps, or walking toward us remakes the sticker every frame
       key: "j:" + (j.id || j.name) + ":" + Math.round((o.scale || 1) * 4) + (o.evil ? "e" : ""), fps: quick ? 60 : walk ? 15 : 12,
       sig: [mood, walk ? 1 : 0, K.head, K.piece, K.body, K.lean, o.hat !== undefined ? o.hat : j.hat, sit ? 1 : 0, dir < 0 ? -1 : 1, o.spin ? 1 : 0, j.hue].join(",") });
 

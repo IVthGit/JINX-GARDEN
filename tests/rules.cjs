@@ -148,7 +148,7 @@ const { chromium } = require('playwright');
     return res;
   });
   console.log(out.join('\n'));
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
   if (errs.length || out.some(l => l.startsWith('WRONG'))) process.exit(1);
 })();

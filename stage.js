@@ -789,8 +789,8 @@
     const cueK = a.cue && rt - a.cue < 0.8 ? Math.sin(((rt - a.cue) / 0.8) * Math.PI) : 0;
     const fall = a.fall && rt - a.fall < 0.5 ? Math.sin((rt - a.fall) * 70) * 8 * U * (1 - (rt - a.fall) / 0.5) : 0;
     const sw = reduced ? 0 : Math.sin(st * 1.2) * 12 * U + cueK * 26 * U;
-    // on a narrow screen it tucks in so it stays on the stage and below the name plate
-    const x = Math.max(P.px - 168 * U, half + 10 * U) + sw + fall, y = P.feet - (P.portrait ? 150 : 168) * U - Math.abs(sw) * 0.2 - cueK * 14 * U;
+    // on a narrow screen it tucks in so it stays clear of the theatre's wing and below the name plate
+    const x = Math.max(P.px - 168 * U, half + clamp(W * 0.045, 22 * U, 58 * U) + 16 * U) + sw + fall, y = P.feet - (P.portrait ? 150 : 168) * U - Math.abs(sw) * 0.2 - cueK * 14 * U;
     rope(x - 44 * U - sw * 0.7, 0, x - 40 * U, y);
     rope(x + 44 * U - sw * 0.7, 0, x + 40 * U, y);
     c.fillStyle = INK; c.fillRect(x - 50 * U, y - 2 * U, 100 * U, 9 * U);

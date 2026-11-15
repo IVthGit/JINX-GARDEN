@@ -30,6 +30,6 @@ const { chromium } = require('playwright');
     }));
   }, setup.toString());
   await p.screenshot({ path: __dirname + '/out/kinds-poses.png' });
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

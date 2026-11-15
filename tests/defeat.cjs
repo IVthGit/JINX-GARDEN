@@ -13,6 +13,6 @@ const { chromium } = require('playwright');
   const i = await p.evaluate(() => JG.game.B.hand.findIndex(c => JG.CARDS[c.id].fx.dmg));
   await p.click(`#hand .card[data-i="${i}"]`, { position: { x: 12, y: 80 } });
   for (let k = 0; k < 6; k++) { await p.waitForTimeout(220); await p.screenshot({ path: __dirname + `/out/win-${k}.png`, clip: { x: 500, y: 60, width: 866, height: 520 } }); }
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

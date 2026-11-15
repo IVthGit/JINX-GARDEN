@@ -28,6 +28,7 @@ Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve
   - Each part brings its own trick to a fight, so a duet is also how you build a fighter: a hooded Umbra has Full moon and Bells together.
   - It also takes its colour, its lean, a trait and its aptitude grades from both of them. Now and then a grade comes out a step better.
   - Each singer needs 2 more shows before the next duet.
+  - The egg is safe once the song starts: if you close the game mid-song it is waiting in the ring when you come back.
 - **Aptitude:** the letter beside each stat, E up to S, is how fast that Jinx learns it. It is set at birth. An egg left by a loved Jinx often has better grades.
 - **Feed** from the pantry. Food fills the Belly and raises stats:
   - Juggle Plum raises Juggle, Springberry raises Tumble, Cotton Comet raises Glow, Sludge Pop raises Grit.
@@ -108,7 +109,9 @@ Open `index.html` in Chrome or Edge, or serve the folder (for example `npx serve
 - **Strange eggs:** a Headliner or a Ringmaster sometimes leaves an egg behind. It comes home with you and hatches into a Hollow or a Lantern. If the garden is full it is sold for 40 Tix.
 - **Winning** all three acts brings home everything in the bag, the Tix and 1.5 times the training.
 - **Fainting** keeps half the Tix, one thing from the bag and 0.6 times the training, and the Jinx comes home sad.
-- **Keys:** 1 to 9 play cards, Shift+1 to 9 hold one, S is the Showstopper, T switches aim, C cues the understudy, E ends the turn.
+- **Going home** part-way counts the same as fainting. Before the first stop on the map it costs nothing and doesn't count as a show.
+- **Keys:** 1 to 9 play cards, Shift+1 to 9 hold one, S is the Showstopper, T switches aim, C cues the understudy, E ends the turn. Escape closes a panel or a question.
+- **On a phone:** tap any small label (a status, a charm, a grade, the Applause meter) to read what it means.
 
 ## The look
 

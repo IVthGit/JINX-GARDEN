@@ -117,6 +117,6 @@ const { chromium } = require('playwright');
     const fights = (res.reduce((s, r) => s + (r.fights || 0), 0) / res.length).toFixed(1);
     console.log(`${bot.padEnd(6)} level ${String(lv).padStart(2)} lean ${String(align).padStart(4)}${moon ? ' moonlit' : ''}: fainted in act I ${by[0]}, II ${by[1]}, III ${by[2]}, won ${by[3]}   (avg ${fights} fights)` + (res.some((r) => r.err) ? '  ERR ' + res.filter((r) => r.err).map((r) => r.err).join(';') : ''));
   }
-  console.log(errs.slice(0, 5).join('\n') || 'no errors');
+  console.log(errs.slice(0, 5).join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

@@ -90,18 +90,28 @@ They print what happened and save pictures to `tests/out/`. Run the relevant one
 
 - **Foe revisions (paused):** every foe three ways (as now, repainted darker, redrawn). The user paused this before choosing, so don't apply any of it unasked. See `drafts/README.md`.
 
+## Small comforts
+
+Added in a sweep in November 2026; `tests/comforts.cjs` checks them.
+
+- The side panel only swaps its contents when they change (`renderPanel`), and never on its timer while a finger is down on it.
+- Anything with a `title` shows it as a toast when tapped by touch, so write explanations as `title`s.
+- Escape calls a modal's `close` handler if it has one, so give a modal a `close` when it can be declined.
+- A duet's egg is stored in the save (`duetEgg`) when the song starts and placed on the next load if the game was closed.
+- An unreadable save is copied to `jinxgarden.v1.unreadable` and the title says so.
+- With reduced motion on, the view doesn't drift or follow the pointer (`camStep`).
+- Sound: nothing is scheduled while sound is off, and the audio pauses when the tab is hidden.
+
 ## Known rough edges
 
 Found in an audit in November 2026 and not fixed yet. Offer them; don't fix them unasked.
 
 - The Ringleader's Shadow looks washed out: its see-through body lets the white paper edge show.
 - The title screen's text still describes the older, cuter game.
-- The side panel rebuilds every 2 seconds and can swallow a tap.
 - The fight screen is crowded on a phone, more so now that a prop and the understudy's buttons sit on the name plates.
 - The balance bots don't use crowd requests, props, the understudy, snacks or polishing, so they now underrate what a player can do.
 - Balance has drifted easier, and the Sludge lean is the weakest. Bot results at level 25: no abilities 3/12 wins, Umbra 6/12, Lantern 7/12, Hollow 12/18. The bot ignores Foresight, and mixes are unmeasured.
 - Most of the 27 mixes across the leans haven't been looked at by eye.
-- Parallax and screen shake ignore the reduced-motion setting.
 
 ## Conventions
 

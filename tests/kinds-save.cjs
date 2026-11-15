@@ -36,6 +36,6 @@ const { chromium } = require('playwright');
   console.log('duet children', kids.join(' | '));
   await p.screenshot({ path: __dirname + '/out/kinds-duet.png' });
   console.log('toast:', await p.evaluate(() => document.querySelector('#toast').textContent));
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

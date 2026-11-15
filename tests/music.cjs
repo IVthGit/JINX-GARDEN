@@ -38,6 +38,6 @@ const fs = require('fs');
     delete r.pcm;
     console.log(name.padEnd(8), JSON.stringify(r));
   }
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

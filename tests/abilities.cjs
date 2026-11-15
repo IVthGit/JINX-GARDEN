@@ -39,6 +39,6 @@ const OUT = __dirname + '/out/';
     console.log('== ' + kind + '\n' + log.join('\n'));
     await p.screenshot({ path: OUT + 'parts-' + kind + '.png' });
   }
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

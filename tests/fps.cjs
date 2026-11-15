@@ -15,6 +15,6 @@ const { chromium } = require('playwright');
     await p.waitForTimeout(1200);
     console.log('act', act, 'fps', await fps());
   }
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

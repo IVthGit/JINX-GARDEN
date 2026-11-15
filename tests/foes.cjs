@@ -30,6 +30,6 @@ const { chromium } = require('playwright');
     }, { chunk, t: +(process.argv[3] || 3.3) });
     await p.screenshot({ path: __dirname + `/out/big-${page}.png` });
   }
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

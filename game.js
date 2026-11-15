@@ -58,8 +58,13 @@
     const d = A.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = rand() * 2 - 1;
     JG.music.init(c, A.music, A.noise);
-    setInterval(() => JG.music.tick(musicScene()), 25);
+    setInterval(() => { if (A.on) JG.music.tick(musicScene()); }, 25);
   };
+  // a tab nobody is looking at goes quiet
+  document.addEventListener("visibilitychange", () => {
+    if (!A.ctx) return;
+    if (document.hidden) A.ctx.suspend(); else A.ctx.resume();
+  });
   // which piece should be playing
   function musicScene() {
     if (G.mode === "battle" && G.B) return (G.B.kind === "boss" ? "boss" : "battle") + (G.B.act || 1);
@@ -144,12 +149,15 @@
     else delete G.save.run;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) { /* storage blocked: play on without saving */ }
   }
+  // A save that can't be read is copied aside before anything can write over it.
+  let saveBroken = false;
   function loadSave() {
+    let s = null;
+    try { s = localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
+    if (!s) return null;
     try {
-      const s = localStorage.getItem(SAVE_KEY);
-      if (!s) return null;
       const o = JSON.parse(s);
-      if (!(o && o.v === 1 && Array.isArray(o.jinxes))) return null;
+      if (!(o && o.v === 1 && Array.isArray(o.jinxes))) throw new Error("not a garden");
       for (const j of o.jinxes) {
         if (j.stage !== "egg" && !JG.TRAITS[j.trait]) j.trait = pick(Object.keys(JG.TRAITS));
         if (j.stage !== "egg") {
@@ -164,7 +172,11 @@
         if (j.hat && !JG.HATS[j.hat]) j.hat = null;
       }
       return gardenDefaults(o);
-    } catch (e) { return null; }
+    } catch (e) {
+      saveBroken = true;
+      try { localStorage.setItem(SAVE_KEY + ".unreadable", s); } catch (e2) { /* no room: nothing more to do */ }
+      return null;
+    }
   }
 
   function blankStats(lo, hi) {
@@ -230,6 +242,12 @@
     if (!s.hats) s.hats = {};
     if (!s.records.ribbons) s.records.ribbons = {};
     for (const it of s.ground) it.held = false;
+    // a duet that was cut short by closing the game: its egg is waiting in the ring
+    if (s.duetEgg) {
+      if (s.jinxes.length < 6) { const e = makeEgg({ hue: s.duetEgg.hue, inherit: s.duetEgg.inherit, hatch: 45 }); e.u = -0.03; e.v = 0.13; s.jinxes.push(e); }
+      else s.inv.balloon = (s.inv.balloon || 0) + 1;
+      delete s.duetEgg;
+    }
     return s;
   }
   function demoSave() {
@@ -299,6 +317,8 @@
   });
   function show(id, on) { $(id).hidden = !on; }
   function setMode(m) {
+    // a garden hint has no business hanging over the map
+    if ((G.mode === "garden" || G.mode === "title") && m !== "garden" && m !== "title") $("#toast").classList.remove("show");
     G.mode = m;
     show("#title", m === "title");
     show("#hud", m === "garden");
@@ -313,7 +333,7 @@
   }
 
   function bar(v, max, color) {
-    return `<span class="bar"><i style="width:${clamp((v / max) * 100, 0, 100)}%;background:${color}"></i></span>`;
+    return `<span class="bar"><i style="width:${Math.round(clamp((v / max) * 100, 0, 100))}%;background:${color}"></i></span>`;
   }
   function itemChip(id, n) {
     const it = JG.ITEMS[id];
@@ -328,16 +348,20 @@
     $("#btnSound").textContent = A.on ? "Sound on" : "Sound off";
     $("#btnSound").setAttribute("aria-pressed", A.on ? "true" : "false");
   }
-  let feedOpen = false, renaming = false, hatOpen = false;
+  let feedOpen = false, renaming = false, hatOpen = false, panelHtml = "", panelDown = false;
+  $("#panel").addEventListener("pointerdown", () => { panelDown = true; });
+  for (const ev of ["pointerup", "pointercancel"]) addEventListener(ev, () => { panelDown = false; });
   function renderPanel() {
     const p = $("#panel");
     const j = jinxById(G.selected);
     if (!j || G.mode !== "garden") { p.hidden = true; return; }
     p.hidden = false;
+    // Only swap the panel's contents when they have changed: a rebuild in the middle of a tap loses the tap.
+    const set = (html) => { if (panelHtml === html) return false; panelHtml = html; p.innerHTML = html; return true; };
     if (j.stage === "egg") {
-      p.innerHTML = `<div class="p-head"><h2>A warm egg</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
+      set(`<div class="p-head"><h2>A warm egg</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
         <p class="tag">Hatches in about ${Math.ceil(j.hatch)} seconds.</p>
-        <p class="note">Tap it to keep it warm and it hatches sooner.${j.inherit ? (j.inherit.duet ? " A duet egg from " + esc(j.inherit.parents.join(" and ")) + "." : " Something of " + esc(j.inherit.name) + " is in there.") : ""}</p>`;
+        <p class="note">Tap it to keep it warm and it hatches sooner.${j.inherit ? (j.inherit.duet ? " A duet egg from " + esc(j.inherit.parents.join(" and ")) + "." : " Something of " + esc(j.inherit.name) + " is in there.") : ""}</p>`);
       return;
     }
     const st = JG.STATS.map((s) => {
@@ -357,7 +381,7 @@
     const nameHtml = renaming
       ? `<input id="renameBox" maxlength="14" value="${esc(j.name)}" aria-label="New name">`
       : `<h2>${esc(j.name)}</h2>`;
-    p.innerHTML = `<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">\u00D7</button></div>
+    const fresh = set(`<div class="p-head">${nameHtml}<button class="x" data-act="close" aria-label="Close">\u00D7</button></div>
       <p class="tag">${kindName(j)} \u00B7 ${formName(j)} \u00B7 show ${j.age} of 12${j.gen > 1 ? " \u00B7 generation " + j.gen : ""}${rib}</p>
       <div class="row">
         <button class="btn small" data-act="pet">Pet</button>
@@ -376,8 +400,8 @@
       <div class="stats">${st}</div>
       <div class="align"><span>Sludge</span><span class="track"><i style="left:${al}%"></i></span><span>Stardust</span></div>
       <div class="align moon" title="Only matters for a Jinx that stays between Sludge and Stardust: Motley grows into a Harlequin, Moonlit into a Pierrot"><span>Motley</span><span class="track"><i style="left:${(((j.moon || 0) + 1) / 2) * 100}%"></i></span><span>Moonlit</span></div>
-      ${ringHtml(j)}`;
-    if (renaming) {
+      ${ringHtml(j)}`);
+    if (renaming && fresh) {
       const box = $("#renameBox");
       box.focus();
       box.select();
@@ -537,7 +561,7 @@
       }
     }
     G.panelT = (G.panelT || 0) + dt;
-    if (G.panelT > 2 && G.selected && !renaming) { G.panelT = 0; renderPanel(); }
+    if (G.panelT > 2 && G.selected && !renaming && !panelDown) { G.panelT = 0; renderPanel(); }
     G.saveT = (G.saveT || 0) + dt;
     if (G.saveT > 10) { G.saveT = 0; persist(); }
   }
@@ -780,12 +804,14 @@
       <div class="shoplist">${rows}</div>
       <button class="btn ghost" data-act="close">Not now</button>`, {
       close: closeModal,
-      sing: (b) => { const o = jinxById(b.dataset.id); if (o && canDuet(j) && canDuet(o) && s.inv.balloon > 0 && s.jinxes.length < 6) { closeModal(); startDuet(j, o); } }
+      sing: (b) => { if (G.duet) { toast("A duet is already under way."); return; } const o = jinxById(b.dataset.id); if (o && canDuet(j) && canDuet(o) && s.inv.balloon > 0 && s.jinxes.length < 6) { closeModal(); startDuet(j, o); } }
     });
   }
   function startDuet(a, b) {
     const s = G.save;
     s.inv.balloon--;
+    // the egg is decided now and kept in the save, so closing the game mid-song doesn't lose the balloon
+    s.duetEgg = { hue: blendHue(a.hue, b.hue), inherit: duetInherit(a, b) };
     a.duetAge = a.age;
     b.duetAge = b.age;
     deselect();
@@ -818,7 +844,17 @@
     }
     if (d.t > 3.6) {
       const s = G.save, [x, y] = D.toScreen(d.u, d.v);
-      const e = makeEgg({ hue: blendHue(a.hue, b.hue), inherit: duetInherit(a, b), hatch: 45 });
+      const de = s.duetEgg || { hue: blendHue(a.hue, b.hue), inherit: duetInherit(a, b) };
+      delete s.duetEgg;
+      if (s.jinxes.length >= 6) {
+        // the garden filled up while they sang
+        s.inv.balloon = (s.inv.balloon || 0) + 1;
+        toast("The garden filled up, so the Heart Balloon is back in the pantry.");
+        G.duet = null;
+        persist();
+        return;
+      }
+      const e = makeEgg({ hue: de.hue, inherit: de.inherit, hatch: 45 });
       e.u = d.u; e.v = d.v + 0.05;
       s.jinxes.push(e);
       for (const j of [a, b]) { j.mood = clamp(j.mood + 20, 0, 100); j.love = clamp(j.love + 5, 0, 100); j.happyT = 2.5; j.idle = 3; }
@@ -1898,6 +1934,21 @@
     if (!b || b.disabled) return;
     if (b.dataset.do === "cue") cue(); else openSnack();
   });
+  // Escape closes whatever is open, when it has a way to be closed without choosing
+  addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!$("#modal").hidden) { if (modalHandlers.close) modalHandlers.close(); }
+    else if (G.mode === "garden" && G.selected && !G.talent) deselect();
+  });
+  // The small print (statuses, charms, grades, Applause) explains itself on hover. A finger can't hover,
+  // so a tap shows the same words.
+  let lastTouch = false;
+  addEventListener("pointerdown", (e) => { lastTouch = e.pointerType !== "mouse"; }, true);
+  $("#app").addEventListener("click", (e) => {
+    if (!lastTouch) return;
+    const el = e.target.closest("[title]");
+    if (el && !e.target.closest("button, input") && el.title) toast(el.title);
+  });
   addEventListener("keydown", (e) => {
     if (G.mode !== "battle" || !G.B || G.B.busy || G.B.over || !$("#modal").hidden) return;
     if (e.key === "e" || e.key === "E") endTurn();
@@ -2698,7 +2749,8 @@
     const has = !!loadSave();
     $("#titleBtns").innerHTML = has
       ? `<button class="btn big" data-act="continue">Back to my garden</button><button class="btn ghost" data-act="new">Start a new garden</button>`
-      : `<button class="btn big" data-act="new">Open the gates</button>`;
+      : `<button class="btn big" data-act="new">Open the gates</button>` +
+        (saveBroken ? `<p class="note" style="flex-basis:100%">Your saved garden couldn't be opened. A copy has been kept in this browser in case it can be rescued.</p>` : "");
   }
   let confirmNew = false;
   for (const el of document.querySelectorAll(".logo, .hud-logo")) { el.setAttribute("aria-label", el.textContent); el.innerHTML = ransom(el.textContent); }
@@ -2744,6 +2796,14 @@
     }
   });
   $("#btnQuit").addEventListener("click", () => {
+    const r = G.run;
+    if (r && r.act === 1 && r.floor === -1) {
+      // nothing has happened yet: changing your mind costs nothing and doesn't count as a show
+      modal(`<h2>Head back?</h2><p>The show hasn't started, so going home now costs nothing.</p>
+        <div class="row"><button class="btn" data-act="yes">Go home</button><button class="btn ghost" data-act="close">Stay</button></div>`,
+        { close: closeModal, yes: () => { closeModal(); G.B = null; G.selected = r.jid; G.run = null; persist(); setMode("garden"); } });
+      return;
+    }
     modal(`<h2>Leave the circus?</h2><p>Your Jinx comes home as if they fainted: less of what they learned, and only one thing from the bag.</p>
       <div class="row"><button class="btn" data-act="yes">Go home</button><button class="btn ghost" data-act="close">Keep going</button></div>`,
       { close: closeModal, yes: () => { closeModal(); if (G.run) endRun(false); } });

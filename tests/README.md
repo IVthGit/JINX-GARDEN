@@ -29,6 +29,7 @@ In Windows PowerShell, set a setting first and then run the check: `$env:PHONE =
 | `kinds-save` | An old save becoming Umbras, and what duets pass on. |
 | `abilities` | The nine part abilities, one kind at a time, in a real fight. |
 | `rules` | Fight and run rules checked against exact numbers: statuses, Mosh Pit, the Fortune tent, crowd requests, second acts, props, the understudy, snacks, polished cards. Fails if one is wrong. |
+| `comforts` | The small comforts: the side panel under a tap, Escape, tap for small print, a duet cut short, going home early, an unreadable save. Fails if one is wrong. |
 | `stage` | Screenshots of fights in each act: idle, an attack in flight, the hit, a Showstopper, the foe's turn. PLAN=<json> picks the fights. |
 | `defeat` | A foe being beaten, frame by frame. |
 | `foes` | Close-ups of every foe, to check that parts line up. |
@@ -39,7 +40,7 @@ In Windows PowerShell, set a setting first and then run the check: `$env:PHONE =
 | `copies` | Counts the canvas copies in a frame, which is where the time goes. |
 | `music` | Renders every piece of music offline: errors, peak level, clipping. Writes short WAVs to out/. |
 
-A check that ends with `no errors` saw no page errors. Anything visual still needs its pictures looked at:
+A check that ends with `no errors` saw no page errors; one that saw any now fails. Anything visual still needs its pictures looked at:
 a drawing can run without errors and be wrong.
 
 Frame rates here come from software rendering, so they are slower than a real device. Compare them with

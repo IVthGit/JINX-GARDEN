@@ -62,6 +62,6 @@ const OUT = __dirname + '/out/';
   ];
   await run({ width: 1366, height: 768 }, 'd', plan);
   await run({ width: 400, height: 860 }, 'm', [plan[0]]);
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

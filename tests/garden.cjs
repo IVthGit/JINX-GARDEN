@@ -55,6 +55,6 @@ const { chromium } = require('playwright');
     console.log(tag, 'learned', await p.evaluate(() => JSON.stringify(JG.game.save.jinxes.find(j => j.name === 'Tinsel').learned)));
     await p.close();
   }
-  console.log(errs.join('\n') || 'no errors');
+  console.log(errs.join('\n') || 'no errors'); if (errs.length) process.exitCode = 1;
   await b.close();
 })();

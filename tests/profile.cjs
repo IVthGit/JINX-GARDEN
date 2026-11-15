@@ -43,7 +43,7 @@ const { chromium } = require('playwright');
     }
     // how many off-screen canvases have piled up
     console.log('   canvases in memory guess:', await p.evaluate(() => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) + ' MB JS heap' : 'n/a')));
-    console.log(errs.join('\n') || '   no errors');
+    console.log(errs.join('\n') || '   no errors'); if (errs.length) process.exitCode = 1;
     await ctx.close();
   }
   await run({ width: 1366, height: 768 }, 1, 'laptop');

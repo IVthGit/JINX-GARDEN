@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), { spawn } = require('child_process');
 const ROOT = path.join(__dirname, '..'), PORT = +(process.env.JINX_PORT || 8765);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
-const QUICK = ['smoke', 'garden', 'shows', 'kinds-save', 'abilities', 'rules'];
+const QUICK = ['smoke', 'garden', 'shows', 'kinds-save', 'abilities', 'rules', 'comforts'];
 const server = http.createServer((req, res) => {
   const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html';
   const file = path.join(ROOT, rel);

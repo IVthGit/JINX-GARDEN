@@ -365,13 +365,13 @@
     }
     if (!song || switchAt) return;
     const spb = 60 / song.bpm / 4;
+    if (nextT < now - 0.5) nextT = now + 0.05;   // the tab was asleep, or the sound was off: don't try to catch up
     while (nextT < now + 0.16) {
       const s = step % 16, bar = Math.floor(step / 16) % song.bars;
       song.play(song, bar, s, nextT + (s % 2 ? song.swing * spb : 0), spb);
       nextT += spb;
       step++;
     }
-    if (nextT < now - 0.5) nextT = now + 0.05;   // the tab was asleep: don't try to catch up
   };
   // where we are in the bar, 0 to 1, for anything that wants to move in time
   M.phase = function () { return song && c ? ((c.currentTime - nextT) / (60 / song.bpm) + step / 4) % 1 : 0; };
